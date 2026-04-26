@@ -1,182 +1,104 @@
 // ============================================================
-// leads.js - ניהול לידים / אירועים עם קישור ללקוחות
+// leads.js - לוגיקת אירועים (נפרדת מלקוחות!)
 // ============================================================
 
+async function ensureCounter(name, env) {
+  await env.DB.prepare(
+    'INSERT OR IGNORE INTO counters (name, value) VALUES (?, 0)'
+  ).bind(name).run();
+}
+
 async function getNextCounter(name, env) {
+  await ensureCounter(name, env);
+
+  await env.DB.prepare(
+    'UPDATE counters SET value = value + 1 WHERE name = ?'
+  ).bind(name).run();
+
   const row = await env.DB.prepare(
     'SELECT value FROM counters WHERE name = ?'
   ).bind(name).first();
 
-  if (!row) {
-    await env.DB.prepare(
-      'INSERT INTO counters (name, value) VALUES (?, ?)'
-    ).bind(name, 1).run();
-
-    return 1;
-  }
-
-  const nextValue = Number(row.value || 0) + 1;
-
-  await env.DB.prepare(
-    'UPDATE counters SET value = ? WHERE name = ?'
-  ).bind(nextValue, name).run();
-
-  return nextValue;
+  return row.value;
 }
 
-async function linkToContact(leadId, name, phone, email, env) {
-  try {
-    let contact = null;
+// 🔥 הפונקציה הכי חשובה – לא נוגעים בלקוח קיים!
+async function findOrCreateContact(name, phone, email, env) {
+  let contact = null;
 
-    if (phone) {
-      contact = await env.DB.prepare(
-        'SELECT * FROM contacts WHERE phone = ?'
-      ).bind(phone).first();
-    }
+  if (phone) {
+    contact = await env.DB.prepare(
+      'SELECT * FROM contacts WHERE phone = ?'
+    ).bind(phone).first();
+  }
 
-    if (!contact && email) {
-      contact = await env.DB.prepare(
-        'SELECT * FROM contacts WHERE email = ?'
-      ).bind(email).first();
-    }
+  if (!contact && email) {
+    contact = await env.DB.prepare(
+      'SELECT * FROM contacts WHERE email = ?'
+    ).bind(email).first();
+  }
 
-    if (!contact && name) {
-      contact = await env.DB.prepare(
-        'SELECT * FROM contacts WHERE name = ?'
-      ).bind(name).first();
-    }
+  if (!contact) {
+    const contactNum = await getNextCounter('contacts', env);
 
-    if (!contact) {
-      const contactNum = await getNextCounter('contacts', env);
-
-      const r = await env.DB.prepare(
-        `INSERT INTO contacts 
-          (name, phone, email, contact_num, created_at, updated_at)
-         VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
-      ).bind(
-        name || 'לקוח ללא שם',
-        phone || null,
-        email || null,
-        contactNum
-      ).run();
-
-      const contactId = r.meta.last_row_id;
-
-      await env.DB.prepare(
-        'UPDATE leads SET contact_id = ? WHERE id = ?'
-      ).bind(contactId, leadId).run();
-
-      return contactId;
-    }
-
-    await env.DB.prepare(
-      `UPDATE contacts
-       SET 
-         name = COALESCE(?, name),
-         phone = COALESCE(?, phone),
-         email = COALESCE(?, email),
-         updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`
+    const result = await env.DB.prepare(
+      `INSERT INTO contacts
+        (contact_num, name, phone, email, created_at, updated_at)
+       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
     ).bind(
-      name || null,
+      contactNum,
+      name || 'לקוח ללא שם',
       phone || null,
-      email || null,
-      contact.id
+      email || null
     ).run();
 
-    await env.DB.prepare(
-      'UPDATE leads SET contact_id = ? WHERE id = ?'
-    ).bind(contact.id, leadId).run();
-
-    return contact.id;
-
-  } catch (e) {
-    console.log('linkToContact:', e.message);
-    return null;
+    contact = await env.DB.prepare(
+      'SELECT * FROM contacts WHERE id = ?'
+    ).bind(result.meta.last_row_id).first();
   }
+
+  return contact;
 }
 
 export async function handleLeads(request, env, path) {
   const method = request.method;
   const url = new URL(request.url);
 
+  // ===============================
+  // GET ALL
+  // ===============================
   if (path === '/api/leads' && method === 'GET') {
-    const search = url.searchParams.get('search') || '';
-    const status = url.searchParams.get('status') || '';
-
-    let query = `
-      SELECT 
+    const { results } = await env.DB.prepare(`
+      SELECT
         leads.*,
-        contacts.name AS contact_name,
-        contacts.phone AS contact_phone,
-        contacts.email AS contact_email,
-        contacts.contact_num AS contact_num
+        contacts.contact_num,
+        contacts.name AS contact_name
       FROM leads
       LEFT JOIN contacts ON leads.contact_id = contacts.id
-      WHERE 1=1
-    `;
-
-    const params = [];
-
-    if (search) {
-      query += `
-        AND (
-          leads.name LIKE ? 
-          OR leads.phone LIKE ? 
-          OR leads.venue LIKE ?
-          OR contacts.name LIKE ?
-          OR contacts.phone LIKE ?
-          OR contacts.email LIKE ?
-        )
-      `;
-      params.push(
-        `%${search}%`,
-        `%${search}%`,
-        `%${search}%`,
-        `%${search}%`,
-        `%${search}%`,
-        `%${search}%`
-      );
-    }
-
-    if (status) {
-      query += ' AND leads.status = ?';
-      params.push(status);
-    }
-
-    query += `
-      ORDER BY 
-        CASE 
-          WHEN leads.next_contact IS NOT NULL THEN leads.next_contact 
-          ELSE leads.event_date 
-        END ASC,
-        leads.created_at DESC
+      ORDER BY leads.created_at DESC
       LIMIT 200
-    `;
-
-    const { results } = await env.DB.prepare(query).bind(...params).all();
+    `).all();
 
     return { leads: results };
   }
 
   const idMatch = path.match(/^\/api\/leads\/(\d+)$/);
 
+  // ===============================
+  // GET SINGLE
+  // ===============================
   if (idMatch && method === 'GET') {
     const id = idMatch[1];
 
-    const lead = await env.DB.prepare(
-      `SELECT 
+    const lead = await env.DB.prepare(`
+      SELECT
         leads.*,
-        contacts.name AS contact_name,
-        contacts.phone AS contact_phone,
-        contacts.email AS contact_email,
-        contacts.contact_num AS contact_num
-       FROM leads
-       LEFT JOIN contacts ON leads.contact_id = contacts.id
-       WHERE leads.id = ?`
-    ).bind(id).first();
-
-    if (!lead) throw new Error('ליד לא נמצא');
+        contacts.contact_num,
+        contacts.name AS contact_name
+      FROM leads
+      LEFT JOIN contacts ON leads.contact_id = contacts.id
+      WHERE leads.id = ?
+    `).bind(id).first();
 
     const { results: notes } = await env.DB.prepare(
       'SELECT * FROM lead_notes WHERE lead_id = ? ORDER BY created_at DESC'
@@ -185,16 +107,28 @@ export async function handleLeads(request, env, path) {
     return { lead, notes };
   }
 
+  // ===============================
+  // CREATE EVENT
+  // ===============================
   if (path === '/api/leads' && method === 'POST') {
     const b = await request.json();
 
-    if (!b.name) throw new Error('שם לקוח חובה');
+    if (!b.name) throw new Error('שם חובה');
+
+    // 🔥 קודם מזהים/יוצרים לקוח
+    const contact = await findOrCreateContact(
+      b.name,
+      b.phone,
+      b.email,
+      env
+    );
 
     const leadNum = await getNextCounter('leads', env);
 
-    const result = await env.DB.prepare(
-      `INSERT INTO leads (
+    const result = await env.DB.prepare(`
+      INSERT INTO leads (
         lead_num,
+        contact_id,
         name,
         phone,
         email,
@@ -205,17 +139,14 @@ export async function handleLeads(request, env, path) {
         attractions,
         price,
         deposit,
-        deposit_date,
-        balance_paid,
         status,
-        last_contact,
-        next_contact,
         details,
         notes
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
       leadNum,
+      contact.id,
       b.name,
       b.phone || null,
       b.email || null,
@@ -226,31 +157,28 @@ export async function handleLeads(request, env, path) {
       JSON.stringify(b.attractions || []),
       b.price || 0,
       b.deposit || 0,
-      b.deposit_date || null,
-      b.balance_paid ? 1 : 0,
       b.status || 'lead',
-      b.last_contact || null,
-      b.next_contact || null,
       b.details || null,
       b.notes || null
     ).run();
 
-    const newId = result.meta.last_row_id;
-
-    await linkToContact(newId, b.name, b.phone, b.email, env);
-
-    return { success: true, id: newId, lead_num: leadNum };
+    return {
+      success: true,
+      id: result.meta.last_row_id,
+      lead_num: leadNum,
+      contact_id: contact.id
+    };
   }
 
+  // ===============================
+  // UPDATE EVENT
+  // ===============================
   if (idMatch && method === 'PUT') {
     const id = idMatch[1];
     const b = await request.json();
 
-    await env.DB.prepare(
-      `UPDATE leads SET
-        name = ?,
-        phone = ?,
-        email = ?,
+    await env.DB.prepare(`
+      UPDATE leads SET
         event_type = ?,
         event_date = ?,
         event_time = ?,
@@ -258,19 +186,12 @@ export async function handleLeads(request, env, path) {
         attractions = ?,
         price = ?,
         deposit = ?,
-        deposit_date = ?,
-        balance_paid = ?,
         status = ?,
-        last_contact = ?,
-        next_contact = ?,
         details = ?,
         notes = ?,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?`
-    ).bind(
-      b.name,
-      b.phone || null,
-      b.email || null,
+      WHERE id = ?
+    `).bind(
       b.event_type || null,
       b.event_date || null,
       b.event_time || null,
@@ -278,21 +199,18 @@ export async function handleLeads(request, env, path) {
       JSON.stringify(b.attractions || []),
       b.price || 0,
       b.deposit || 0,
-      b.deposit_date || null,
-      b.balance_paid ? 1 : 0,
       b.status || 'lead',
-      b.last_contact || null,
-      b.next_contact || null,
       b.details || null,
       b.notes || null,
       id
     ).run();
 
-    await linkToContact(id, b.name, b.phone, b.email, env);
-
     return { success: true };
   }
 
+  // ===============================
+  // DELETE
+  // ===============================
   if (idMatch && method === 'DELETE') {
     await env.DB.prepare(
       'DELETE FROM lead_notes WHERE lead_id = ?'
@@ -301,20 +219,6 @@ export async function handleLeads(request, env, path) {
     await env.DB.prepare(
       'DELETE FROM leads WHERE id = ?'
     ).bind(idMatch[1]).run();
-
-    return { success: true };
-  }
-
-  const noteMatch = path.match(/^\/api\/leads\/(\d+)\/notes$/);
-
-  if (noteMatch && method === 'POST') {
-    const { note } = await request.json();
-
-    if (!note) throw new Error('הערה ריקה');
-
-    await env.DB.prepare(
-      'INSERT INTO lead_notes (lead_id, note) VALUES (?, ?)'
-    ).bind(noteMatch[1], note).run();
 
     return { success: true };
   }
@@ -384,7 +288,7 @@ export async function handleDashboard(request, env, path) {
   const today = now.toISOString().split('T')[0];
 
   const { results: followUps } = await env.DB.prepare(
-    `SELECT 
+    `SELECT
       leads.*,
       contacts.contact_num AS contact_num,
       contacts.name AS contact_name
@@ -397,7 +301,7 @@ export async function handleDashboard(request, env, path) {
   ).bind(today).all();
 
   const { results: upcoming } = await env.DB.prepare(
-    `SELECT 
+    `SELECT
       leads.*,
       contacts.contact_num AS contact_num,
       contacts.name AS contact_name
@@ -410,7 +314,7 @@ export async function handleDashboard(request, env, path) {
   ).bind(today).all();
 
   const { results: recentLeads } = await env.DB.prepare(
-    `SELECT 
+    `SELECT
       leads.*,
       contacts.contact_num AS contact_num,
       contacts.name AS contact_name
@@ -421,7 +325,7 @@ export async function handleDashboard(request, env, path) {
   ).all();
 
   const { results: allLeads } = await env.DB.prepare(
-    `SELECT 
+    `SELECT
       leads.id,
       leads.lead_num,
       leads.name,
@@ -435,7 +339,7 @@ export async function handleDashboard(request, env, path) {
       contacts.name AS contact_name
      FROM leads
      LEFT JOIN contacts ON leads.contact_id = contacts.id
-     WHERE leads.event_date IS NOT NULL 
+     WHERE leads.event_date IS NOT NULL
         OR leads.next_contact IS NOT NULL`
   ).all();
 
@@ -457,7 +361,6 @@ export async function handleDashboard(request, env, path) {
   };
 }
 
-// פונקציה לסנכרון אוטומטי כאשר סטטוס משתנה ל-closed
 export async function autoSyncToCalendar(leadId, newStatus, env) {
   if (newStatus !== 'closed') return;
 
