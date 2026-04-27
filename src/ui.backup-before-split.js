@@ -1,10 +1,10 @@
-export function serveHTML() {
+﻿export function serveHTML() {
   return `<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CRM | אטרקציות לאירועים</title>
+<title>CRM | ׳׳˜׳¨׳§׳¦׳™׳•׳× ׳׳׳™׳¨׳•׳¢׳™׳</title>
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -228,176 +228,177 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 <div id="login-page">
   <div class="login-card">
     <div class="login-top">
-      <div class="login-icon">🎈</div>
-      <div class="login-title">אטרקציות CRM</div>
-      <div class="login-sub">ניהול לקוחות ואירועים</div>
+      <div class="login-icon">נˆ</div>
+      <div class="login-title">׳׳˜׳¨׳§׳¦׳™׳•׳× CRM</div>
+      <div class="login-sub">׳ ׳™׳”׳•׳ ׳׳§׳•׳—׳•׳× ׳•׳׳™׳¨׳•׳¢׳™׳</div>
     </div>
     <div class="login-error" id="login-error"></div>
-    <div class="form-group"><label class="form-label">אימייל</label><input class="form-input" type="email" id="login-email" placeholder="your@email.com"></div>
-    <div class="form-group"><label class="form-label">סיסמה</label><input class="form-input" type="password" id="login-password" placeholder=""></div>
-    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:11px;margin-top:6px" id="login-btn">כניסה</button>
+    <div class="form-group"><label class="form-label">׳׳™׳׳™׳™׳</label><input class="form-input" type="email" id="login-email" placeholder="your@email.com"></div>
+    <div class="form-group"><label class="form-label">׳¡׳™׳¡׳׳”</label><input class="form-input" type="password" id="login-password" placeholder=""></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:11px;margin-top:6px" id="login-btn">׳›׳ ׳™׳¡׳”</button>
   </div>
 </div>
 <div id="app" style="display:none">
   <div id="sidebar">
     <div class="sidebar-logo">
       <div class="logo-row">
-        <div class="logo-icon">🎈</div>
-        <div><div class="logo-title">אטרקציות CRM</div><div class="logo-sub">ניהול אירועים</div></div>
+        <div class="logo-icon">נˆ</div>
+        <div><div class="logo-title">׳׳˜׳¨׳§׳¦׳™׳•׳× CRM</div><div class="logo-sub">׳ ׳™׳”׳•׳ ׳׳™׳¨׳•׳¢׳™׳</div></div>
       </div>
     </div>
-    <div class="nav-section">תפריט</div>
-    <div class="nav-item active" id="nav-dashboard"><span class="nav-icon">📊</span> דאשבורד</div>
-    <div class="nav-item" id="nav-leads"><span class="nav-icon">👥</span> לקוחות <span class="nav-badge" id="nav-leads-count" style="display:none">0</span></div>
-    <div class="nav-item" id="nav-calendar"><span class="nav-icon">📅</span> יומן אירועים</div>
+    <div class="nav-section">׳×׳₪׳¨׳™׳˜</div>
+    <div class="nav-item active" id="nav-dashboard"><span class="nav-icon">נ“</span> ׳“׳׳©׳‘׳•׳¨׳“</div>
+    <div class="nav-item" id="nav-leads"><span class="nav-icon">נ‘¥</span> ׳׳§׳•׳—׳•׳× <span class="nav-badge" id="nav-leads-count" style="display:none">0</span></div>
+    <div class="nav-item" id="nav-customers"><span class="nav-icon">נ·ן¸</span> ׳›׳¨׳˜׳™׳¡׳™ ׳׳§׳•׳—</div>
+    <div class="nav-item" id="nav-calendar"><span class="nav-icon">נ“…</span> ׳™׳•׳׳ ׳׳™׳¨׳•׳¢׳™׳</div>
     <div id="gcal-status" style="margin:8px;padding:10px 12px;border-radius:8px;font-size:12px;display:none"></div>
     <div class="sidebar-bottom">
       <div class="user-row">
-        <div class="user-avatar" id="user-avatar">מ</div>
-        <div><div class="user-name" id="user-name">טוען...</div><div class="user-role">מנהל</div></div>
-        <button class="logout-btn" id="logout-btn">יציאה</button>
+        <div class="user-avatar" id="user-avatar">׳</div>
+        <div><div class="user-name" id="user-name">׳˜׳•׳¢׳...</div><div class="user-role">׳׳ ׳”׳</div></div>
+        <button class="logout-btn" id="logout-btn">׳™׳¦׳™׳׳”</button>
       </div>
     </div>
   </div>
   <div id="main">
     <div id="page-dashboard" class="page active">
       <div class="page-header">
-        <div class="page-title">שלום! 👋 <small id="dash-date"></small></div>
-        <button class="btn btn-primary" id="btn-new-lead">+ ליד חדש</button>
+        <div class="page-title">׳©׳׳•׳! נ‘‹ <small id="dash-date"></small></div>
+        <button class="btn btn-primary" id="btn-new-lead">+ ׳׳™׳“ ׳—׳“׳©</button>
       </div>
       <div class="stats-grid">
-        <div class="stat-card purple"><div class="stat-icon-wrap">👥</div><div><div class="stat-label">סה"כ לידים</div><div class="stat-value" id="stat-total">—</div></div></div>
-        <div class="stat-card green"><div class="stat-icon-wrap">✅</div><div><div class="stat-label">עסקאות סגורות</div><div class="stat-value" id="stat-closed">—</div></div></div>
-        <div class="stat-card orange"><div class="stat-icon-wrap">📋</div><div><div class="stat-label">הצעות מחיר</div><div class="stat-value" id="stat-quotes">—</div></div></div>
+        <div class="stat-card purple"><div class="stat-icon-wrap">נ‘¥</div><div><div class="stat-label">׳¡׳”"׳› ׳׳™׳“׳™׳</div><div class="stat-value" id="stat-total">ג€”</div></div></div>
+        <div class="stat-card green"><div class="stat-icon-wrap">ג…</div><div><div class="stat-label">׳¢׳¡׳§׳׳•׳× ׳¡׳’׳•׳¨׳•׳×</div><div class="stat-value" id="stat-closed">ג€”</div></div></div>
+        <div class="stat-card orange"><div class="stat-icon-wrap">נ“‹</div><div><div class="stat-label">׳”׳¦׳¢׳•׳× ׳׳—׳™׳¨</div><div class="stat-value" id="stat-quotes">ג€”</div></div></div>
         <div class="stat-card blue" style="flex-direction:column;align-items:flex-start;gap:6px">
-          <div style="display:flex;align-items:center;gap:10px"><div class="stat-icon-wrap">💰</div><div><div class="stat-label">הכנסות</div><div class="stat-value" id="stat-revenue">—</div></div></div>
+          <div style="display:flex;align-items:center;gap:10px"><div class="stat-icon-wrap">נ’°</div><div><div class="stat-label">׳”׳›׳ ׳¡׳•׳×</div><div class="stat-value" id="stat-revenue">ג€”</div></div></div>
           <div class="revenue-grid">
-            <div class="rev-box prev"><div class="rev-box-label">חודש קודם</div><div class="rev-box-value" id="rev-prev">—</div></div>
-            <div class="rev-box curr"><div class="rev-box-label">החודש</div><div class="rev-box-value" id="rev-curr">—</div></div>
-            <div class="rev-box next"><div class="rev-box-label">חודש הבא</div><div class="rev-box-value" id="rev-next">—</div></div>
+            <div class="rev-box prev"><div class="rev-box-label">׳—׳•׳“׳© ׳§׳•׳“׳</div><div class="rev-box-value" id="rev-prev">ג€”</div></div>
+            <div class="rev-box curr"><div class="rev-box-label">׳”׳—׳•׳“׳©</div><div class="rev-box-value" id="rev-curr">ג€”</div></div>
+            <div class="rev-box next"><div class="rev-box-label">׳—׳•׳“׳© ׳”׳‘׳</div><div class="rev-box-value" id="rev-next">ג€”</div></div>
           </div>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:18px">
-        <div class="dash-section"><div class="dash-section-title">🔔 מעקב — להתקשר היום</div><div id="dash-followups"><div class="dash-empty">טוען...</div></div></div>
-        <div class="dash-section"><div class="dash-section-title">📅 אירועים קרובים</div><div id="dash-upcoming"><div class="dash-empty">טוען...</div></div></div>
-        <div class="mini-cal" id="mini-cal"><div class="dash-empty">טוען...</div></div>
+        <div class="dash-section"><div class="dash-section-title">נ”” ׳׳¢׳§׳‘ ג€” ׳׳”׳×׳§׳©׳¨ ׳”׳™׳•׳</div><div id="dash-followups"><div class="dash-empty">׳˜׳•׳¢׳...</div></div></div>
+        <div class="dash-section"><div class="dash-section-title">נ“… ׳׳™׳¨׳•׳¢׳™׳ ׳§׳¨׳•׳‘׳™׳</div><div id="dash-upcoming"><div class="dash-empty">׳˜׳•׳¢׳...</div></div></div>
+        <div class="mini-cal" id="mini-cal"><div class="dash-empty">׳˜׳•׳¢׳...</div></div>
       </div>
-      <div class="dash-section" style="margin-top:18px"><div class="dash-section-title">🕐 לידים אחרונים</div><div id="dash-recent"><div class="dash-empty">טוען...</div></div></div>
+      <div class="dash-section" style="margin-top:18px"><div class="dash-section-title">נ• ׳׳™׳“׳™׳ ׳׳—׳¨׳•׳ ׳™׳</div><div id="dash-recent"><div class="dash-empty">׳˜׳•׳¢׳...</div></div></div>
     </div>
     <div id="page-leads" class="page">
-      <div class="page-header"><div class="page-title">לקוחות ולידים</div><button class="btn btn-primary" id="btn-new-lead2">+ ליד חדש</button></div>
+      <div class="page-header"><div class="page-title">׳׳§׳•׳—׳•׳× ׳•׳׳™׳“׳™׳</div><button class="btn btn-primary" id="btn-new-lead2">+ ׳׳™׳“ ׳—׳“׳©</button></div>
       <div class="table-card">
         <div class="table-toolbar">
-          <input class="search-input" type="text" placeholder="חיפוש שם / טלפון / אולם..." id="leads-search">
-          <select class="filter-select" id="leads-status-filter"><option value="">כל הסטטוסים</option><option value="lead">ליד</option><option value="quote">הצעת מחיר</option><option value="closed">סגור</option><option value="cancelled">בוטל</option></select>
-          <select class="filter-select" id="leads-event-filter"><option value="">כל סוגי האירועים</option><option>חתונה</option><option>בר מצווה</option><option>בת מצווה</option><option>יום הולדת</option><option>אירוע חברה</option><option>ברית</option><option>הפרשת חלה</option><option>אחר</option></select>
+          <input class="search-input" type="text" placeholder="׳—׳™׳₪׳•׳© ׳©׳ / ׳˜׳׳₪׳•׳ / ׳׳•׳׳..." id="leads-search">
+          <select class="filter-select" id="leads-status-filter"><option value="">׳›׳ ׳”׳¡׳˜׳˜׳•׳¡׳™׳</option><option value="lead">׳׳™׳“</option><option value="quote">׳”׳¦׳¢׳× ׳׳—׳™׳¨</option><option value="closed">׳¡׳’׳•׳¨</option><option value="cancelled">׳‘׳•׳˜׳</option></select>
+          <select class="filter-select" id="leads-event-filter"><option value="">׳›׳ ׳¡׳•׳’׳™ ׳”׳׳™׳¨׳•׳¢׳™׳</option><option>׳—׳×׳•׳ ׳”</option><option>׳‘׳¨ ׳׳¦׳•׳•׳”</option><option>׳‘׳× ׳׳¦׳•׳•׳”</option><option>׳™׳•׳ ׳”׳•׳׳“׳×</option><option>׳׳™׳¨׳•׳¢ ׳—׳‘׳¨׳”</option><option>׳‘׳¨׳™׳×</option><option>׳”׳₪׳¨׳©׳× ׳—׳׳”</option><option>׳׳—׳¨</option></select>
         </div>
-        <table><thead><tr><th></th><th>שם לקוח</th><th>טלפון</th><th>סוג אירוע</th><th>תאריך</th><th>אולם</th><th>מחיר</th><th>סטטוס</th><th>מעקב הבא</th><th></th></tr></thead><tbody id="leads-body"><tr class="empty-row"><td colspan="10">טוען...</td></tr></tbody></table>
+        <table><thead><tr><th></th><th>׳©׳ ׳׳§׳•׳—</th><th>׳˜׳׳₪׳•׳</th><th>׳¡׳•׳’ ׳׳™׳¨׳•׳¢</th><th>׳×׳׳¨׳™׳</th><th>׳׳•׳׳</th><th>׳׳—׳™׳¨</th><th>׳¡׳˜׳˜׳•׳¡</th><th>׳׳¢׳§׳‘ ׳”׳‘׳</th><th></th></tr></thead><tbody id="leads-body"><tr class="empty-row"><td colspan="10">׳˜׳•׳¢׳...</td></tr></tbody></table>
       </div>
     </div>
     <div id="page-customers" class="page">
       <div class="page-header">
-        <div class="page-title">כרטיסי לקוח <small>לקוחות חוזרים וכל האירועים שלהם</small></div>
+        <div class="page-title">׳›׳¨׳˜׳™׳¡׳™ ׳׳§׳•׳— <small>׳׳§׳•׳—׳•׳× ׳—׳•׳–׳¨׳™׳ ׳•׳›׳ ׳”׳׳™׳¨׳•׳¢׳™׳ ׳©׳׳”׳</small></div>
       </div>
       <div class="table-card">
         <div class="table-toolbar">
-          <input class="search-input" type="text" placeholder="חיפוש לקוח לפי שם / טלפון / אימייל..." id="customers-search">
+          <input class="search-input" type="text" placeholder="׳—׳™׳₪׳•׳© ׳׳§׳•׳— ׳׳₪׳™ ׳©׳ / ׳˜׳׳₪׳•׳ / ׳׳™׳׳™׳™׳..." id="customers-search">
         </div>
         <div id="customers-grid" style="padding:16px">
-          <div class="dash-empty">טוען...</div>
+          <div class="dash-empty">׳˜׳•׳¢׳...</div>
         </div>
       </div>
     </div>
     <div id="page-calendar" class="page">
-      <div class="page-header"><div class="page-title">יומן אירועים 📅</div></div>
+      <div class="page-header"><div class="page-title">׳™׳•׳׳ ׳׳™׳¨׳•׳¢׳™׳ נ“…</div></div>
       <div class="table-card">
-        <table><thead><tr><th>תאריך</th><th>שם לקוח</th><th>סוג אירוע</th><th>אולם</th><th>שעה</th><th>אטרקציות</th><th>מחיר</th><th>סטטוס תשלום</th></tr></thead><tbody id="calendar-body"><tr class="empty-row"><td colspan="8">טוען...</td></tr></tbody></table>
+        <table><thead><tr><th>׳×׳׳¨׳™׳</th><th>׳©׳ ׳׳§׳•׳—</th><th>׳¡׳•׳’ ׳׳™׳¨׳•׳¢</th><th>׳׳•׳׳</th><th>׳©׳¢׳”</th><th>׳׳˜׳¨׳§׳¦׳™׳•׳×</th><th>׳׳—׳™׳¨</th><th>׳¡׳˜׳˜׳•׳¡ ׳×׳©׳׳•׳</th></tr></thead><tbody id="calendar-body"><tr class="empty-row"><td colspan="8">׳˜׳•׳¢׳...</td></tr></tbody></table>
       </div>
     </div>
   </div>
 </div>
 <div class="modal-overlay" id="modal-lead">
   <div class="modal">
-    <div class="modal-header"><h2 id="modal-lead-title">ליד חדש</h2><button class="modal-close" id="modal-close-btn">✕</button></div>
+    <div class="modal-header"><h2 id="modal-lead-title">׳׳™׳“ ׳—׳“׳©</h2><button class="modal-close" id="modal-close-btn">ג•</button></div>
     <div class="modal-body">
       <input type="hidden" id="lead-id">
-      <div class="form-section">פרטי לקוח</div>
+      <div class="form-section">׳₪׳¨׳˜׳™ ׳׳§׳•׳—</div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">שם לקוח *</label>
+        <div class="form-group"><label class="form-label">׳©׳ ׳׳§׳•׳— *</label>
           <div style="position:relative">
-            <input class="form-input" id="l-name" placeholder="ישראל ישראלי" autocomplete="off">
+            <input class="form-input" id="l-name" placeholder="׳™׳©׳¨׳׳ ׳™׳©׳¨׳׳׳™" autocomplete="off">
             <div id="ac-name" class="ac-dropdown"></div>
           </div>
-          <div class="dup-warning" id="dup-name">טוען...</div>
+          <div class="dup-warning" id="dup-name">׳˜׳•׳¢׳...</div>
         </div>
-        <div class="form-group"><label class="form-label">טלפון</label>
+        <div class="form-group"><label class="form-label">׳˜׳׳₪׳•׳</label>
           <div style="position:relative">
             <input class="form-input" id="l-phone" placeholder="050-0000000" type="tel" autocomplete="off">
             <div id="ac-phone" class="ac-dropdown"></div>
           </div>
-          <div class="dup-warning" id="dup-phone">טוען...</div>
+          <div class="dup-warning" id="dup-phone">׳˜׳•׳¢׳...</div>
         </div>
       </div>
-      <div class="form-group"><label class="form-label">אימייל</label>
+      <div class="form-group"><label class="form-label">׳׳™׳׳™׳™׳</label>
         <div style="position:relative">
           <input class="form-input" id="l-email" placeholder="email@example.com" type="email" autocomplete="off">
           <div id="ac-email" class="ac-dropdown"></div>
         </div>
       </div>
-      <div class="form-section">פרטי האירוע</div>
+      <div class="form-section">׳₪׳¨׳˜׳™ ׳”׳׳™׳¨׳•׳¢</div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">סוג אירוע</label><select class="form-select" id="l-event-type"><option value="">בחר סוג...</option><option>חתונה</option><option>בר מצווה</option><option>בת מצווה</option><option>יום הולדת</option><option>אירוע חברה</option><option>ברית</option><option>הפרשת חלה</option><option>אחר</option></select></div>
-        <div class="form-group"><label class="form-label">סטטוס</label><select class="form-select" id="l-status"><option value="lead">ליד</option><option value="quote">הצעת מחיר</option><option value="closed">סגור</option><option value="cancelled">בוטל</option></select></div>
+        <div class="form-group"><label class="form-label">׳¡׳•׳’ ׳׳™׳¨׳•׳¢</label><select class="form-select" id="l-event-type"><option value="">׳‘׳—׳¨ ׳¡׳•׳’...</option><option>׳—׳×׳•׳ ׳”</option><option>׳‘׳¨ ׳׳¦׳•׳•׳”</option><option>׳‘׳× ׳׳¦׳•׳•׳”</option><option>׳™׳•׳ ׳”׳•׳׳“׳×</option><option>׳׳™׳¨׳•׳¢ ׳—׳‘׳¨׳”</option><option>׳‘׳¨׳™׳×</option><option>׳”׳₪׳¨׳©׳× ׳—׳׳”</option><option>׳׳—׳¨</option></select></div>
+        <div class="form-group"><label class="form-label">׳¡׳˜׳˜׳•׳¡</label><select class="form-select" id="l-status"><option value="lead">׳׳™׳“</option><option value="quote">׳”׳¦׳¢׳× ׳׳—׳™׳¨</option><option value="closed">׳¡׳’׳•׳¨</option><option value="cancelled">׳‘׳•׳˜׳</option></select></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">תאריך אירוע</label><input class="form-input" id="l-event-date" type="date"></div>
-        <div class="form-group"><label class="form-label">שעה</label><input class="form-input" id="l-event-time" type="time"></div>
+        <div class="form-group"><label class="form-label">׳×׳׳¨׳™׳ ׳׳™׳¨׳•׳¢</label><input class="form-input" id="l-event-date" type="date"></div>
+        <div class="form-group"><label class="form-label">׳©׳¢׳”</label><input class="form-input" id="l-event-time" type="time"></div>
       </div>
-      <div class="form-group"><label class="form-label">אולם / מיקום</label><input class="form-input" id="l-venue" placeholder="שם האולם / עיר"></div>
-      <div class="form-section">אטרקציות</div>
+      <div class="form-group"><label class="form-label">׳׳•׳׳ / ׳׳™׳§׳•׳</label><input class="form-input" id="l-venue" placeholder="׳©׳ ׳”׳׳•׳׳ / ׳¢׳™׳¨"></div>
+      <div class="form-section">׳׳˜׳¨׳§׳¦׳™׳•׳×</div>
       <div class="check-grid" id="attractions-grid">
-        <label class="check-item"><input type="checkbox" value="בלונים"> 🎈 בלונים</label>
-        <label class="check-item"><input type="checkbox" value="עמדת צילום"> 📸 עמדת צילום</label>
-        <label class="check-item"><input type="checkbox" value="צילום מגנטים"> 🧲 צילום מגנטים</label>
-        <label class="check-item"><input type="checkbox" value="זיקוקים"> 🎆 זיקוקים</label>
+        <label class="check-item"><input type="checkbox" value="׳‘׳׳•׳ ׳™׳"> נˆ ׳‘׳׳•׳ ׳™׳</label>
+        <label class="check-item"><input type="checkbox" value="׳¢׳׳“׳× ׳¦׳™׳׳•׳"> נ“¸ ׳¢׳׳“׳× ׳¦׳™׳׳•׳</label>
+        <label class="check-item"><input type="checkbox" value="׳¦׳™׳׳•׳ ׳׳’׳ ׳˜׳™׳"> נ§² ׳¦׳™׳׳•׳ ׳׳’׳ ׳˜׳™׳</label>
+        <label class="check-item"><input type="checkbox" value="׳–׳™׳§׳•׳§׳™׳"> נ† ׳–׳™׳§׳•׳§׳™׳</label>
       </div>
-      <div class="form-section">כספים</div>
+      <div class="form-section">׳›׳¡׳₪׳™׳</div>
       <div class="form-row-3">
-        <div class="form-group"><label class="form-label">מחיר סופי (₪)</label><input class="form-input" id="l-price" type="number" placeholder="0"></div>
-        <div class="form-group"><label class="form-label">מקדמה ששולמה (₪)</label><input class="form-input" id="l-deposit" type="number" placeholder="0"></div>
-        <div class="form-group"><label class="form-label">תאריך מקדמה</label><input class="form-input" id="l-deposit-date" type="date"></div>
+        <div class="form-group"><label class="form-label">׳׳—׳™׳¨ ׳¡׳•׳₪׳™ (ג‚×)</label><input class="form-input" id="l-price" type="number" placeholder="0"></div>
+        <div class="form-group"><label class="form-label">׳׳§׳“׳׳” ׳©׳©׳•׳׳׳” (ג‚×)</label><input class="form-input" id="l-deposit" type="number" placeholder="0"></div>
+        <div class="form-group"><label class="form-label">׳×׳׳¨׳™׳ ׳׳§׳“׳׳”</label><input class="form-input" id="l-deposit-date" type="date"></div>
       </div>
-      <div class="form-group"><label class="check-item" id="balance-paid-check" style="display:inline-flex;width:auto"><input type="checkbox" id="l-balance-paid"> יתרה שולמה במלואה</label></div>
-      <div class="form-section">מעקב</div>
+      <div class="form-group"><label class="check-item" id="balance-paid-check" style="display:inline-flex;width:auto"><input type="checkbox" id="l-balance-paid"> ׳™׳×׳¨׳” ׳©׳•׳׳׳” ׳‘׳׳׳•׳׳”</label></div>
+      <div class="form-section">׳׳¢׳§׳‘</div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">תאריך קשר אחרון</label><input class="form-input" id="l-last-contact" type="date"></div>
-        <div class="form-group"><label class="form-label">תאריך קשר הבא</label><input class="form-input" id="l-next-contact" type="date"></div>
+        <div class="form-group"><label class="form-label">׳×׳׳¨׳™׳ ׳§׳©׳¨ ׳׳—׳¨׳•׳</label><input class="form-input" id="l-last-contact" type="date"></div>
+        <div class="form-group"><label class="form-label">׳×׳׳¨׳™׳ ׳§׳©׳¨ ׳”׳‘׳</label><input class="form-input" id="l-next-contact" type="date"></div>
       </div>
-      <div class="form-section">פרטים נוספים</div>
-      <div class="form-group"><label class="form-label">פרטי אירוע</label><textarea class="form-textarea" id="l-details" placeholder="פרטים נוספים..."></textarea></div>
-      <div class="form-group"><label class="form-label">הערות פנימיות</label><textarea class="form-textarea" id="l-notes" placeholder="הערות..."></textarea></div>
+      <div class="form-section">׳₪׳¨׳˜׳™׳ ׳ ׳•׳¡׳₪׳™׳</div>
+      <div class="form-group"><label class="form-label">׳₪׳¨׳˜׳™ ׳׳™׳¨׳•׳¢</label><textarea class="form-textarea" id="l-details" placeholder="׳₪׳¨׳˜׳™׳ ׳ ׳•׳¡׳₪׳™׳..."></textarea></div>
+      <div class="form-group"><label class="form-label">׳”׳¢׳¨׳•׳× ׳₪׳ ׳™׳׳™׳•׳×</label><textarea class="form-textarea" id="l-notes" placeholder="׳”׳¢׳¨׳•׳×..."></textarea></div>
     </div>
-    <div class="modal-footer"><button class="btn btn-secondary" id="modal-cancel-btn">ביטול</button><button class="btn btn-primary" id="modal-save-btn">שמור</button></div>
+    <div class="modal-footer"><button class="btn btn-secondary" id="modal-cancel-btn">׳‘׳™׳˜׳•׳</button><button class="btn btn-primary" id="modal-save-btn">׳©׳׳•׳¨</button></div>
   </div>
 </div>
 <div class="modal-overlay" id="modal-customer">
   <div class="modal" style="width:760px">
     <div class="modal-header">
-      <h2 id="customer-modal-title">כרטיס לקוח</h2>
-      <button class="modal-close" id="customer-modal-close">✕</button>
+      <h2 id="customer-modal-title">׳›׳¨׳˜׳™׳¡ ׳׳§׳•׳—</h2>
+      <button class="modal-close" id="customer-modal-close">ג•</button>
     </div>
-    <div class="modal-body" id="customer-modal-body">טוען...</div>
+    <div class="modal-body" id="customer-modal-body">׳˜׳•׳¢׳...</div>
   </div>
 </div>
 <div class="drawer-overlay" id="drawer-overlay"></div>
 <div class="drawer" id="lead-drawer">
   <div class="drawer-header">
-    <div class="drawer-title" id="drawer-title">פרטי לקוח</div>
-    <div style="display:flex;gap:8px"><button class="btn btn-ghost btn-sm" id="drawer-edit-btn">עריכה</button><button class="btn btn-ghost btn-sm" id="drawer-sync-btn" title="סנכרן ל-Google Calendar" style="display:none">📅 סנכרן</button><button class="modal-close" id="drawer-close-btn">✕</button></div>
+    <div class="drawer-title" id="drawer-title">׳₪׳¨׳˜׳™ ׳׳§׳•׳—</div>
+    <div style="display:flex;gap:8px"><button class="btn btn-ghost btn-sm" id="drawer-edit-btn">׳¢׳¨׳™׳›׳”</button><button class="btn btn-ghost btn-sm" id="drawer-sync-btn" title="׳¡׳ ׳›׳¨׳ ׳-Google Calendar" style="display:none">נ“… ׳¡׳ ׳›׳¨׳</button><button class="modal-close" id="drawer-close-btn">ג•</button></div>
   </div>
-  <div class="drawer-body" id="drawer-body">טוען...</div>
-  <div class="drawer-footer"><div class="note-input-row"><input class="note-input" id="new-note-input" placeholder="הוסף הערה..."><button class="btn btn-primary btn-sm" id="add-note-btn">הוסף</button></div></div>
+  <div class="drawer-body" id="drawer-body">׳˜׳•׳¢׳...</div>
+  <div class="drawer-footer"><div class="note-input-row"><input class="note-input" id="new-note-input" placeholder="׳”׳•׳¡׳£ ׳”׳¢׳¨׳”..."><button class="btn btn-primary btn-sm" id="add-note-btn">׳”׳•׳¡׳£</button></div></div>
 </div>
 <div class="toast-container" id="toasts"></div>
 <script>
@@ -416,13 +417,7 @@ function init() {
 
   document.getElementById('login-btn').addEventListener('click', doLogin);
   document.getElementById('logout-btn').addEventListener('click', logout);
-document.getElementById('btn-new-lead').addEventListener('click', function() {
-  goTo('customers', document.getElementById('nav-leads'));
-});
-
-document.getElementById('btn-new-lead2').addEventListener('click', function() {
-  goTo('customers', document.getElementById('nav-leads'));
-});  document.getElementById('modal-close-btn').addEventListener('click', closeLeadModal);
+document.getElementById('btn-new-lead').addEventListener('click', function() { goTo('customers', document.getElementById('nav-leads')); });`r`n  document.getElementById('btn-new-lead2').addEventListener('click', function() { goTo('customers', document.getElementById('nav-leads')); });  document.getElementById('modal-close-btn').addEventListener('click', closeLeadModal);
   document.getElementById('modal-cancel-btn').addEventListener('click', closeLeadModal);
   document.getElementById('modal-save-btn').addEventListener('click', saveLead);
   document.getElementById('drawer-close-btn').addEventListener('click', closeDrawer);
@@ -498,7 +493,7 @@ function doLogin() {
     localStorage.setItem('crm_user', JSON.stringify(currentUser));
     showApp();
   }).catch(function(e) {
-    errEl.textContent = e.message || 'שגיאה בכניסה';
+    errEl.textContent = e.message || '׳©׳’׳™׳׳” ׳‘׳›׳ ׳™׳¡׳”';
     errEl.style.display = 'block';
   });
 }
@@ -507,7 +502,7 @@ function showApp() {
   document.getElementById('login-page').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('user-name').textContent = currentUser ? currentUser.name : '';
-  document.getElementById('user-avatar').textContent = currentUser ? currentUser.name[0] : 'מ';
+  document.getElementById('user-avatar').textContent = currentUser ? currentUser.name[0] : '׳';
   loadDashboard();
   preloadLeads();
   checkGoogleStatus();
@@ -545,14 +540,14 @@ function checkDup(field, value) {
     if (found) {
       dupLeadId = found.id;
       var el = document.getElementById('dup-' + field);
-      el.textContent = field === 'name' ? ('לקוח "' + found.name + '" כבר קיים — לחץ לפתיחה') : ('טלפון זה שייך ל-"' + found.name + '" — לחץ לפתיחה');
+      el.textContent = field === 'name' ? ('׳׳§׳•׳— "' + found.name + '" ׳›׳‘׳¨ ׳§׳™׳™׳ ג€” ׳׳—׳¥ ׳׳₪׳×׳™׳—׳”') : ('׳˜׳׳₪׳•׳ ׳–׳” ׳©׳™׳™׳ ׳-"' + found.name + '" ג€” ׳׳—׳¥ ׳׳₪׳×׳™׳—׳”');
       el.style.display = 'block';
     }
   }, 400);
 }
 
 function openDupLead() {
-  // לא עושים כלום - המשתמש ייבחר מהאוטוקומפליט
+  // ׳׳ ׳¢׳•׳©׳™׳ ׳›׳׳•׳ - ׳”׳׳©׳×׳׳© ׳™׳™׳‘׳—׳¨ ׳׳”׳׳•׳˜׳•׳§׳•׳׳₪׳׳™׳˜
 }
 
 function loadDashboard() {
@@ -566,22 +561,22 @@ function loadDashboard() {
     document.getElementById('rev-next').textContent = 'R' + fmtMoney(d.stats.rev_next || 0);
     // fix shekel sign
     ['stat-revenue','rev-prev','rev-curr','rev-next'].forEach(function(id) {
-      document.getElementById(id).textContent = document.getElementById(id).textContent.replace('R','₪');
+      document.getElementById(id).textContent = document.getElementById(id).textContent.replace('R','ג‚×');
     });
     var nb = document.getElementById('nav-leads-count');
     if (d.stats.leads > 0) { nb.textContent = d.stats.leads; nb.style.display = ''; }
     var fuEl = document.getElementById('dash-followups');
     fuEl.innerHTML = d.followUps.length ? d.followUps.map(function(l) {
       return '<div class="dash-item" data-id="' + l.id + '"><div><div class="dash-item-name">' + l.name + '</div><div class="dash-item-sub">' + (l.event_type||'') + (l.event_date ? ' - ' + formatDate(l.event_date) : '') + '</div></div>' + statusBadge(l.status) + '</div>';
-    }).join('') : '<div class="dash-empty">אין מעקבים להיום</div>';
+    }).join('') : '<div class="dash-empty">׳׳™׳ ׳׳¢׳§׳‘׳™׳ ׳׳”׳™׳•׳</div>';
     var upEl = document.getElementById('dash-upcoming');
     upEl.innerHTML = d.upcoming.length ? d.upcoming.map(function(l) {
       return '<div class="dash-item" data-id="' + l.id + '"><div><div class="dash-item-name">' + l.name + '</div><div class="dash-item-sub">' + (l.event_type||'') + ' - ' + (l.venue||'') + '</div></div><span style="font-size:12px;font-weight:700;color:var(--accent)">' + formatDate(l.event_date) + '</span></div>';
-    }).join('') : '<div class="dash-empty">אין אירועים קרובים</div>';
+    }).join('') : '<div class="dash-empty">׳׳™׳ ׳׳™׳¨׳•׳¢׳™׳ ׳§׳¨׳•׳‘׳™׳</div>';
     var recEl = document.getElementById('dash-recent');
     recEl.innerHTML = d.recentLeads.length ? d.recentLeads.map(function(l) {
       return '<div class="dash-item" data-id="' + l.id + '"><div><div class="dash-item-name">' + l.name + '</div><div class="dash-item-sub">' + (l.phone||'') + (l.event_type ? ' - ' + l.event_type : '') + '</div></div>' + statusBadge(l.status) + '</div>';
-    }).join('') : '<div class="dash-empty">אין לידים עדיין</div>';
+    }).join('') : '<div class="dash-empty">׳׳™׳ ׳׳™׳“׳™׳ ׳¢׳“׳™׳™׳</div>';
     document.querySelectorAll('.dash-item[data-id]').forEach(function(el) {
       el.addEventListener('click', function() { openDrawer(parseInt(this.getAttribute('data-id'))); });
     });
@@ -592,8 +587,8 @@ function loadDashboard() {
 
 function renderMiniCal(leads) {
   var cal = document.getElementById('mini-cal');
-  var monthNames = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
-  var dayNames = ['א','ב','ג','ד','ה','ו','ש'];
+  var monthNames = ['׳™׳ ׳•׳׳¨','׳₪׳‘׳¨׳•׳׳¨','׳׳¨׳¥','׳׳₪׳¨׳™׳','׳׳׳™','׳™׳•׳ ׳™','׳™׳•׳׳™','׳׳•׳’׳•׳¡׳˜','׳¡׳₪׳˜׳׳‘׳¨','׳׳•׳§׳˜׳•׳‘׳¨','׳ ׳•׳‘׳׳‘׳¨','׳“׳¦׳׳‘׳¨'];
+  var dayNames = ['׳','׳‘','׳’','׳“','׳”','׳•','׳©'];
   var year = calYear, month = calMonth;
   var eventMap = {}, followMap = {};
   leads.forEach(function(l) {
@@ -625,7 +620,7 @@ function renderMiniCal(leads) {
   for (var i = 1; i <= rem; i++) {
     daysHTML += '<div class="cal-day other-month"><span class="cal-day-num">' + i + '</span></div>';
   }
-  cal.innerHTML = '<div class="cal-header"><button class="cal-nav" id="cal-prev">&#x203A;</button><div class="cal-title">' + monthNames[month] + ' ' + year + '</div><button class="cal-nav" id="cal-next">&#x2039;</button></div><div class="cal-grid"><div class="cal-days-header">' + dayNames.map(function(n) { return '<div class="cal-day-name">' + n + '</div>'; }).join('') + '</div><div class="cal-days">' + daysHTML + '</div></div><div class="cal-legend"><div class="cal-legend-item"><div class="cal-dot cal-dot-e"></div> אירוע</div><div class="cal-legend-item"><div class="cal-dot cal-dot-f"></div> מעקב</div></div>';
+  cal.innerHTML = '<div class="cal-header"><button class="cal-nav" id="cal-prev">&#x203A;</button><div class="cal-title">' + monthNames[month] + ' ' + year + '</div><button class="cal-nav" id="cal-next">&#x2039;</button></div><div class="cal-grid"><div class="cal-days-header">' + dayNames.map(function(n) { return '<div class="cal-day-name">' + n + '</div>'; }).join('') + '</div><div class="cal-days">' + daysHTML + '</div></div><div class="cal-legend"><div class="cal-legend-item"><div class="cal-dot cal-dot-e"></div> ׳׳™׳¨׳•׳¢</div><div class="cal-legend-item"><div class="cal-dot cal-dot-f"></div> ׳׳¢׳§׳‘</div></div>';
   document.getElementById('cal-prev').addEventListener('click', function() { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } renderMiniCal(allLeadsCache); });
   document.getElementById('cal-next').addEventListener('click', function() { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } renderMiniCal(allLeadsCache); });
   cal.querySelectorAll('.cal-day[data-calid]').forEach(function(el) {
@@ -644,10 +639,10 @@ function loadLeads() {
     var leads = data.leads;
     if (eventType) leads = leads.filter(function(l) { return l.event_type === eventType; });
     var tbody = document.getElementById('leads-body');
-    if (!leads.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="10">לא נמצאו לידים</td></tr>'; return; }
+    if (!leads.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="10">׳׳ ׳ ׳׳¦׳׳• ׳׳™׳“׳™׳</td></tr>'; return; }
     tbody.innerHTML = leads.map(function(l) {
-      var payBadge = l.price > 0 ? (l.balance_paid ? '<span class="badge badge-green">שולם</span>' : (l.deposit > 0 ? '<span class="badge badge-yellow">מקדמה</span>' : '<span class="badge badge-red">טרם שולם</span>')) : '';
-      return '<tr data-id="' + l.id + '"><td><div class="dot ' + getUrgencyDot(l.next_contact) + '"></div></td><td class="bold">' + l.name + '</td><td>' + (l.phone||'—') + '</td><td>' + (l.event_type||'—') + '</td><td>' + (l.event_date?formatDate(l.event_date):'—') + '</td><td>' + (l.venue||'—') + '</td><td>' + (l.price?'₪'+fmtMoney(l.price):payBadge||'—') + '</td><td>' + statusBadge(l.status) + '</td><td style="font-size:12px;' + (isOverdue(l.next_contact)?'color:var(--red);font-weight:700':'') + '">' + (l.next_contact?formatDate(l.next_contact):'—') + '</td><td><button class="btn btn-ghost btn-sm edit-btn" data-id="' + l.id + '">עריכה</button> <button class="btn btn-danger btn-sm del-btn" data-id="' + l.id + '">מחיקה</button></td></tr>';
+      var payBadge = l.price > 0 ? (l.balance_paid ? '<span class="badge badge-green">׳©׳•׳׳</span>' : (l.deposit > 0 ? '<span class="badge badge-yellow">׳׳§׳“׳׳”</span>' : '<span class="badge badge-red">׳˜׳¨׳ ׳©׳•׳׳</span>')) : '';
+      return '<tr data-id="' + l.id + '"><td><div class="dot ' + getUrgencyDot(l.next_contact) + '"></div></td><td class="bold">' + l.name + '</td><td>' + (l.phone||'ג€”') + '</td><td>' + (l.event_type||'ג€”') + '</td><td>' + (l.event_date?formatDate(l.event_date):'ג€”') + '</td><td>' + (l.venue||'ג€”') + '</td><td>' + (l.price?'ג‚×'+fmtMoney(l.price):payBadge||'ג€”') + '</td><td>' + statusBadge(l.status) + '</td><td style="font-size:12px;' + (isOverdue(l.next_contact)?'color:var(--red);font-weight:700':'') + '">' + (l.next_contact?formatDate(l.next_contact):'ג€”') + '</td><td><button class="btn btn-ghost btn-sm edit-btn" data-id="' + l.id + '">׳¢׳¨׳™׳›׳”</button> <button class="btn btn-danger btn-sm del-btn" data-id="' + l.id + '">׳׳—׳™׳§׳”</button></td></tr>';
     }).join('');
     tbody.querySelectorAll('tr[data-id]').forEach(function(row) {
       row.addEventListener('click', function(e) { if (!e.target.classList.contains('edit-btn') && !e.target.classList.contains('del-btn')) openDrawer(parseInt(this.getAttribute('data-id'))); });
@@ -661,11 +656,11 @@ function loadCalendar() {
   apiCall('GET', '/api/leads?status=closed').then(function(data) {
     var leads = data.leads.filter(function(l) { return l.event_date; }).sort(function(a,b) { return a.event_date.localeCompare(b.event_date); });
     var tbody = document.getElementById('calendar-body');
-    if (!leads.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="8">אין אירועים סגורים</td></tr>'; return; }
+    if (!leads.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="8">׳׳™׳ ׳׳™׳¨׳•׳¢׳™׳ ׳¡׳’׳•׳¨׳™׳</td></tr>'; return; }
     tbody.innerHTML = leads.map(function(l) {
       var attrs = safeJSON(l.attractions);
-      var bal = l.balance_paid ? '<span class="badge badge-green">שולם הכל</span>' : (l.deposit > 0 ? '<span class="badge badge-yellow">מקדמה ₪' + fmtMoney(l.deposit) + '</span>' : '<span class="badge badge-red">לא שולם</span>');
-      return '<tr data-id="' + l.id + '"><td class="bold" style="color:var(--accent)">' + formatDate(l.event_date) + '</td><td class="bold">' + l.name + '</td><td>' + (l.event_type||'—') + '</td><td>' + (l.venue||'—') + '</td><td>' + (l.event_time||'—') + '</td><td><div class="attraction-tags">' + attrs.map(function(a) { return '<span class="attraction-tag">' + a + '</span>'; }).join('') + '</div></td><td class="bold">' + (l.price?'₪'+fmtMoney(l.price):'—') + '</td><td>' + bal + '</td></tr>';
+      var bal = l.balance_paid ? '<span class="badge badge-green">׳©׳•׳׳ ׳”׳›׳</span>' : (l.deposit > 0 ? '<span class="badge badge-yellow">׳׳§׳“׳׳” ג‚×' + fmtMoney(l.deposit) + '</span>' : '<span class="badge badge-red">׳׳ ׳©׳•׳׳</span>');
+      return '<tr data-id="' + l.id + '"><td class="bold" style="color:var(--accent)">' + formatDate(l.event_date) + '</td><td class="bold">' + l.name + '</td><td>' + (l.event_type||'ג€”') + '</td><td>' + (l.venue||'ג€”') + '</td><td>' + (l.event_time||'ג€”') + '</td><td><div class="attraction-tags">' + attrs.map(function(a) { return '<span class="attraction-tag">' + a + '</span>'; }).join('') + '</div></td><td class="bold">' + (l.price?'ג‚×'+fmtMoney(l.price):'ג€”') + '</td><td>' + bal + '</td></tr>';
     }).join('');
     tbody.querySelectorAll('tr[data-id]').forEach(function(row) {
       row.addEventListener('click', function() { openDrawer(parseInt(this.getAttribute('data-id'))); });
@@ -677,34 +672,34 @@ function openDrawer(id) {
   currentLeadId = id;
   document.getElementById('drawer-overlay').classList.add('open');
   document.getElementById('lead-drawer').classList.add('open');
-  document.getElementById('drawer-body').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3)">טוען...</div>';
+  document.getElementById('drawer-body').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3)">׳˜׳•׳¢׳...</div>';
   apiCall('GET', '/api/leads/' + id).then(function(data) { renderDrawer(data.lead, data.notes); }).catch(function(e) { toast(e.message, 'error'); });
 }
 
 function renderDrawer(l, notes) {
-  document.getElementById('drawer-title').textContent = 'אירוע #' + (l.lead_num || l.id) + ' · ' + l.name;
+  document.getElementById('drawer-title').textContent = '׳׳™׳¨׳•׳¢ #' + (l.lead_num || l.id) + ' ֲ· ' + l.name;
   var attrs = safeJSON(l.attractions);
   var balance = (l.price||0) - (l.deposit||0);
-  var html = '<div class="info-section"><div style="display:flex;gap:8px;margin-bottom:12px"><span class="badge badge-purple">אירוע #' + (l.lead_num || l.id) + '</span>' + statusBadge(l.status) + (l.event_type ? '<span class="badge badge-purple">' + l.event_type + '</span>' : '') + '</div>';
-  html += '<div class="info-section-title">פרטי לקוח</div>';
-  html += '<div class="info-row"><span class="info-label">טלפון</span><span class="info-value">' + (l.phone ? '<a href="tel:' + l.phone + '" style="color:var(--accent)">' + l.phone + '</a>' : '—') + '</span></div>';
-  html += '<div class="info-row"><span class="info-label">אימייל</span><span class="info-value">' + (l.email||'—') + '</span></div></div>';
-  html += '<div class="info-section"><div class="info-section-title">פרטי האירוע</div>';
-  html += '<div class="info-row"><span class="info-label">תאריך</span><span class="info-value" style="font-weight:700;color:var(--accent)">' + (l.event_date?formatDate(l.event_date):'—') + '</span></div>';
-  html += '<div class="info-row"><span class="info-label">שעה</span><span class="info-value">' + (l.event_time||'—') + '</span></div>';
-  html += '<div class="info-row"><span class="info-label">אולם</span><span class="info-value">' + (l.venue||'—') + '</span></div>';
-  if (attrs.length) html += '<div class="info-row"><span class="info-label">אטרקציות</span><div class="attraction-tags">' + attrs.map(function(a) { return '<span class="attraction-tag">' + a + '</span>'; }).join('') + '</div></div>';
-  if (l.details) html += '<div class="info-row"><span class="info-label">פרטים</span><span class="info-value">' + l.details + '</span></div>';
-  html += '</div><div class="info-section"><div class="info-section-title">כספים</div><div class="payment-box">';
-  html += '<div class="payment-row"><span class="payment-label">מחיר סופי</span><span class="payment-value">₪' + fmtMoney(l.price||0) + '</span></div>';
-  html += '<div class="payment-row"><span class="payment-label">מקדמה</span><span class="payment-value" style="color:var(--green)">₪' + fmtMoney(l.deposit||0) + (l.deposit_date?' ('+formatDate(l.deposit_date)+')':'') + '</span></div>';
-  html += '<div class="payment-row" style="border-top:1px solid var(--border2);padding-top:8px;margin-top:4px"><span class="payment-label">יתרה</span><span class="' + (l.balance_paid?'balance-ok':'balance-due') + '">' + (l.balance_paid ? 'שולם במלואו' : '₪'+fmtMoney(balance)) + '</span></div></div></div>';
-  html += '<div class="info-section"><div class="info-section-title">מעקב</div>';
-  html += '<div class="info-row"><span class="info-label">קשר אחרון</span><span class="info-value">' + (l.last_contact?formatDate(l.last_contact):'—') + '</span></div>';
-  html += '<div class="info-row"><span class="info-label">קשר הבא</span><span class="info-value" style="' + (isOverdue(l.next_contact)?'color:var(--red);font-weight:700':'') + '">' + (l.next_contact?formatDate(l.next_contact):'—') + '</span></div>';
-  if (l.notes) html += '<div class="info-row"><span class="info-label">הערות</span><span class="info-value">' + l.notes + '</span></div>';
-  html += '</div><div class="info-section"><div class="info-section-title">יומן הערות (' + notes.length + ')</div>';
-  html += notes.length ? notes.map(function(n) { return '<div class="note-item">' + n.note + '<div class="note-date">' + fmtDT(n.created_at) + '</div></div>'; }).join('') : '<div style="color:var(--text3);font-size:13px">אין הערות עדיין</div>';
+  var html = '<div class="info-section"><div style="display:flex;gap:8px;margin-bottom:12px"><span class="badge badge-purple">׳׳™׳¨׳•׳¢ #' + (l.lead_num || l.id) + '</span>' + statusBadge(l.status) + (l.event_type ? '<span class="badge badge-purple">' + l.event_type + '</span>' : '') + '</div>';
+  html += '<div class="info-section-title">׳₪׳¨׳˜׳™ ׳׳§׳•׳—</div>';
+  html += '<div class="info-row"><span class="info-label">׳˜׳׳₪׳•׳</span><span class="info-value">' + (l.phone ? '<a href="tel:' + l.phone + '" style="color:var(--accent)">' + l.phone + '</a>' : 'ג€”') + '</span></div>';
+  html += '<div class="info-row"><span class="info-label">׳׳™׳׳™׳™׳</span><span class="info-value">' + (l.email||'ג€”') + '</span></div></div>';
+  html += '<div class="info-section"><div class="info-section-title">׳₪׳¨׳˜׳™ ׳”׳׳™׳¨׳•׳¢</div>';
+  html += '<div class="info-row"><span class="info-label">׳×׳׳¨׳™׳</span><span class="info-value" style="font-weight:700;color:var(--accent)">' + (l.event_date?formatDate(l.event_date):'ג€”') + '</span></div>';
+  html += '<div class="info-row"><span class="info-label">׳©׳¢׳”</span><span class="info-value">' + (l.event_time||'ג€”') + '</span></div>';
+  html += '<div class="info-row"><span class="info-label">׳׳•׳׳</span><span class="info-value">' + (l.venue||'ג€”') + '</span></div>';
+  if (attrs.length) html += '<div class="info-row"><span class="info-label">׳׳˜׳¨׳§׳¦׳™׳•׳×</span><div class="attraction-tags">' + attrs.map(function(a) { return '<span class="attraction-tag">' + a + '</span>'; }).join('') + '</div></div>';
+  if (l.details) html += '<div class="info-row"><span class="info-label">׳₪׳¨׳˜׳™׳</span><span class="info-value">' + l.details + '</span></div>';
+  html += '</div><div class="info-section"><div class="info-section-title">׳›׳¡׳₪׳™׳</div><div class="payment-box">';
+  html += '<div class="payment-row"><span class="payment-label">׳׳—׳™׳¨ ׳¡׳•׳₪׳™</span><span class="payment-value">ג‚×' + fmtMoney(l.price||0) + '</span></div>';
+  html += '<div class="payment-row"><span class="payment-label">׳׳§׳“׳׳”</span><span class="payment-value" style="color:var(--green)">ג‚×' + fmtMoney(l.deposit||0) + (l.deposit_date?' ('+formatDate(l.deposit_date)+')':'') + '</span></div>';
+  html += '<div class="payment-row" style="border-top:1px solid var(--border2);padding-top:8px;margin-top:4px"><span class="payment-label">׳™׳×׳¨׳”</span><span class="' + (l.balance_paid?'balance-ok':'balance-due') + '">' + (l.balance_paid ? '׳©׳•׳׳ ׳‘׳׳׳•׳׳•' : 'ג‚×'+fmtMoney(balance)) + '</span></div></div></div>';
+  html += '<div class="info-section"><div class="info-section-title">׳׳¢׳§׳‘</div>';
+  html += '<div class="info-row"><span class="info-label">׳§׳©׳¨ ׳׳—׳¨׳•׳</span><span class="info-value">' + (l.last_contact?formatDate(l.last_contact):'ג€”') + '</span></div>';
+  html += '<div class="info-row"><span class="info-label">׳§׳©׳¨ ׳”׳‘׳</span><span class="info-value" style="' + (isOverdue(l.next_contact)?'color:var(--red);font-weight:700':'') + '">' + (l.next_contact?formatDate(l.next_contact):'ג€”') + '</span></div>';
+  if (l.notes) html += '<div class="info-row"><span class="info-label">׳”׳¢׳¨׳•׳×</span><span class="info-value">' + l.notes + '</span></div>';
+  html += '</div><div class="info-section"><div class="info-section-title">׳™׳•׳׳ ׳”׳¢׳¨׳•׳× (' + notes.length + ')</div>';
+  html += notes.length ? notes.map(function(n) { return '<div class="note-item">' + n.note + '<div class="note-date">' + fmtDT(n.created_at) + '</div></div>'; }).join('') : '<div style="color:var(--text3);font-size:13px">׳׳™׳ ׳”׳¢׳¨׳•׳× ׳¢׳“׳™׳™׳</div>';
   html += '</div>';
   document.getElementById('drawer-body').innerHTML = html;
 }
@@ -722,14 +717,14 @@ function addNote() {
   apiCall('POST', '/api/leads/' + currentLeadId + '/notes', { note: note }).then(function() {
     input.value = '';
     return apiCall('GET', '/api/leads/' + currentLeadId);
-  }).then(function(data) { renderDrawer(data.lead, data.notes); toast('הערה נוספה', 'success'); }).catch(function(e) { toast(e.message, 'error'); });
+  }).then(function(data) { renderDrawer(data.lead, data.notes); toast('׳”׳¢׳¨׳” ׳ ׳•׳¡׳₪׳”', 'success'); }).catch(function(e) { toast(e.message, 'error'); });
 }
 
 var acSetupDone = false;
 function openLeadModal() {
   if (!acSetupDone) { setupAutocomplete(); acSetupDone = true; }
   document.getElementById('lead-id').value = '';
-  document.getElementById('modal-lead-title').textContent = 'ליד חדש';
+  document.getElementById('modal-lead-title').textContent = '׳׳™׳“ ׳—׳“׳©';
   ['l-name','l-phone','l-email','l-venue','l-details','l-notes','l-price','l-deposit'].forEach(function(id) { document.getElementById(id).value = ''; });
   ['l-event-date','l-event-time','l-deposit-date','l-last-contact','l-next-contact'].forEach(function(id) { document.getElementById(id).value = ''; });
   document.getElementById('l-event-type').value = '';
@@ -749,7 +744,7 @@ function editLead(id) {
   apiCall('GET', '/api/leads/' + id).then(function(data) {
     var l = data.lead;
     document.getElementById('lead-id').value = l.id;
-    document.getElementById('modal-lead-title').textContent = 'עריכת ליד';
+    document.getElementById('modal-lead-title').textContent = '׳¢׳¨׳™׳›׳× ׳׳™׳“';
     document.getElementById('l-name').value = l.name||'';
     document.getElementById('l-phone').value = l.phone||'';
     document.getElementById('l-email').value = l.email||'';
@@ -802,29 +797,29 @@ function saveLead() {
     details: document.getElementById('l-details').value,
     notes: document.getElementById('l-notes').value
   };
-  if (!body.name) { toast('שם לקוח חובה', 'error'); return; }
+  if (!body.name) { toast('׳©׳ ׳׳§׳•׳— ׳—׳•׳‘׳”', 'error'); return; }
   var req = id ? apiCall('PUT', '/api/leads/' + id, body) : apiCall('POST', '/api/leads', body);
   req.then(function() {
     closeLeadModal();
     loadLeads();
     loadDashboard();
     preloadLeads();
-    toast(id ? 'ליד עודכן בהצלחה' : 'ליד נוסף בהצלחה', 'success');
+    toast(id ? '׳׳™׳“ ׳¢׳•׳“׳›׳ ׳‘׳”׳¦׳׳—׳”' : '׳׳™׳“ ׳ ׳•׳¡׳£ ׳‘׳”׳¦׳׳—׳”', 'success');
   }).catch(function(e) { toast(e.message, 'error'); });
 }
 
 function deleteLead(id) {
-  if (!confirm('למחוק ליד זה?')) return;
-  apiCall('DELETE', '/api/leads/' + id).then(function() { loadLeads(); preloadLeads(); toast('נמחק', 'success'); }).catch(function(e) { toast(e.message, 'error'); });
+  if (!confirm('׳׳׳—׳•׳§ ׳׳™׳“ ׳–׳”?')) return;
+  apiCall('DELETE', '/api/leads/' + id).then(function() { loadLeads(); preloadLeads(); toast('׳ ׳׳—׳§', 'success'); }).catch(function(e) { toast(e.message, 'error'); });
 }
 
-function formatDate(d) { if (!d) return '—'; var p = d.substring(0,10).split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
-function fmtDT(d) { if (!d) return '—'; return new Date(d).toLocaleString('he-IL'); }
+function formatDate(d) { if (!d) return 'ג€”'; var p = d.substring(0,10).split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+function fmtDT(d) { if (!d) return 'ג€”'; return new Date(d).toLocaleString('he-IL'); }
 function isOverdue(d) { if (!d) return false; return d.substring(0,10) < new Date().toISOString().split('T')[0]; }
 function getUrgencyDot(nc) { if (!nc) return 'dot-gray'; var t = new Date().toISOString().split('T')[0]; if (nc < t) return 'dot-red'; var tm = new Date(Date.now()+86400000).toISOString().split('T')[0]; return nc <= tm ? 'dot-orange' : 'dot-green'; }
 function safeJSON(v) { try { var r = JSON.parse(v); return Array.isArray(r)?r:[]; } catch(e) { return []; } }
 function fmtMoney(n) { return Number(n||0).toLocaleString('he-IL'); }
-function statusBadge(s) { var m={lead:'badge-blue',quote:'badge-orange',closed:'badge-green',cancelled:'badge-gray'}; var l={lead:'ליד',quote:'הצעת מחיר',closed:'סגור',cancelled:'בוטל'}; return '<span class="badge '+(m[s]||'badge-gray')+'">'+(l[s]||s)+'</span>'; }
+function statusBadge(s) { var m={lead:'badge-blue',quote:'badge-orange',closed:'badge-green',cancelled:'badge-gray'}; var l={lead:'׳׳™׳“',quote:'׳”׳¦׳¢׳× ׳׳—׳™׳¨',closed:'׳¡׳’׳•׳¨',cancelled:'׳‘׳•׳˜׳'}; return '<span class="badge '+(m[s]||'badge-gray')+'">'+(l[s]||s)+'</span>'; }
 function toast(msg, type) { type = type||'success'; var c = document.getElementById('toasts'); var el = document.createElement('div'); el.className = 'toast '+type; el.textContent = msg; c.appendChild(el); setTimeout(function() { el.remove(); }, 3000); }
 
 
@@ -836,13 +831,13 @@ function checkGoogleStatus() {
       el.style.display = 'block';
       el.style.background = '#f0fdf4';
       el.style.border = '1px solid #bbf7d0';
-      el.innerHTML = '<span style="color:#16a34a;font-weight:600">✓ Google Calendar מחובר</span><br><button onclick="disconnectGoogle()" style="margin-top:6px;font-size:11px;background:none;border:none;color:#dc2626;cursor:pointer">נתק חיבור</button>';
+      el.innerHTML = '<span style="color:#16a34a;font-weight:600">ג“ Google Calendar ׳׳—׳•׳‘׳¨</span><br><button onclick="disconnectGoogle()" style="margin-top:6px;font-size:11px;background:none;border:none;color:#dc2626;cursor:pointer">׳ ׳×׳§ ׳—׳™׳‘׳•׳¨</button>';
       document.getElementById('drawer-sync-btn').style.display = '';
     } else {
       el.style.display = 'block';
       el.style.background = '#eff6ff';
       el.style.border = '1px solid #bfdbfe';
-      el.innerHTML = '<span style="color:#2563eb">📅 Google Calendar לא מחובר</span><br><button onclick="connectGoogle()" style="margin-top:6px;font-size:11px;background:var(--blue);color:white;border:none;border-radius:4px;padding:4px 8px;cursor:pointer">חבר יומן</button>';
+      el.innerHTML = '<span style="color:#2563eb">נ“… Google Calendar ׳׳ ׳׳—׳•׳‘׳¨</span><br><button onclick="connectGoogle()" style="margin-top:6px;font-size:11px;background:var(--blue);color:white;border:none;border-radius:4px;padding:4px 8px;cursor:pointer">׳—׳‘׳¨ ׳™׳•׳׳</button>';
     }
   }).catch(function() {});
 }
@@ -854,19 +849,19 @@ function connectGoogle() {
 }
 
 function disconnectGoogle() {
-  if (!confirm('לנתק את החיבור ל-Google Calendar?')) return;
+  if (!confirm('׳׳ ׳×׳§ ׳׳× ׳”׳—׳™׳‘׳•׳¨ ׳-Google Calendar?')) return;
   apiCall('POST', '/api/google/disconnect').then(function() {
-    toast('החיבור נותק', 'success');
+    toast('׳”׳—׳™׳‘׳•׳¨ ׳ ׳•׳×׳§', 'success');
     checkGoogleStatus();
   }).catch(function(e) { toast(e.message, 'error'); });
 }
 
 function syncToGoogle(id) {
-  toast('מסנכרן ל-Google Calendar...', 'success');
+  toast('׳׳¡׳ ׳›׳¨׳ ׳-Google Calendar...', 'success');
   apiCall('POST', '/api/google/sync/' + id).then(function(data) {
-    if (data.skipped) { toast('ניתן לסנכרן רק אירועים סגורים עם תאריך', 'error'); }
-    else { toast('האירוע סונכרן ל-Google Calendar! ✓', 'success'); }
-  }).catch(function(e) { toast('שגיאה: ' + e.message, 'error'); });
+    if (data.skipped) { toast('׳ ׳™׳×׳ ׳׳¡׳ ׳›׳¨׳ ׳¨׳§ ׳׳™׳¨׳•׳¢׳™׳ ׳¡׳’׳•׳¨׳™׳ ׳¢׳ ׳×׳׳¨׳™׳', 'error'); }
+    else { toast('׳”׳׳™׳¨׳•׳¢ ׳¡׳•׳ ׳›׳¨׳ ׳-Google Calendar! ג“', 'success'); }
+  }).catch(function(e) { toast('׳©׳’׳™׳׳”: ' + e.message, 'error'); });
 }
 
 
@@ -892,8 +887,8 @@ function setupAC2(inputId, listId) {
         list.innerHTML = data.contacts.map(function(c) {
           return '<div class="autocomplete-item" data-id="' + c.id + '" data-name="' + encodeURIComponent(c.name||'') + '" data-phone="' + encodeURIComponent(c.phone||'') + '" data-email="' + encodeURIComponent(c.email||'') + '">' +
             '<div class="autocomplete-item-name">' + c.name + '</div>' +
-            '<div class="autocomplete-item-sub">' + (c.phone||'') + (c.email ? ' · ' + c.email : '') + '</div>' +
-            '<div style="font-size:11px;color:var(--accent);margin-top:4px">לחץ לפתיחת כרטיס לקוח</div>' +
+            '<div class="autocomplete-item-sub">' + (c.phone||'') + (c.email ? ' ֲ· ' + c.email : '') + '</div>' +
+            '<div style="font-size:11px;color:var(--accent);margin-top:4px">׳׳—׳¥ ׳׳₪׳×׳™׳—׳× ׳›׳¨׳˜׳™׳¡ ׳׳§׳•׳—</div>' +
           '</div>';
         }).join('');
         list.style.display = 'block';
@@ -910,7 +905,7 @@ document.getElementById('dup-name').style.display = 'none';
 document.getElementById('dup-phone').style.display = 'none';
 list.style.display = 'none';
 
-toast('לקוח קיים נבחר — האירוע יקושר לכרטיס הלקוח', 'success');          });
+toast('׳׳§׳•׳— ׳§׳™׳™׳ ׳ ׳‘׳—׳¨ ג€” ׳”׳׳™׳¨׳•׳¢ ׳™׳§׳•׳©׳¨ ׳׳›׳¨׳˜׳™׳¡ ׳”׳׳§׳•׳—', 'success');          });
         });
       }).catch(function() {});
     }, 300);
@@ -933,7 +928,7 @@ function fillFromContact(contactId, contact) {
 }
 
 function openDupLead() {
-  // לא בשימוש יותר
+  // ׳׳ ׳‘׳©׳™׳׳•׳© ׳™׳•׳×׳¨
 }
 
 // ---- Customer Cards ----
@@ -943,7 +938,7 @@ function loadCustomers() {
     var grid = document.getElementById('customers-grid');
     if (!grid) return;
     if (!data.contacts || !data.contacts.length) {
-      grid.innerHTML = '<div class="dash-empty">אין לקוחות עדיין — לקוחות נוצרים אוטומטית בעת הוספת ליד</div>';
+      grid.innerHTML = '<div class="dash-empty">׳׳™׳ ׳׳§׳•׳—׳•׳× ׳¢׳“׳™׳™׳ ג€” ׳׳§׳•׳—׳•׳× ׳ ׳•׳¦׳¨׳™׳ ׳׳•׳˜׳•׳׳˜׳™׳× ׳‘׳¢׳× ׳”׳•׳¡׳₪׳× ׳׳™׳“</div>';
       return;
     }
     grid.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">' +
@@ -953,8 +948,8 @@ function loadCustomers() {
             '<div class="customer-card-name">' + c.name + '</div>' +
             '<span class="badge badge-purple">C-' + String(c.contact_num||c.id).padStart(3,'0') + '</span>' +
           '</div>' +
-          '<div class="customer-card-meta">' + (c.phone ? '📞 ' + c.phone : '') + '</div>' +
-          '<div class="customer-card-meta">' + (c.email ? '✉️ ' + c.email : '') + '</div>' +
+          '<div class="customer-card-meta">' + (c.phone ? 'נ“ ' + c.phone : '') + '</div>' +
+          '<div class="customer-card-meta">' + (c.email ? 'ג‰ן¸ ' + c.email : '') + '</div>' +
         '</div>';
       }).join('') + '</div>';
     grid.querySelectorAll('.customer-card[data-cid]').forEach(function(card) {
@@ -964,17 +959,17 @@ function loadCustomers() {
 }
 
 function openCustomerCard(id) {
-  // כרטיס לקוח במסך מלא בתוך אזור התוכן, לא חלון צד ולא modal
+  // ׳›׳¨׳˜׳™׳¡ ׳׳§׳•׳— ׳‘׳׳¡׳ ׳׳׳ ׳‘׳×׳•׳ ׳׳–׳•׳¨ ׳”׳×׳•׳›׳, ׳׳ ׳—׳׳•׳ ׳¦׳“ ׳•׳׳ modal
   document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
   document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
   var page = document.getElementById('page-customers');
-  var nav = document.getElementById('nav-customers');
+  var nav = document.getElementById('nav-leads');
   if (page) page.classList.add('active');
   if (nav) nav.classList.add('active');
 
   var grid = document.getElementById('customers-grid');
   if (!grid) return;
-  grid.innerHTML = '<div class="dash-empty">טוען כרטיס לקוח...</div>';
+  grid.innerHTML = '<div class="dash-empty">׳˜׳•׳¢׳ ׳›׳¨׳˜׳™׳¡ ׳׳§׳•׳—...</div>';
 
   apiCall('GET', '/api/contacts/' + id).then(function(data) {
     var c = data.contact;
@@ -983,35 +978,35 @@ function openCustomerCard(id) {
 
     var html = '';
     html += '<div style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px">';
-    html += '<button class="btn btn-secondary btn-sm" id="back-to-customers">← חזרה לרשימת לקוחות</button>';
-    html += '<button class="btn btn-primary btn-sm" id="add-event-btn">+ אירוע חדש ללקוח</button>';
+    html += '<button class="btn btn-secondary btn-sm" id="back-to-customers">ג† ׳—׳–׳¨׳” ׳׳¨׳©׳™׳׳× ׳׳§׳•׳—׳•׳×</button>';
+    html += '<button class="btn btn-primary btn-sm" id="add-event-btn">+ ׳׳™׳¨׳•׳¢ ׳—׳“׳© ׳׳׳§׳•׳—</button>';
     html += '</div>';
 
     html += '<div class="contact-card">';
     html += '<div class="contact-card-header">';
-    html += '<div><div class="contact-card-name">לקוח #' + (c.contact_num || c.id) + ' · ' + c.name + '</div>';
-    html += '<div class="contact-card-meta">' + (c.phone || 'אין טלפון') + (c.email ? ' · ' + c.email : '') + '</div></div>';
+    html += '<div><div class="contact-card-name">׳׳§׳•׳— #' + (c.contact_num || c.id) + ' ֲ· ' + c.name + '</div>';
+    html += '<div class="contact-card-meta">' + (c.phone || '׳׳™׳ ׳˜׳׳₪׳•׳') + (c.email ? ' ֲ· ' + c.email : '') + '</div></div>';
     html += '</div>';
     html += '<div class="contact-stats">';
-    html += '<div class="contact-stat"><div class="contact-stat-val">' + (stats.total || 0) + '</div><div class="contact-stat-label">אירועים</div></div>';
-    html += '<div class="contact-stat"><div class="contact-stat-val">' + (stats.closed || 0) + '</div><div class="contact-stat-label">סגורים</div></div>';
-    html += '<div class="contact-stat"><div class="contact-stat-val">₪' + fmtMoney(stats.revenue || 0) + '</div><div class="contact-stat-label">הכנסות</div></div>';
+    html += '<div class="contact-stat"><div class="contact-stat-val">' + (stats.total || 0) + '</div><div class="contact-stat-label">׳׳™׳¨׳•׳¢׳™׳</div></div>';
+    html += '<div class="contact-stat"><div class="contact-stat-val">' + (stats.closed || 0) + '</div><div class="contact-stat-label">׳¡׳’׳•׳¨׳™׳</div></div>';
+    html += '<div class="contact-stat"><div class="contact-stat-val">ג‚×' + fmtMoney(stats.revenue || 0) + '</div><div class="contact-stat-label">׳”׳›׳ ׳¡׳•׳×</div></div>';
     html += '</div>';
     html += '</div>';
 
     html += '<div class="table-card" style="margin-bottom:16px">';
-    html += '<div class="dash-section-title">אירועים של הלקוח</div>';
+    html += '<div class="dash-section-title">׳׳™׳¨׳•׳¢׳™׳ ׳©׳ ׳”׳׳§׳•׳—</div>';
     if (!leads.length) {
-      html += '<div class="dash-empty">אין אירועים עדיין</div>';
+      html += '<div class="dash-empty">׳׳™׳ ׳׳™׳¨׳•׳¢׳™׳ ׳¢׳“׳™׳™׳</div>';
     } else {
-      html += '<table><thead><tr><th>מספר אירוע</th><th>תאריך</th><th>סוג</th><th>אולם</th><th>מחיר</th><th>סטטוס</th></tr></thead><tbody>';
+      html += '<table><thead><tr><th>׳׳¡׳₪׳¨ ׳׳™׳¨׳•׳¢</th><th>׳×׳׳¨׳™׳</th><th>׳¡׳•׳’</th><th>׳׳•׳׳</th><th>׳׳—׳™׳¨</th><th>׳¡׳˜׳˜׳•׳¡</th></tr></thead><tbody>';
       leads.forEach(function(l) {
         html += '<tr data-customer-event-id="' + l.id + '">' +
-          '<td class="bold" style="color:var(--accent)">אירוע #' + (l.lead_num || l.id) + '</td>' +
-          '<td>' + (l.event_date ? formatDate(l.event_date) : '—') + '</td>' +
-          '<td>' + (l.event_type || '—') + '</td>' +
-          '<td>' + (l.venue || '—') + '</td>' +
-          '<td>' + (l.price ? '₪' + fmtMoney(l.price) : '—') + '</td>' +
+          '<td class="bold" style="color:var(--accent)">׳׳™׳¨׳•׳¢ #' + (l.lead_num || l.id) + '</td>' +
+          '<td>' + (l.event_date ? formatDate(l.event_date) : 'ג€”') + '</td>' +
+          '<td>' + (l.event_type || 'ג€”') + '</td>' +
+          '<td>' + (l.venue || 'ג€”') + '</td>' +
+          '<td>' + (l.price ? 'ג‚×' + fmtMoney(l.price) : 'ג€”') + '</td>' +
           '<td>' + statusBadge(l.status) + '</td>' +
         '</tr>';
       });
@@ -1050,21 +1045,21 @@ function showCustomerEventDetails(id, leads) {
   var attrs = safeJSON(l.attractions);
   var box = document.getElementById('customer-event-details');
   var html = '<div class="contact-card">';
-  html += '<div class="contact-card-header"><div><div class="contact-card-name">אירוע #' + (l.lead_num || l.id) + '</div><div class="contact-card-meta">' + (l.event_type || 'אירוע') + (l.event_date ? ' · ' + formatDate(l.event_date) : '') + '</div></div>' + statusBadge(l.status) + '</div>';
-  html += '<div class="info-section"><div class="info-section-title">פרטי האירוע</div>';
-  html += '<div class="info-row"><span class="info-label">מספר אירוע</span><span class="info-value">#' + (l.lead_num || l.id) + '</span></div>';
-  html += '<div class="info-row"><span class="info-label">תאריך</span><span class="info-value">' + (l.event_date ? formatDate(l.event_date) : '—') + '</span></div>';
-  html += '<div class="info-row"><span class="info-label">שעה</span><span class="info-value">' + (l.event_time || '—') + '</span></div>';
-  html += '<div class="info-row"><span class="info-label">אולם</span><span class="info-value">' + (l.venue || '—') + '</span></div>';
-  if (attrs.length) html += '<div class="info-row"><span class="info-label">אטרקציות</span><div class="attraction-tags">' + attrs.map(function(a) { return '<span class="attraction-tag">' + a + '</span>'; }).join('') + '</div></div>';
-  html += '</div><div class="info-section"><div class="info-section-title">כספים</div>';
-  html += '<div class="info-row"><span class="info-label">מחיר</span><span class="info-value">₪' + fmtMoney(l.price || 0) + '</span></div>';
-  html += '<div class="info-row"><span class="info-label">מקדמה</span><span class="info-value">₪' + fmtMoney(l.deposit || 0) + '</span></div>';
+  html += '<div class="contact-card-header"><div><div class="contact-card-name">׳׳™׳¨׳•׳¢ #' + (l.lead_num || l.id) + '</div><div class="contact-card-meta">' + (l.event_type || '׳׳™׳¨׳•׳¢') + (l.event_date ? ' ֲ· ' + formatDate(l.event_date) : '') + '</div></div>' + statusBadge(l.status) + '</div>';
+  html += '<div class="info-section"><div class="info-section-title">׳₪׳¨׳˜׳™ ׳”׳׳™׳¨׳•׳¢</div>';
+  html += '<div class="info-row"><span class="info-label">׳׳¡׳₪׳¨ ׳׳™׳¨׳•׳¢</span><span class="info-value">#' + (l.lead_num || l.id) + '</span></div>';
+  html += '<div class="info-row"><span class="info-label">׳×׳׳¨׳™׳</span><span class="info-value">' + (l.event_date ? formatDate(l.event_date) : 'ג€”') + '</span></div>';
+  html += '<div class="info-row"><span class="info-label">׳©׳¢׳”</span><span class="info-value">' + (l.event_time || 'ג€”') + '</span></div>';
+  html += '<div class="info-row"><span class="info-label">׳׳•׳׳</span><span class="info-value">' + (l.venue || 'ג€”') + '</span></div>';
+  if (attrs.length) html += '<div class="info-row"><span class="info-label">׳׳˜׳¨׳§׳¦׳™׳•׳×</span><div class="attraction-tags">' + attrs.map(function(a) { return '<span class="attraction-tag">' + a + '</span>'; }).join('') + '</div></div>';
+  html += '</div><div class="info-section"><div class="info-section-title">׳›׳¡׳₪׳™׳</div>';
+  html += '<div class="info-row"><span class="info-label">׳׳—׳™׳¨</span><span class="info-value">ג‚×' + fmtMoney(l.price || 0) + '</span></div>';
+  html += '<div class="info-row"><span class="info-label">׳׳§׳“׳׳”</span><span class="info-value">ג‚×' + fmtMoney(l.deposit || 0) + '</span></div>';
   html += '</div>';
   if (l.notes || l.details) {
-    html += '<div class="info-section"><div class="info-section-title">הערות</div>';
-    if (l.details) html += '<div class="info-row"><span class="info-label">פרטים</span><span class="info-value">' + l.details + '</span></div>';
-    if (l.notes) html += '<div class="info-row"><span class="info-label">הערות</span><span class="info-value">' + l.notes + '</span></div>';
+    html += '<div class="info-section"><div class="info-section-title">׳”׳¢׳¨׳•׳×</div>';
+    if (l.details) html += '<div class="info-row"><span class="info-label">׳₪׳¨׳˜׳™׳</span><span class="info-value">' + l.details + '</span></div>';
+    if (l.notes) html += '<div class="info-row"><span class="info-label">׳”׳¢׳¨׳•׳×</span><span class="info-value">' + l.notes + '</span></div>';
     html += '</div>';
   }
   html += '</div>';
@@ -1076,10 +1071,10 @@ function closeCustomerModal() {
 }
 
 function addEventForContact(contactId, name, phone, email) {
-  // סגור את כרטיס הלקוח ופתח טופס ליד חדש עם פרטים ממולאים
+  // ׳¡׳’׳•׳¨ ׳׳× ׳›׳¨׳˜׳™׳¡ ׳”׳׳§׳•׳— ׳•׳₪׳×׳— ׳˜׳•׳₪׳¡ ׳׳™׳“ ׳—׳“׳© ׳¢׳ ׳₪׳¨׳˜׳™׳ ׳׳׳•׳׳׳™׳
   closeCustomerModal();
   openLeadModal();
-  // מלא את פרטי הלקוח
+  // ׳׳׳ ׳׳× ׳₪׳¨׳˜׳™ ׳”׳׳§׳•׳—
   setTimeout(function() {
     document.getElementById('l-name').value = name;
     document.getElementById('l-phone').value = phone;
@@ -1095,44 +1090,44 @@ var currentCustomer = null;
 
 function openCustomerModal(id) {
   document.getElementById('modal-customer').classList.add('open');
-  document.getElementById('customer-modal-body').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3)">טוען...</div>';
+  document.getElementById('customer-modal-body').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3)">׳˜׳•׳¢׳...</div>';
   apiCall('GET', '/api/contacts/' + id).then(function(data) {
     currentCustomer = data.contact;
     var c = data.contact, leads = data.leads, stats = data.stats;
-    document.getElementById('customer-modal-title').textContent = c.name + ' · לקוח #' + (c.contact_num || c.id);
+    document.getElementById('customer-modal-title').textContent = c.name + ' ֲ· ׳׳§׳•׳— #' + (c.contact_num || c.id);
     var html = '';
-    // כפתור הוסף אירוע
+    // ׳›׳₪׳×׳•׳¨ ׳”׳•׳¡׳£ ׳׳™׳¨׳•׳¢
     html += '<div style="margin-bottom:16px;display:flex;gap:10px;align-items:center">';
-    html += '<button onclick="addEventForCustomer()" class="btn btn-primary">+ הוסף אירוע חדש</button>';
-    if (c.phone) html += '<a href="tel:' + c.phone + '" class="btn btn-secondary">📞 ' + c.phone + '</a>';
-    if (c.email) html += '<span class="btn btn-secondary">✉️ ' + c.email + '</span>';
+    html += '<button onclick="addEventForCustomer()" class="btn btn-primary">+ ׳”׳•׳¡׳£ ׳׳™׳¨׳•׳¢ ׳—׳“׳©</button>';
+    if (c.phone) html += '<a href="tel:' + c.phone + '" class="btn btn-secondary">נ“ ' + c.phone + '</a>';
+    if (c.email) html += '<span class="btn btn-secondary">ג‰ן¸ ' + c.email + '</span>';
     html += '</div>';
     // Stats
     html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">';
-    html += '<div style="background:var(--accent-light);border-radius:var(--radius-sm);padding:12px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--accent)">' + (stats.total||0) + '</div><div style="font-size:10px;color:var(--text3)">סה"כ אירועים</div></div>';
-    html += '<div style="background:var(--green-light);border-radius:var(--radius-sm);padding:12px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--green)">' + (stats.closed||0) + '</div><div style="font-size:10px;color:var(--text3)">סגורים</div></div>';
-    html += '<div style="background:var(--blue-light);border-radius:var(--radius-sm);padding:12px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--blue)">₪' + fmtMoney(stats.revenue||0) + '</div><div style="font-size:10px;color:var(--text3)">הכנסות</div></div>';
+    html += '<div style="background:var(--accent-light);border-radius:var(--radius-sm);padding:12px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--accent)">' + (stats.total||0) + '</div><div style="font-size:10px;color:var(--text3)">׳¡׳”"׳› ׳׳™׳¨׳•׳¢׳™׳</div></div>';
+    html += '<div style="background:var(--green-light);border-radius:var(--radius-sm);padding:12px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--green)">' + (stats.closed||0) + '</div><div style="font-size:10px;color:var(--text3)">׳¡׳’׳•׳¨׳™׳</div></div>';
+    html += '<div style="background:var(--blue-light);border-radius:var(--radius-sm);padding:12px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--blue)">ג‚×' + fmtMoney(stats.revenue||0) + '</div><div style="font-size:10px;color:var(--text3)">׳”׳›׳ ׳¡׳•׳×</div></div>';
     html += '</div>';
-    // פרטי לקוח
-    html += '<div class="info-section"><div class="info-section-title">פרטי לקוח</div>';
-    html += '<div class="info-row"><span class="info-label">מספר לקוח</span><span class="info-value">#' + c.contact_num + '</span></div>';
-    html += '<div class="info-row"><span class="info-label">שם</span><span class="info-value">' + c.name + '</span></div>';
-    html += '<div class="info-row"><span class="info-label">טלפון</span><span class="info-value">' + (c.phone||'—') + '</span></div>';
-    html += '<div class="info-row"><span class="info-label">אימייל</span><span class="info-value">' + (c.email||'—') + '</span></div>';
+    // ׳₪׳¨׳˜׳™ ׳׳§׳•׳—
+    html += '<div class="info-section"><div class="info-section-title">׳₪׳¨׳˜׳™ ׳׳§׳•׳—</div>';
+    html += '<div class="info-row"><span class="info-label">׳׳¡׳₪׳¨ ׳׳§׳•׳—</span><span class="info-value">#' + c.contact_num + '</span></div>';
+    html += '<div class="info-row"><span class="info-label">׳©׳</span><span class="info-value">' + c.name + '</span></div>';
+    html += '<div class="info-row"><span class="info-label">׳˜׳׳₪׳•׳</span><span class="info-value">' + (c.phone||'ג€”') + '</span></div>';
+    html += '<div class="info-row"><span class="info-label">׳׳™׳׳™׳™׳</span><span class="info-value">' + (c.email||'ג€”') + '</span></div>';
     html += '</div>';
-    // אירועים
-    html += '<div class="info-section"><div class="info-section-title">אירועים של הלקוח</div>';
+    // ׳׳™׳¨׳•׳¢׳™׳
+    html += '<div class="info-section"><div class="info-section-title">׳׳™׳¨׳•׳¢׳™׳ ׳©׳ ׳”׳׳§׳•׳—</div>';
     if (!leads || !leads.length) {
-      html += '<div class="dash-empty">אין אירועים עדיין. לחץ "הוסף אירוע חדש" כדי לפתוח טופס ליד חדש עם פרטי הלקוח.</div>';
+      html += '<div class="dash-empty">׳׳™׳ ׳׳™׳¨׳•׳¢׳™׳ ׳¢׳“׳™׳™׳. ׳׳—׳¥ "׳”׳•׳¡׳£ ׳׳™׳¨׳•׳¢ ׳—׳“׳©" ׳›׳“׳™ ׳׳₪׳×׳•׳— ׳˜׳•׳₪׳¡ ׳׳™׳“ ׳—׳“׳© ׳¢׳ ׳₪׳¨׳˜׳™ ׳”׳׳§׳•׳—.</div>';
     } else {
-      html += '<table><thead><tr><th>מספר</th><th>תאריך</th><th>סוג</th><th>אולם</th><th>מחיר</th><th>סטטוס</th></tr></thead><tbody>';
+      html += '<table><thead><tr><th>׳׳¡׳₪׳¨</th><th>׳×׳׳¨׳™׳</th><th>׳¡׳•׳’</th><th>׳׳•׳׳</th><th>׳׳—׳™׳¨</th><th>׳¡׳˜׳˜׳•׳¡</th></tr></thead><tbody>';
       leads.forEach(function(l) {
         html += '<tr data-id="' + l.id + '">' +
-          '<td class="bold">אירוע #' + (l.lead_num||l.id) + '</td>' +
-          '<td>' + (l.event_date?formatDate(l.event_date):'—') + '</td>' +
-          '<td>' + (l.event_type||'—') + '</td>' +
-          '<td>' + (l.venue||'—') + '</td>' +
-          '<td>' + (l.price?'₪'+fmtMoney(l.price):'—') + '</td>' +
+          '<td class="bold">׳׳™׳¨׳•׳¢ #' + (l.lead_num||l.id) + '</td>' +
+          '<td>' + (l.event_date?formatDate(l.event_date):'ג€”') + '</td>' +
+          '<td>' + (l.event_type||'ג€”') + '</td>' +
+          '<td>' + (l.venue||'ג€”') + '</td>' +
+          '<td>' + (l.price?'ג‚×'+fmtMoney(l.price):'ג€”') + '</td>' +
           '<td>' + statusBadge(l.status) + '</td>' +
         '</tr>';
       });
@@ -1151,7 +1146,7 @@ function openCustomerModal(id) {
 function addEventForCustomer() {
   if (!currentCustomer) return;
   closeCustomerModal();
-  // פתח טופס ליד חדש עם פרטי הלקוח ממולאים
+  // ׳₪׳×׳— ׳˜׳•׳₪׳¡ ׳׳™׳“ ׳—׳“׳© ׳¢׳ ׳₪׳¨׳˜׳™ ׳”׳׳§׳•׳— ׳׳׳•׳׳׳™׳
   openLeadModal();
   setTimeout(function() {
     fillFromContact(currentCustomer.id, currentCustomer);
@@ -1178,7 +1173,7 @@ function selectCustomer(c) {
   document.getElementById('l-phone').value = c.phone || '';
   document.getElementById('l-email').value = c.email || '';
 
-  // הסתר autocomplete
+  // ׳”׳¡׳×׳¨ autocomplete
   document.getElementById('ac-name').style.display = 'none';
   document.getElementById('ac-phone').style.display = 'none';
   document.getElementById('ac-email').style.display = 'none';

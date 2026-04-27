@@ -249,6 +249,7 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     <div class="nav-section">תפריט</div>
     <div class="nav-item active" id="nav-dashboard"><span class="nav-icon">📊</span> דאשבורד</div>
     <div class="nav-item" id="nav-leads"><span class="nav-icon">👥</span> לקוחות <span class="nav-badge" id="nav-leads-count" style="display:none">0</span></div>
+    <div class="nav-item" id="nav-customers"><span class="nav-icon">🏷️</span> כרטיסי לקוח</div>
     <div class="nav-item" id="nav-calendar"><span class="nav-icon">📅</span> יומן אירועים</div>
     <div id="gcal-status" style="margin:8px;padding:10px 12px;border-radius:8px;font-size:12px;display:none"></div>
     <div class="sidebar-bottom">
@@ -417,11 +418,11 @@ function init() {
   document.getElementById('login-btn').addEventListener('click', doLogin);
   document.getElementById('logout-btn').addEventListener('click', logout);
 document.getElementById('btn-new-lead').addEventListener('click', function() {
-  goTo('customers', document.getElementById('nav-leads'));
+  goTo('customers', document.getElementById('nav-customers'));
 });
 
 document.getElementById('btn-new-lead2').addEventListener('click', function() {
-  goTo('customers', document.getElementById('nav-leads'));
+  goTo('customers', document.getElementById('nav-customers'));
 });  document.getElementById('modal-close-btn').addEventListener('click', closeLeadModal);
   document.getElementById('modal-cancel-btn').addEventListener('click', closeLeadModal);
   document.getElementById('modal-save-btn').addEventListener('click', saveLead);
@@ -431,7 +432,7 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   document.getElementById('drawer-edit-btn').addEventListener('click', function() { if (currentLeadId) editLead(currentLeadId); });
   document.getElementById('add-note-btn').addEventListener('click', addNote);
   document.getElementById('nav-dashboard').addEventListener('click', function() { goTo('dashboard', this); });
-  document.getElementById('nav-leads').addEventListener('click', function() { goTo('customers', this); });
+  document.getElementById('nav-leads').addEventListener('click', function() { goTo('leads', this); });
   document.getElementById('nav-calendar').addEventListener('click', function() { goTo('calendar', this); });
   var navCustomers = document.getElementById('nav-customers');
   if (navCustomers) navCustomers.addEventListener('click', function() { goTo('customers', this); });
