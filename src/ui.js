@@ -404,7 +404,7 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 <script>
 var token = localStorage.getItem('crm_token');
 var currentUser = JSON.parse(localStorage.getItem('crm_user') || 'null');
-var searchTimer, currentLeadId, dupLeadId;
+var searchTimer, currentLeadId, dupLeadId, selectedContactId = null;
 var allLeadsCache = [];
 var calYear, calMonth;
 
@@ -417,9 +417,13 @@ function init() {
 
   document.getElementById('login-btn').addEventListener('click', doLogin);
   document.getElementById('logout-btn').addEventListener('click', logout);
-  document.getElementById('btn-new-lead').addEventListener('click', openLeadModal);
-  document.getElementById('btn-new-lead2').addEventListener('click', openLeadModal);
-  document.getElementById('modal-close-btn').addEventListener('click', closeLeadModal);
+document.getElementById('btn-new-lead').addEventListener('click', function() {
+  goTo('customers', document.getElementById('nav-customers'));
+});
+
+document.getElementById('btn-new-lead2').addEventListener('click', function() {
+  goTo('customers', document.getElementById('nav-customers'));
+});  document.getElementById('modal-close-btn').addEventListener('click', closeLeadModal);
   document.getElementById('modal-cancel-btn').addEventListener('click', closeLeadModal);
   document.getElementById('modal-save-btn').addEventListener('click', saveLead);
   document.getElementById('drawer-close-btn').addEventListener('click', closeDrawer);
@@ -896,12 +900,18 @@ function setupAC2(inputId, listId) {
         list.style.display = 'block';
         list.querySelectorAll('.autocomplete-item').forEach(function(item) {
           item.addEventListener('click', function() {
-            var contactId = this.getAttribute('data-id');
-            list.style.display = 'none';
-            // סגור את טופס הליד החדש ופתח כרטיס לקוח
-            closeLeadModal();
-            openCustomerCard(parseInt(contactId));
-          });
+var contactId = this.getAttribute('data-id');
+selectedContactId = parseInt(contactId);
+
+document.getElementById('l-name').value = decodeURIComponent(this.getAttribute('data-name') || '');
+document.getElementById('l-phone').value = decodeURIComponent(this.getAttribute('data-phone') || '');
+document.getElementById('l-email').value = decodeURIComponent(this.getAttribute('data-email') || '');
+
+document.getElementById('dup-name').style.display = 'none';
+document.getElementById('dup-phone').style.display = 'none';
+list.style.display = 'none';
+
+toast('לקוח קיים נבחר — האירוע יקושר לכרטיס הלקוח', 'success');          });
         });
       }).catch(function() {});
     }, 300);
@@ -1161,4 +1171,16 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 </body>
 </html>`;
+}
+function selectCustomer(c) {
+  selectedContactId = c.id;
+
+  document.getElementById('l-name').value = c.name || '';
+  document.getElementById('l-phone').value = c.phone || '';
+  document.getElementById('l-email').value = c.email || '';
+
+  // הסתר autocomplete
+  document.getElementById('ac-name').style.display = 'none';
+  document.getElementById('ac-phone').style.display = 'none';
+  document.getElementById('ac-email').style.display = 'none';
 }
