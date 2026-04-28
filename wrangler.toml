@@ -6,17 +6,14 @@ name = "comics-crm"
 main = "worker.js"
 compatibility_date = "2024-01-01"
 
-# חבר את זה לדומיין שלך
-# routes = [{ pattern = "crm.comics-events.co.il/*", zone_name = "comics-events.co.il" }]
+# Static assets (תמונות וכו')
+assets = { directory = "./public" }
 
 # D1 Database
 [[d1_databases]]
 binding = "DB"
 database_name = "comics-crm-db"
 database_id = "38fb2c28-44cf-4c67-996c-f6e16d9d77d0"
-
-# Environment variables (סודות - הכנס דרך wrangler secret put)
-# JWT_SECRET = "your-secret-key"
 
 [vars]
 ENVIRONMENT = "production"
