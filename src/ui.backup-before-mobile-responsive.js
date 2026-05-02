@@ -222,181 +222,6 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .contact-stat{text-align:center;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm)}
 .contact-stat-val{font-size:18px;font-weight:800;color:var(--accent)}
 .contact-stat-label{font-size:10px;color:var(--text3);margin-top:2px}
-
-/* ===== Mobile Responsive ===== */
-@media (max-width: 768px) {
-  #app {
-    display: block;
-  }
-
-  #sidebar {
-    position: fixed;
-    top: auto;
-    right: 0;
-    left: 0;
-    bottom: 0;
-    width: 100%;
-    height: 68px;
-    flex-direction: row;
-    align-items: center;
-    border-left: none;
-    border-top: 1px solid var(--border);
-    z-index: 999;
-  }
-
-  .sidebar-logo,
-  .nav-section,
-  .sidebar-bottom,
-  #gcal-status {
-    display: none !important;
-  }
-
-  #sidebar .nav-item {
-    flex: 1;
-    justify-content: center;
-    flex-direction: column;
-    gap: 2px;
-    margin: 0;
-    padding: 8px 4px;
-    border-radius: 0;
-    font-size: 11px;
-  }
-
-  .nav-icon {
-    font-size: 18px;
-  }
-
-  #main {
-    margin-right: 0;
-    padding: 16px 12px 86px;
-  }
-
-  .page-header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-    margin-bottom: 14px;
-  }
-
-  .page-title {
-    font-size: 20px;
-  }
-
-  .page-title small {
-    display: block;
-    margin-right: 0;
-    margin-top: 4px;
-    font-size: 12px;
-  }
-
-  .stats-grid {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-
-  .stat-card {
-    padding: 14px;
-  }
-
-  .dash-grid,
-  #page-dashboard > div[style*="grid-template-columns"] {
-    display: grid !important;
-    grid-template-columns: 1fr !important;
-  }
-
-  .table-toolbar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .search-input,
-  .filter-select,
-  .form-input,
-  .form-select {
-    width: 100% !important;
-    max-width: none !important;
-  }
-
-  #customers-grid > div {
-    grid-template-columns: 1fr !important;
-  }
-
-  .customer-card {
-    padding: 16px;
-  }
-
-  .customer-card-name {
-    font-size: 18px;
-  }
-
-  .customer-card-meta {
-    font-size: 13px;
-  }
-
-  .customer-card-stats {
-    flex-wrap: wrap;
-  }
-
-  .customer-stat-pill {
-    font-size: 12px;
-    padding: 5px 10px;
-  }
-
-  table {
-    min-width: 720px;
-  }
-
-  .table-card {
-    overflow-x: auto;
-  }
-
-  .drawer {
-    width: 100%;
-  }
-
-  .modal {
-    width: 94vw;
-    max-height: 90vh;
-  }
-
-  .form-row,
-  .form-row-3,
-  .check-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .contact-card {
-    position: static !important;
-  }
-
-  #customers-grid div[style*="grid-template-columns:360px 1fr"] {
-    display: grid !important;
-    grid-template-columns: 1fr !important;
-  }
-}
-
-@media (max-width: 480px) {
-  #main {
-    padding: 12px 10px 84px;
-  }
-
-  .btn {
-    justify-content: center;
-  }
-
-  .customer-card {
-    border-radius: 14px;
-  }
-
-  .badge {
-    font-size: 10px;
-  }
-
-  .page-title {
-    font-size: 18px;
-  }
-}
-
 </style>
 </head>
 <body>
@@ -474,7 +299,6 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     <div id="page-customers" class="page">
       <div class="page-header">
         <div class="page-title">כרטיסי לקוח <small>לקוחות חוזרים וכל האירועים שלהם</small></div>
-        <button class="btn btn-primary" id="btn-new-customer">+ לקוח חדש</button>
       </div>
       <div class="table-card">
         <div class="table-toolbar">
@@ -772,29 +596,7 @@ function checkDup(field, value) {
 }
 
 function openDupLead() {
-  if (!dupLeadId) return;
-
-  apiCall('GET', '/api/leads/' + dupLeadId).then(function(data) {
-    var l = data.lead || {};
-
-    if (l.contact_id) {
-      closeLeadModal();
-      openCustomerCard(parseInt(l.contact_id));
-      return;
-    }
-
-    var q = l.phone || l.email || l.name || '';
-    return apiCall('GET', '/api/contacts?search=' + encodeURIComponent(q)).then(function(res) {
-      if (res.contacts && res.contacts.length) {
-        closeLeadModal();
-        openCustomerCard(parseInt(res.contacts[0].id));
-      } else {
-        toast('נמצא ליד קיים, אבל עדיין אין לו כרטיס לקוח', 'error');
-      }
-    });
-  }).catch(function(e) {
-    toast(e.message, 'error');
-  });
+  // לא עושים כלום - המשתמש ייבחר מהאוטוקומפליט
 }
 
 function loadDashboard() {
@@ -1175,29 +977,7 @@ function fillFromContact(contactId, contact) {
 }
 
 function openDupLead() {
-  if (!dupLeadId) return;
-
-  apiCall('GET', '/api/leads/' + dupLeadId).then(function(data) {
-    var l = data.lead || {};
-
-    if (l.contact_id) {
-      closeLeadModal();
-      openCustomerCard(parseInt(l.contact_id));
-      return;
-    }
-
-    var q = l.phone || l.email || l.name || '';
-    return apiCall('GET', '/api/contacts?search=' + encodeURIComponent(q)).then(function(res) {
-      if (res.contacts && res.contacts.length) {
-        closeLeadModal();
-        openCustomerCard(parseInt(res.contacts[0].id));
-      } else {
-        toast('נמצא ליד קיים, אבל עדיין אין לו כרטיס לקוח', 'error');
-      }
-    });
-  }).catch(function(e) {
-    toast(e.message, 'error');
-  });
+  // לא בשימוש יותר
 }
 
 // ---- Customer Cards ----
@@ -1393,9 +1173,6 @@ document.addEventListener('DOMContentLoaded', function() {
   init();
   var custClose = document.getElementById('customer-modal-close');
   if (custClose) custClose.addEventListener('click', closeCustomerModal);
-  var newCustomerBtn = document.getElementById('btn-new-customer');
-  if (newCustomerBtn) newCustomerBtn.addEventListener('click', openLeadModal);
-
   var custSearch = document.getElementById('customers-search');
   if (custSearch) custSearch.addEventListener('input', function() {
     clearTimeout(searchTimer); searchTimer = setTimeout(loadCustomers, 300);

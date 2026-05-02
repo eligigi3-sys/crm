@@ -929,7 +929,29 @@ function renderDrawer(l, notes) {
   var balance = (l.price||0) - (l.deposit||0);
   var html = '<div class="info-section"><div style="display:flex;gap:8px;margin-bottom:12px"><span class="badge badge-purple">אירוע #' + (l.lead_num || l.id) + '</span>' + statusBadge(l.status) + (l.event_type ? '<span class="badge badge-purple">' + l.event_type + '</span>' : '') + '</div>';
   html += '<div class="info-section-title">פרטי לקוח</div>';
-  html += '<div class="info-row"><span class="info-label">טלפון</span><span class="info-value">' + (l.phone ? '<a href="tel:' + l.phone + '" style="color:var(--accent)"><img src="/phone-icon.png" alt="Phone" style="width:24px;height:24px;object-fit:contain;display:block"></a>' : '—') + '</span></div>';
+'<div class="info-row">' +
+  '<span class="info-label">טלפון</span>' +
+  '<span class="info-value" style="display:flex;align-items:center;gap:8px">' +
+
+    '<span style="font-weight:600;color:var(--text)">' + (c.phone || '') + '</span>' +
+
+    (c.phone ? 
+      '<a onclick="event.stopPropagation()" target="_blank" href="https://wa.me/' + 
+      String(c.phone).replace(/[^0-9]/g,'').replace(/^0/,'972') + '">' +
+      '<img src="/whatsapp-icon.png" style="width:30px;height:30px">' +
+      '</a>' 
+    : '') +
+
+    (c.phone ? 
+      '<a onclick="event.stopPropagation()" href="tel:' + c.phone + '">' +
+      '<img src="/phone-icon.png" style="width:30px;height:30px">' +
+      '</a>' 
+    : '') +
+
+  '</span>' +
+'</div>'    (c.phone ? '<a onclick="event.stopPropagation()" target="_blank" href="https://wa.me/' + String(c.phone).replace(/[^0-9]/g,'').replace(/^0/,'972') + '"><img src="/whatsapp-icon.png" style="width:28px;height:28px"></a>' : '') +
+    (c.phone ? '<a onclick="event.stopPropagation()" href="tel:' + c.phone + '"><img src="/phone-icon.png" style="width:28px;height:28px"></a>' : '') +
+  '</span></div>';
   html += '<div class="info-row"><span class="info-label">אימייל</span><span class="info-value">' + (l.email||'—') + '</span></div></div>';
   html += '<div class="info-section"><div class="info-section-title">פרטי האירוע</div>';
   html += '<div class="info-row"><span class="info-label">תאריך</span><span class="info-value" style="font-weight:700;color:var(--accent)">' + (l.event_date?formatDate(l.event_date):'—') + '</span></div>';
@@ -1202,6 +1224,7 @@ function openDupLead() {
 
 // ---- Customer Cards ----
 
+
 function loadCustomers() {
   var search = document.getElementById('customers-search') ? document.getElementById('customers-search').value : '';
   var statusFilter = document.getElementById('customers-filter-status') ? document.getElementById('customers-filter-status').value : '';
@@ -1227,15 +1250,21 @@ function loadCustomers() {
     }
 
     if (sortBy === 'name') {
-      contacts.sort(function(a,b) { return String(a.name || '').localeCompare(String(b.name || ''), 'he'); });
+      contacts.sort(function(a,b) {
+        return String(a.name || '').localeCompare(String(b.name || ''), 'he');
+      });
     }
 
     if (sortBy === 'events') {
-      contacts.sort(function(a,b) { return Number(b.events_count || 0) - Number(a.events_count || 0); });
+      contacts.sort(function(a,b) {
+        return Number(b.events_count || 0) - Number(a.events_count || 0);
+      });
     }
 
     if (sortBy === 'revenue') {
-      contacts.sort(function(a,b) { return Number(b.revenue || 0) - Number(a.revenue || 0); });
+      contacts.sort(function(a,b) {
+        return Number(b.revenue || 0) - Number(a.revenue || 0);
+      });
     }
 
     if (sortBy === 'next_event') {
@@ -1262,7 +1291,6 @@ function loadCustomers() {
         var waPhone = cleanPhone.replace(/^0/, '972');
 
         return '<div class="customer-card" data-cid="' + c.id + '">' +
-
           '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">' +
             '<div style="flex:1">' +
               '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-start">' +
@@ -1287,7 +1315,6 @@ function loadCustomers() {
           '</div>' +
 
           (c.next_event_date ? '<div class="customer-card-meta" style="color:var(--blue);font-weight:800;margin-top:10px;font-size:13px">אירוע קרוב: ' + formatDate(c.next_event_date) + '</div>' : '') +
-
         '</div>';
       }).join('') + '</div>';
 
@@ -1296,7 +1323,9 @@ function loadCustomers() {
         openCustomerCard(parseInt(this.getAttribute('data-cid')));
       });
     });
-  }).catch(function(e) { toast(e.message, 'error'); });
+  }).catch(function(e) {
+    toast(e.message, 'error');
+  });
 }
 
 function openCustomerCard(id) {\n  apiCall('GET', '/api/contacts/' + id).then(function(data) {\n    var c = data.contact || {};\n    var leads = data.leads || [];\n    var stats = data.stats || {};\n    var grid = document.getElementById('customers-grid');\n    if (!grid) return;\n\n    var tags = [];\n    try { tags = c.tags ? JSON.parse(c.tags) : []; if (!Array.isArray(tags)) tags = []; } catch(e) { tags = []; }\n\n    var cleanPhone = (c.phone || '').replace(/[^0-9]/g, '');\n    var waPhone = cleanPhone.charAt(0) === '0' ? '972' + cleanPhone.substring(1) : cleanPhone;\n\n    var html = '';\n\n    html += '<div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">';\n    html += '<button class="btn btn-secondary btn-sm" id="back-to-customers">← חזרה לרשימת לקוחות</button>';\n    html += '<button class="btn btn-primary btn-sm" id="add-event-btn">+ אירוע חדש ללקוח</button>';\n    html += '</div>';\n\n    html += '<div style="display:grid;grid-template-columns:360px 1fr;gap:20px;align-items:start">';\n\n    html += '<div class="contact-card" style="position:sticky;top:20px">';\n    html += '<div class="contact-card-header"><div>';\n    html += '<div class="contact-card-name">' + (c.name || 'לקוח ללא שם') + '</div>';\n    html += '<div class="contact-card-meta">מספר לקוח #' + (c.contact_num || c.id || '') + '</div>';\n    html += '</div><div style="display:flex;gap:6px;flex-wrap:wrap">';

@@ -474,7 +474,6 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     <div id="page-customers" class="page">
       <div class="page-header">
         <div class="page-title">כרטיסי לקוח <small>לקוחות חוזרים וכל האירועים שלהם</small></div>
-        <button class="btn btn-primary" id="btn-new-customer">+ לקוח חדש</button>
       </div>
       <div class="table-card">
         <div class="table-toolbar">
@@ -772,29 +771,7 @@ function checkDup(field, value) {
 }
 
 function openDupLead() {
-  if (!dupLeadId) return;
-
-  apiCall('GET', '/api/leads/' + dupLeadId).then(function(data) {
-    var l = data.lead || {};
-
-    if (l.contact_id) {
-      closeLeadModal();
-      openCustomerCard(parseInt(l.contact_id));
-      return;
-    }
-
-    var q = l.phone || l.email || l.name || '';
-    return apiCall('GET', '/api/contacts?search=' + encodeURIComponent(q)).then(function(res) {
-      if (res.contacts && res.contacts.length) {
-        closeLeadModal();
-        openCustomerCard(parseInt(res.contacts[0].id));
-      } else {
-        toast('נמצא ליד קיים, אבל עדיין אין לו כרטיס לקוח', 'error');
-      }
-    });
-  }).catch(function(e) {
-    toast(e.message, 'error');
-  });
+  // לא עושים כלום - המשתמש ייבחר מהאוטוקומפליט
 }
 
 function loadDashboard() {
@@ -1175,29 +1152,7 @@ function fillFromContact(contactId, contact) {
 }
 
 function openDupLead() {
-  if (!dupLeadId) return;
-
-  apiCall('GET', '/api/leads/' + dupLeadId).then(function(data) {
-    var l = data.lead || {};
-
-    if (l.contact_id) {
-      closeLeadModal();
-      openCustomerCard(parseInt(l.contact_id));
-      return;
-    }
-
-    var q = l.phone || l.email || l.name || '';
-    return apiCall('GET', '/api/contacts?search=' + encodeURIComponent(q)).then(function(res) {
-      if (res.contacts && res.contacts.length) {
-        closeLeadModal();
-        openCustomerCard(parseInt(res.contacts[0].id));
-      } else {
-        toast('נמצא ליד קיים, אבל עדיין אין לו כרטיס לקוח', 'error');
-      }
-    });
-  }).catch(function(e) {
-    toast(e.message, 'error');
-  });
+  // לא בשימוש יותר
 }
 
 // ---- Customer Cards ----
@@ -1393,9 +1348,6 @@ document.addEventListener('DOMContentLoaded', function() {
   init();
   var custClose = document.getElementById('customer-modal-close');
   if (custClose) custClose.addEventListener('click', closeCustomerModal);
-  var newCustomerBtn = document.getElementById('btn-new-customer');
-  if (newCustomerBtn) newCustomerBtn.addEventListener('click', openLeadModal);
-
   var custSearch = document.getElementById('customers-search');
   if (custSearch) custSearch.addEventListener('input', function() {
     clearTimeout(searchTimer); searchTimer = setTimeout(loadCustomers, 300);

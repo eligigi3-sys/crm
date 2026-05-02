@@ -38,15 +38,21 @@ function loadCustomers() {
     }
 
     if (sortBy === 'name') {
-      contacts.sort(function(a,b) { return String(a.name || '').localeCompare(String(b.name || ''), 'he'); });
+      contacts.sort(function(a,b) {
+        return String(a.name || '').localeCompare(String(b.name || ''), 'he');
+      });
     }
 
     if (sortBy === 'events') {
-      contacts.sort(function(a,b) { return Number(b.events_count || 0) - Number(a.events_count || 0); });
+      contacts.sort(function(a,b) {
+        return Number(b.events_count || 0) - Number(a.events_count || 0);
+      });
     }
 
     if (sortBy === 'revenue') {
-      contacts.sort(function(a,b) { return Number(b.revenue || 0) - Number(a.revenue || 0); });
+      contacts.sort(function(a,b) {
+        return Number(b.revenue || 0) - Number(a.revenue || 0);
+      });
     }
 
     if (sortBy === 'next_event') {
@@ -73,7 +79,6 @@ function loadCustomers() {
         var waPhone = cleanPhone.replace(/^0/, '972');
 
         return '<div class="customer-card" data-cid="' + c.id + '">' +
-
           '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">' +
             '<div style="flex:1">' +
               '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-start">' +
@@ -98,7 +103,6 @@ function loadCustomers() {
           '</div>' +
 
           (c.next_event_date ? '<div class="customer-card-meta" style="color:var(--blue);font-weight:800;margin-top:10px;font-size:13px">אירוע קרוב: ' + formatDate(c.next_event_date) + '</div>' : '') +
-
         '</div>';
       }).join('') + '</div>';
 
@@ -107,7 +111,9 @@ function loadCustomers() {
         openCustomerCard(parseInt(this.getAttribute('data-cid')));
       });
     });
-  }).catch(function(e) { toast(e.message, 'error'); });
+  }).catch(function(e) {
+    toast(e.message, 'error');
+  });
 }
 
 `;
