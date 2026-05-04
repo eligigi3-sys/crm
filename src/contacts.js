@@ -76,7 +76,94 @@ export async function handleContacts(request, env, path) {
     return { contacts: results };
   }
 
+  const timelineMatch = path.match(/^\/api\/contacts\/(\d+)\/timeline$/);
   const idMatch = path.match(/^\/api\/contacts\/(\d+)$/);
+
+  // GET /api/contacts/:id/timeline
+  if (timelineMatch && method === 'GET') {
+    const id = timelineMatch[1];
+
+    const contact = await env.DB.prepare(
+      'SELECT * FROM contacts WHERE id = ?'
+    ).bind(id).first();
+
+    if (!contact) throw new Error('לקוח לא נמצא');
+
+    const { results: leads } = await env.DB.prepare(
+      `SELECT id, contact_id, lead_num, name, status, event_type, event_date, created_at, updated_at
+       FROM leads
+       WHERE contact_id = ?`
+    ).bind(id).all();
+
+    const { results: notes } = await env.DB.prepare(
+      `SELECT lead_notes.id, lead_notes.lead_id, lead_notes.note, lead_notes.created_at, leads.name, leads.event_type, leads.lead_num
+       FROM lead_notes
+       LEFT JOIN leads ON lead_notes.lead_id = leads.id
+       WHERE leads.contact_id = ?`
+    ).bind(id).all();
+
+    const timeline = [];
+
+    timeline.push({
+      type: 'customer_created',
+      created_at: contact.created_at,
+      title: 'לקוח נוצר',
+      text: 'הלקוח נוסף למערכת',
+      contact_id: contact.id
+    });
+
+    if (contact.updated_at && contact.updated_at !== contact.created_at) {
+      timeline.push({
+        type: 'customer_updated',
+        created_at: contact.updated_at,
+        title: 'כרטיס לקוח עודכן',
+        text: 'פרטי הלקוח עודכנו',
+        contact_id: contact.id
+      });
+    }
+
+    leads.forEach(function(lead) {
+      timeline.push({
+        type: 'lead_created',
+        created_at: lead.created_at,
+        title: 'ליד/אירוע נוצר',
+        text: 'נוצר ליד #' + (lead.lead_num || lead.id) + (lead.event_type ? ' עבור ' + lead.event_type : ''),
+        lead_id: lead.id,
+        contact_id: contact.id
+      });
+
+      if (lead.updated_at && lead.updated_at !== lead.created_at) {
+        timeline.push({
+          type: 'lead_updated',
+          created_at: lead.updated_at,
+          title: 'ליד/אירוע עודכן',
+          text: 'ליד #' + (lead.lead_num || lead.id) + (lead.status ? ' עודכן לסטטוס ' + lead.status : ' עודכן'),
+          lead_id: lead.id,
+          contact_id: contact.id
+        });
+      }
+    });
+
+    notes.forEach(function(note) {
+      timeline.push({
+        type: 'note_added',
+        created_at: note.created_at,
+        title: 'נוספה הערה',
+        text: note.note,
+        lead_id: note.lead_id,
+        contact_id: contact.id
+      });
+    });
+
+    timeline.sort(function(a, b) {
+      return String(b.created_at || '').localeCompare(String(a.created_at || ''));
+    });
+
+    return {
+      contact_id: contact.id,
+      timeline
+    };
+  }
 
   // GET /api/contacts/:id
   if (idMatch && method === 'GET') {
