@@ -616,18 +616,6 @@ tr:hover td{background:#fafbfc;cursor:pointer}
   .calendar-event-pill{font-size:10px;padding:4px 5px}
 }
 
-
-/* ===== Calendar Complete Final ===== */
-.calendar-day-real{min-height:120px;border-left:1px solid var(--border);border-bottom:1px solid var(--border);padding:8px;background:#fff;position:relative;cursor:pointer}
-.calendar-day-real:hover{background:#f8fbff}
-.calendar-day-real.today{background:#eef6ff;box-shadow:inset 0 0 0 2px var(--accent)}
-.calendar-add-btn{position:absolute;top:6px;left:6px;width:24px;height:24px;border-radius:50%;border:0;background:var(--accent);color:#fff;font-weight:900;cursor:pointer}
-.calendar-event-pill{display:block;width:100%;border:0;border-radius:8px;padding:5px 7px;margin-bottom:5px;text-align:right;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.calendar-event-pill.closed{background:var(--green-light);color:var(--green)}
-.calendar-event-pill.lead{background:var(--blue-light);color:var(--blue)}
-.calendar-event-pill.quote{background:var(--orange-light);color:var(--orange)}
-.calendar-event-pill.cancelled{background:var(--bg);color:var(--text3)}
-
 </style>
 </head>
 <body>
@@ -655,7 +643,6 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     <div class="nav-section">תפריט</div>
     <div class="nav-item active" id="nav-dashboard"><span class="nav-icon">📊</span> דאשבורד</div>
     <div class="nav-item" id="nav-leads"><span class="nav-icon">👥</span> לקוחות <span class="nav-badge" id="nav-leads-count" style="display:none">0</span></div>
-    <div class="nav-item" id="nav-shopping"><span class="nav-icon">🛒</span> רשימות קניות</div>
     <div class="nav-item" id="nav-calendar"><span class="nav-icon">📅</span> יומן אירועים</div>
     <div id="gcal-status" style="margin:8px;padding:10px 12px;border-radius:8px;font-size:12px;display:none"></div>
     <div class="sidebar-bottom">
@@ -743,21 +730,6 @@ id="customers-search">
         </div>
       </div>
     </div>
-    <div id="page-shopping" class="page">
-      <div class="page-header">
-        <div class="page-title">רשימות קניות <small>חנויות ופריטים לקנייה</small></div>
-        <button class="btn btn-primary" id="btn-new-shopping-list">+ חנות חדשה</button>
-      </div>
-
-      <div class="table-toolbar">
-        <input class="search-input" id="shopping-search" placeholder="חיפוש חנות...">
-      </div>
-
-      <div id="shopping-grid" style="padding:16px">
-        <div class="dash-empty">אין עדיין רשימות קניות</div>
-      </div>
-    </div>
-
     <div id="page-calendar" class="page">
       <div class="page-header"><div class="page-title">יומן אירועים 📅</div></div>
       <div class="table-card">
@@ -899,8 +871,6 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   document.getElementById('add-note-btn').addEventListener('click', addNote);
   document.getElementById('nav-dashboard').addEventListener('click', function() { goTo('dashboard', this); });
   document.getElementById('nav-leads').addEventListener('click', function() { goTo('customers', this); });
-  var navShopping = document.getElementById('nav-shopping');
-  if (navShopping) navShopping.addEventListener('click', function() { goTo('shopping', this); });
   document.getElementById('nav-calendar').addEventListener('click', function() { goTo('calendar', this); });
   var navCustomers = document.getElementById('nav-customers');
   if (navCustomers) navCustomers.addEventListener('click', function() { goTo('customers', this); });
@@ -941,7 +911,6 @@ function goTo(page, el) {
   if (el) el.classList.add('active');
   if (page === 'dashboard') loadDashboard();
   if (page === 'leads') loadLeads();
-  if (page === 'shopping') loadShoppingLists();
   if (page === 'calendar') loadCalendar();
   if (page === 'customers') loadCustomers();
 }
@@ -967,22 +936,7 @@ function doLogin() {
     localStorage.setItem('crm_token', token);
     localStorage.setItem('crm_user', JSON.stringify(currentUser));
     showApp();
-  
-setTimeout(function() {
-
-  grid.querySelectorAll('[data-shopping-id]').forEach(function(card) {
-
-    card.addEventListener('click', function() {
-
-      openShoppingList(parseInt(this.getAttribute('data-shopping-id')));
-
-    });
-
-  });
-
-}, 50);
-
-}).catch(function(e) {
+  }).catch(function(e) {
     errEl.textContent = e.message || 'שגיאה בכניסה';
     errEl.style.display = 'block';
   });
@@ -1166,274 +1120,20 @@ function loadLeads() {
 
 
 
-
-
-function loadShoppingLists() {
-  var grid = document.getElementById('shopping-grid');
-  if (!grid) return;
-
-  apiCall('GET', '/api/shopping-lists').then(function(data) {
-    var lists = data.lists || [];
-
-    if (!lists.length) {
-      grid.innerHTML = '<div class="dash-empty">אין עדיין רשימות קניות</div>';
-      return;
-    }
-
-    grid.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">' +
-      lists.map(function(l) {
-        return '<div class="customer-card" data-shopping-id="' + l.id + '" style="cursor:pointer">' +
-          '<div class="customer-card-name">' + (l.name || 'חנות ללא שם') + '</div>' +
-          '<div class="customer-card-meta">' + (l.contact_name || '') + (l.contact_phone ? ' · ' + l.contact_phone : '') + '</div>' +
-          '<div class="customer-card-meta">' + (l.address || '') + '</div>' +
-          '<div class="customer-card-stats" style="margin-top:12px">' +
-            '<span class="customer-stat-pill">' + (l.items_count || 0) + ' פריטים</span>' +
-            '<span class="customer-stat-pill">' + (l.done_count || 0) + ' נקנו</span>' +
-          '</div>' +
-        '</div>';
-      }).join('') +
-    '</div>';
-
-    grid.querySelectorAll('[data-shopping-id]').forEach(function(card) {
-      card.onclick = function() {
-        openShoppingList(parseInt(this.getAttribute('data-shopping-id')));
-      };
-    });
-  }).catch(function(e) {
-    toast(e.message, 'error');
-  });
-}
-
-
-
-var currentShoppingListId = null;
-
-function openShoppingItemModal() {
-
-  if (!currentShoppingListId) {
-    toast('לא נבחרה חנות', 'error');
-    return;
-  }
-
-  var old = document.getElementById('shopping-item-modal');
-  if (old) old.remove();
-
-  var overlay = document.createElement('div');
-  overlay.className = 'modal-overlay open';
-  overlay.id = 'shopping-item-modal';
-
-  overlay.innerHTML =
-    '<div class="modal" style="width:500px">' +
-
-      '<div class="modal-header">' +
-        '<h2>מוצר חדש</h2>' +
-        '<button class="modal-close" id="shopping-item-close">✕</button>' +
-      '</div>' +
-
-      '<div class="modal-body">' +
-
-        '<div class="form-group">' +
-          '<label class="form-label">שם מוצר</label>' +
-          '<input class="form-input" id="shopping-item-name">' +
-        '</div>' +
-
-        '<div class="form-group">' +
-          '<label class="form-label">כמות</label>' +
-          '<input class="form-input" id="shopping-item-quantity">' +
-        '</div>' +
-
-        '<div class="form-group">' +
-          '<label class="form-label">מחיר</label>' +
-          '<input class="form-input" type="number" id="shopping-item-price">' +
-        '</div>' +
-
-        '<div class="form-group">' +
-          '<label class="form-label">סטטוס</label>' +
-          '<select class="form-input" id="shopping-item-status">' +
-            '<option value="pending">ממתין</option>' +
-            '<option value="done">נקנה</option>' +
-          '</select>' +
-        '</div>' +
-
-        '<div class="form-group">' +
-          '<label class="form-label">הערות</label>' +
-          '<textarea class="form-input" id="shopping-item-notes" style="min-height:80px"></textarea>' +
-        '</div>' +
-
-      '</div>' +
-
-      '<div class="modal-footer">' +
-        '<button class="btn btn-secondary" id="shopping-item-cancel">ביטול</button>' +
-        '<button class="btn btn-primary" id="shopping-item-save">שמור</button>' +
-      '</div>' +
-
-    '</div>';
-
-  document.body.appendChild(overlay);
-
-  function closeModal() {
-    overlay.remove();
-  }
-
-  document.getElementById('shopping-item-close').onclick = closeModal;
-  document.getElementById('shopping-item-cancel').onclick = closeModal;
-
-  document.getElementById('shopping-item-save').onclick = function() {
-
-    var itemName = document.getElementById('shopping-item-name').value.trim();
-
-    if (!itemName) {
-      toast('שם מוצר חובה', 'error');
-      return;
-    }
-
-    apiCall(
-      'POST',
-      '/api/shopping-lists/' + currentShoppingListId + '/items',
-      {
-        item_name: itemName,
-        quantity: document.getElementById('shopping-item-quantity').value.trim(),
-        price: Number(document.getElementById('shopping-item-price').value || 0),
-        status: document.getElementById('shopping-item-status').value,
-        notes: document.getElementById('shopping-item-notes').value.trim()
-      }
-    )
-    .then(function() {
-
-      closeModal();
-
-      toast('מוצר נוסף', 'success');
-
-      openShoppingList(currentShoppingListId);
-
-    })
-    .catch(function(e) {
-
-      toast(e.message, 'error');
-
-    });
-  };
-}
-
-
-
-function openShoppingList(id) {
-  currentShoppingListId = id;
-  apiCall('GET', '/api/shopping-lists/' + id).then(function(data) {
-    var grid = document.getElementById('shopping-grid');
-    if (!grid) return;
-
-    var list = data.list || {};
-    var items = data.items || [];
-    var purchases = data.purchases || [];
-    var summary = data.summary || {};
-
-    var html = '';
-
-    html += '<div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:10px">';
-    html += '<button class="btn btn-secondary btn-sm" id="back-to-shopping">← חזרה לחנויות</button>';
-    html += '<button class="btn btn-primary btn-sm" id="add-shopping-item-btn">+ מוצר לרשימה</button>';
-    html += '</div>';
-
-    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">';
-
-    html += '<div>';
-
-    html += '<div class="contact-card">';
-    html += '<div class="contact-card-header"><div>';
-    html += '<div class="contact-card-name">' + (list.name || 'חנות') + '</div>';
-    html += '<div class="contact-card-meta">' + (list.address || '') + '</div>';
-    html += '</div><span class="badge badge-purple">' + items.length + ' פריטים</span></div>';
-
-    html += '<div class="info-section"><div class="info-section-title">פרטי חנות</div>';
-    html += '<div class="info-row"><span class="info-label">איש קשר</span><span class="info-value">' + (list.contact_name || '—') + '</span></div>';
-    html += '<div class="info-row"><span class="info-label">טלפון</span><span class="info-value">' + (list.contact_phone || '—') + '</span></div>';
-    html += '<div class="info-row"><span class="info-label">טלפון נוסף</span><span class="info-value">' + (list.extra_phone || '—') + '</span></div>';
-    html += '<div class="info-row"><span class="info-label">שעות פתיחה</span><span class="info-value">' + (list.opening_hours || '—') + '</span></div>';
-    html += '</div></div>';
-
-    html += '<div class="stats-grid" style="margin-top:16px">';
-    html += '<div class="stat-card"><div class="stat-label">החודש</div><div class="stat-value">₪' + fmtMoney(summary.current_month || 0) + '</div></div>';
-    html += '<div class="stat-card"><div class="stat-label">חודש שעבר</div><div class="stat-value">₪' + fmtMoney(summary.previous_month || 0) + '</div></div>';
-    html += '<div class="stat-card"><div class="stat-label">מתחילת השנה</div><div class="stat-value">₪' + fmtMoney(summary.year_total || 0) + '</div></div>';
-    html += '</div>';
-
-    html += '<div class="table-card" style="margin-top:16px">';
-    html += '<div class="table-toolbar" style="justify-content:space-between"><strong>רשימת קניות פעילה</strong><button class="btn btn-primary btn-sm" id="shopping-purchased-btn">קניתי</button></div>';
-
-    if (!items.length) {
-      html += '<div class="dash-empty">אין מוצרים ברשימה</div>';
-    } else {
-      html += '<table><thead><tr><th>מוצר</th><th>כמות</th><th>מחיר</th><th>סטטוס</th></tr></thead><tbody>';
-      items.forEach(function(it) {
-        html += '<tr><td>' + (it.item_name || '') + '</td><td>' + (it.quantity || '') + '</td><td>₪' + fmtMoney(it.price || 0) + '</td><td>' + (it.status || 'pending') + '</td></tr>';
-      });
-      html += '</tbody></table>';
-    }
-
-    html += '</div></div>';
-
-    html += '<div class="table-card">';
-    html += '<div class="table-toolbar"><strong>עסקאות קודמות</strong></div>';
-
-    if (!purchases.length) {
-      html += '<div class="dash-empty">אין עסקאות קודמות</div>';
-    } else {
-      html += '<table><thead><tr><th>תאריך</th><th>סכום</th><th>הערות</th></tr></thead><tbody>';
-      purchases.forEach(function(p) {
-        html += '<tr class="shopping-purchase-row" data-purchase-id="' + p.id + '" style="cursor:pointer"><td>' + (p.purchase_date || '') + '</td><td>₪' + fmtMoney(p.total_amount || 0) + '</td><td>' + (p.notes || '') + '</td></tr>';
-      });
-      html += '</tbody></table>';
-    }
-
-    html += '</div></div>';
-
-    grid.innerHTML = html;
-
-    
-document.getElementById('back-to-shopping').onclick = loadShoppingLists;
-
-var addBtn = document.getElementById('add-shopping-item-btn');
-
-if (addBtn) {
-  addBtn.onclick = openShoppingItemModal;
-}
-
-  }).catch(function(e) {
-    toast(e.message, 'error');
-  });
-}
-
 function loadCalendar() {
-  if (typeof window.calendarViewYear === 'undefined') {
-    var now = new Date();
-    window.calendarViewYear = now.getFullYear();
-    window.calendarViewMonth = now.getMonth();
+  if (typeof calendarViewYear === 'undefined') {
+    window.calendarViewYear = new Date().getFullYear();
+    window.calendarViewMonth = new Date().getMonth();
   }
 
   apiCall('GET', '/api/leads').then(function(data) {
     var leads = (data.leads || []).filter(function(l) { return l.event_date; });
-
-    var statusFilter = window.calendarStatusFilter || '';
-    var typeFilter = window.calendarTypeFilter || '';
-
-    if (statusFilter) {
-      leads = leads.filter(function(l) {
-        return String(l.status || '') === String(statusFilter);
-      });
-    }
-
-    if (typeFilter) {
-      leads = leads.filter(function(l) {
-        return String(l.event_type || '') === String(typeFilter);
-      });
-    }
-
     renderRealCalendar(leads);
   }).catch(function(e) { toast(e.message, 'error'); });
 }
 
 function renderRealCalendar(leads) {
+  var tbody = document.getElementById('calendar-body');
   var page = document.getElementById('page-calendar');
   if (!page) return;
 
@@ -1446,102 +1146,66 @@ function renderRealCalendar(leads) {
   var year = window.calendarViewYear;
   var month = window.calendarViewMonth;
 
-  var today = new Date();
   var firstDay = new Date(year, month, 1).getDay();
   var daysInMonth = new Date(year, month + 1, 0).getDate();
+  var daysInPrev = new Date(year, month, 0).getDate();
 
   var eventMap = {};
   leads.forEach(function(l) {
-    var d = String(l.event_date || '').substring(0,10);
+    var d = (l.event_date || '').substring(0,10);
     if (!eventMap[d]) eventMap[d] = [];
     eventMap[d].push(l);
   });
 
   var html = '';
-
   html += '<div class="calendar-month-wrap">';
-  html += '<div class="calendar-top" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">';
+  html += '<div class="calendar-top">';
   html += '<div class="calendar-title">' + monthNames[month] + ' ' + year + '</div>';
-
-  html += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
-  html += '<select id="calendar-status-filter" class="form-select" style="width:150px">';
-  html += '<option value="">כל הסטטוסים</option>';
-  html += '<option value="lead">ליד</option>';
-  html += '<option value="quote">הצעת מחיר</option>';
-  html += '<option value="closed">סגור</option>';
-  html += '<option value="cancelled">בוטל</option>';
-  html += '</select>';
-
-  html += '<select id="calendar-type-filter" class="form-select" style="width:170px">';
-  html += '<option value="">כל סוגי האירועים</option>';
-  html += '<option value="בת מצווה">בת מצווה</option>';
-  html += '<option value="יום הולדת">יום הולדת</option>';
-  html += '<option value="אירוע חברה">אירוע חברה</option>';
-  html += '<option value="בר מצווה">בר מצווה</option>';
-  html += '<option value="חתונה">חתונה</option>';
-  html += '<option value="אחר">אחר</option>';
-  html += '</select>';
-  html += '</div>';
-
-  html += '<div style="display:flex;gap:8px">';
-  html += '<button class="btn btn-secondary btn-sm" id="cal-real-prev">‹ קודם</button>';
+  html += '<div class="calendar-actions">';
+  html += '<button class="btn btn-secondary btn-sm" id="cal-real-prev">‹ חודש קודם</button>';
   html += '<button class="btn btn-secondary btn-sm" id="cal-real-today">היום</button>';
-  html += '<button class="btn btn-secondary btn-sm" id="cal-real-next">הבא ›</button>';
+  html += '<button class="btn btn-secondary btn-sm" id="cal-real-next">חודש הבא ›</button>';
+  html += '</div></div>';
+
+  html += '<div class="calendar-weekdays">';
+  dayNames.forEach(function(d) { html += '<div class="calendar-weekday">' + d + '</div>'; });
   html += '</div>';
 
-  html += '</div>';
+  html += '<div class="calendar-grid-real">';
 
-  html += '<div class="calendar-weekdays" style="display:grid;grid-template-columns:repeat(7,1fr);background:#fafbfc;border-bottom:1px solid var(--border)">';
-  dayNames.forEach(function(d) {
-    html += '<div style="padding:10px;text-align:center;font-size:12px;font-weight:800;color:var(--text3)">' + d + '</div>';
-  });
-  html += '</div>';
-
-  html += '<div class="calendar-grid-real" style="display:grid;grid-template-columns:repeat(7,1fr)">';
-
-  for (var empty = 0; empty < firstDay; empty++) {
-    html += '<div class="calendar-day-real" style="opacity:.35;background:#fafbfc"></div>';
+  for (var i = firstDay - 1; i >= 0; i--) {
+    html += '<div class="calendar-day-real other"><div class="calendar-day-num-real">' + (daysInPrev - i) + '</div></div>';
   }
 
   for (var d = 1; d <= daysInMonth; d++) {
     var ds = year + '-' + pad2(month + 1) + '-' + pad2(d);
-    var isToday = year === today.getFullYear() && month === today.getMonth() && d === today.getDate();
     var events = eventMap[ds] || [];
 
-    html += '<div class="calendar-day-real ' + (isToday ? 'today' : '') + '" data-date="' + ds + '">';
-    html += '<button class="calendar-add-btn" data-date="' + ds + '">+</button>';
-    html += '<div class="calendar-day-num-real" style="font-size:12px;font-weight:900;margin-bottom:8px">' + d + '</div>';
+    html += '<div class="calendar-day-real">';
+    html += '<div class="calendar-day-num-real">' + d + '</div>';
 
-    events.forEach(function(l) {
-      html += '<button class="calendar-event-pill ' + (l.status || 'lead') + '" data-event-id="' + l.id + '">';
-      html += (l.event_time ? l.event_time + ' · ' : '') + (l.name || '') + (l.event_type ? ' · ' + l.event_type : '');
-      html += '</button>';
-    });
+    if (events.length) {
+      events.forEach(function(l) {
+        html += '<button class="calendar-event-pill ' + (l.status || 'lead') + '" data-event-id="' + l.id + '">';
+        html += (l.event_time ? l.event_time + ' · ' : '') + (l.name || '') + (l.event_type ? ' · ' + l.event_type : '');
+        html += '</button>';
+      });
+    } else {
+      html += '<div class="calendar-empty-day"> </div>';
+    }
 
     html += '</div>';
+  }
+
+  var totalCells = firstDay + daysInMonth;
+  var rem = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+  for (var x = 1; x <= rem; x++) {
+    html += '<div class="calendar-day-real other"><div class="calendar-day-num-real">' + x + '</div></div>';
   }
 
   html += '</div></div>';
 
   tableCard.innerHTML = html;
-
-  var sf = document.getElementById('calendar-status-filter');
-  if (sf) {
-    sf.value = window.calendarStatusFilter || '';
-    sf.onchange = function() {
-      window.calendarStatusFilter = this.value;
-      loadCalendar();
-    };
-  }
-
-  var tf = document.getElementById('calendar-type-filter');
-  if (tf) {
-    tf.value = window.calendarTypeFilter || '';
-    tf.onchange = function() {
-      window.calendarTypeFilter = this.value;
-      loadCalendar();
-    };
-  }
 
   document.getElementById('cal-real-prev').onclick = function() {
     window.calendarViewMonth--;
@@ -1568,37 +1232,11 @@ function renderRealCalendar(leads) {
     loadCalendar();
   };
 
-  tableCard.querySelectorAll('.calendar-add-btn').forEach(function(btn) {
-    btn.onclick = function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      var date = this.getAttribute('data-date');
-      openLeadModal();
-      setTimeout(function() {
-        document.getElementById('l-event-date').value = date;
-      }, 80);
-    };
-  });
-
-  tableCard.querySelectorAll('.calendar-day-real[data-date]').forEach(function(day) {
-    day.ondblclick = function(e) {
-      if (e.target.classList.contains('calendar-event-pill')) return;
-      if (e.target.classList.contains('calendar-add-btn')) return;
-
-      var date = this.getAttribute('data-date');
-      openLeadModal();
-      setTimeout(function() {
-        document.getElementById('l-event-date').value = date;
-      }, 80);
-    };
-  });
-
   tableCard.querySelectorAll('.calendar-event-pill[data-event-id]').forEach(function(btn) {
-    btn.onclick = function(e) {
-      e.preventDefault();
+    btn.addEventListener('click', function(e) {
       e.stopPropagation();
       openEventDetailsModal(parseInt(this.getAttribute('data-event-id')));
-    };
+    });
   });
 }
 
@@ -2700,639 +2338,6 @@ document.addEventListener('DOMContentLoaded', function() {
     clearTimeout(searchTimer); searchTimer = setTimeout(loadCustomers, 300);
   });
 });
-
-function openShoppingStoreModalV2() {
-  var old = document.getElementById('shopping-store-modal-v2');
-  if (old) old.remove();
-
-  var overlay = document.createElement('div');
-  overlay.className = 'modal-overlay open';
-  overlay.id = 'shopping-store-modal-v2';
-
-  overlay.innerHTML =
-    '<div class="modal" style="width:520px">' +
-      '<div class="modal-header">' +
-        '<h2>חנות חדשה</h2>' +
-        '<button class="modal-close" id="shop-close">✕</button>' +
-      '</div>' +
-      '<div class="modal-body">' +
-        '<div class="form-group"><label class="form-label">שם חנות</label><input class="form-input" id="shop-name"></div>' +
-        '<div class="form-group"><label class="form-label">איש קשר</label><input class="form-input" id="shop-contact"></div>' +
-        '<div class="form-group"><label class="form-label">טלפון איש קשר</label><input class="form-input" id="shop-phone"></div>' +
-        '<div class="form-group"><label class="form-label">טלפון נוסף</label><input class="form-input" id="shop-extra-phone"></div>' +
-        '<div class="form-group"><label class="form-label">כתובת חנות</label><input class="form-input" id="shop-address"></div>' +
-        '<div class="form-group"><label class="form-label">שעות פתיחה</label><input class="form-input" id="shop-hours"></div>' +
-        '<div class="form-group"><label class="form-label">הערות</label><textarea class="form-input" id="shop-notes" style="min-height:90px"></textarea></div>' +
-      '</div>' +
-      '<div class="modal-footer">' +
-        '<button class="btn btn-secondary" id="shop-cancel">ביטול</button>' +
-        '<button class="btn btn-primary" id="shop-save">שמור</button>' +
-      '</div>' +
-    '</div>';
-
-  document.body.appendChild(overlay);
-
-  function close() { overlay.remove(); }
-
-  document.getElementById('shop-close').onclick = close;
-  document.getElementById('shop-cancel').onclick = close;
-
-  document.getElementById('shop-save').onclick = function() {
-    var name = document.getElementById('shop-name').value.trim();
-
-    if (!name) {
-      toast('שם חנות חובה', 'error');
-      return;
-    }
-
-    apiCall('POST', '/api/shopping-lists', {
-      name: name,
-      contact_name: document.getElementById('shop-contact').value.trim(),
-      contact_phone: document.getElementById('shop-phone').value.trim(),
-      extra_phone: document.getElementById('shop-extra-phone').value.trim(),
-      address: document.getElementById('shop-address').value.trim(),
-      opening_hours: document.getElementById('shop-hours').value.trim(),
-      notes: document.getElementById('shop-notes').value.trim()
-    }).then(function() {
-      close();
-      toast('חנות נוספה', 'success');
-      if (typeof loadShoppingLists === 'function') loadShoppingLists();
-    }).catch(function(e) {
-      toast(e.message, 'error');
-    });
-  };
-}
-
-document.addEventListener('click', function(e) {
-  var btn = e.target.closest('#btn-new-shopping-list');
-  if (!btn) return;
-
-  e.preventDefault();
-  e.stopPropagation();
-  openShoppingStoreModalV2();
-}, true);
-
-
-
-window.shoppingStatusBadge = function(status) {
-  if (status === 'done') return '<span class="badge badge-green">נקנה</span>';
-  return '<span class="badge badge-orange">ממתין</span>';
-};
-
-window.openEditShoppingItemModal = function(listId, item) {
-  var old = document.getElementById('shopping-item-edit-modal');
-  if (old) old.remove();
-
-  var overlay = document.createElement('div');
-  overlay.className = 'modal-overlay open';
-  overlay.id = 'shopping-item-edit-modal';
-
-  overlay.innerHTML =
-    '<div class="modal" style="width:500px">' +
-      '<div class="modal-header"><h2>עריכת מוצר</h2><button class="modal-close" id="shopping-edit-close">✕</button></div>' +
-      '<div class="modal-body">' +
-        '<div class="form-group"><label class="form-label">שם מוצר</label><input class="form-input" id="shopping-edit-name" value="' + (item.item_name || '') + '"></div>' +
-        '<div class="form-group"><label class="form-label">כמות</label><input class="form-input" id="shopping-edit-quantity" value="' + (item.quantity || '') + '"></div>' +
-        '<div class="form-group"><label class="form-label">מחיר</label><input class="form-input" type="number" id="shopping-edit-price" value="' + (item.price || 0) + '"></div>' +
-        '<div class="form-group"><label class="form-label">סטטוס</label><select class="form-input" id="shopping-edit-status"><option value="pending">ממתין</option><option value="done">נקנה</option></select></div>' +
-        '<div class="form-group"><label class="form-label">הערות</label><textarea class="form-input" id="shopping-edit-notes" style="min-height:90px">' + (item.notes || '') + '</textarea></div>' +
-      '</div>' +
-      '<div class="modal-footer">' +
-        '<button class="btn btn-danger" id="shopping-edit-delete">מחק</button>' +
-        '<button class="btn btn-secondary" id="shopping-edit-cancel">ביטול</button>' +
-        '<button class="btn btn-primary" id="shopping-edit-save">שמור</button>' +
-      '</div>' +
-    '</div>';
-
-  document.body.appendChild(overlay);
-  document.getElementById('shopping-edit-status').value = item.status || 'pending';
-
-  function close() { overlay.remove(); }
-
-  document.getElementById('shopping-edit-close').onclick = close;
-  document.getElementById('shopping-edit-cancel').onclick = close;
-
-  document.getElementById('shopping-edit-save').onclick = function() {
-    apiCall('PUT', '/api/shopping-items/' + item.id, {
-      item_name: document.getElementById('shopping-edit-name').value.trim(),
-      quantity: document.getElementById('shopping-edit-quantity').value.trim(),
-      price: Number(document.getElementById('shopping-edit-price').value || 0),
-      status: document.getElementById('shopping-edit-status').value,
-      notes: document.getElementById('shopping-edit-notes').value.trim()
-    }).then(function() {
-      close();
-      toast('המוצר עודכן', 'success');
-      openShoppingList(listId);
-    }).catch(function(e) { toast(e.message, 'error'); });
-  };
-
-  document.getElementById('shopping-edit-delete').onclick = function() {
-    if (!confirm('האם למחוק את המוצר?')) return;
-
-    apiCall('DELETE', '/api/shopping-items/' + item.id).then(function() {
-      close();
-      toast('המוצר נמחק', 'success');
-      openShoppingList(listId);
-    }).catch(function(e) { toast(e.message, 'error'); });
-  };
-};
-
-openShoppingList = function(id) {
-  window.currentShoppingListId = id;
-
-  apiCall('GET', '/api/shopping-lists/' + id).then(function(data) {
-    var grid = document.getElementById('shopping-grid');
-    if (!grid) return;
-
-    var list = data.list || {};
-    var items = data.items || [];
-    var purchases = data.purchases || [];
-    var summary = data.summary || {};
-
-    var html = '';
-
-    html += '<div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:10px">';
-    html += '<button class="btn btn-secondary btn-sm" id="back-to-shopping">← חזרה לחנויות</button>';
-    html += '<button class="btn btn-primary btn-sm" id="add-shopping-item-btn">+ מוצר לרשימה</button>';
-    html += '</div>';
-
-    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">';
-
-    html += '<div>';
-    html += '<div class="contact-card">';
-    html += '<div class="contact-card-header"><div>';
-    html += '<div class="contact-card-name">' + (list.name || 'חנות') + '</div>';
-    html += '<div class="contact-card-meta">' + (list.address || '') + '</div>';
-    html += '</div><span class="badge badge-purple">' + items.length + ' פריטים</span></div>';
-
-    html += '<div class="info-section"><div class="info-section-title">פרטי חנות</div>';
-    html += '<div class="info-row"><span class="info-label">איש קשר</span><span class="info-value">' + (list.contact_name || '—') + '</span></div>';
-    html += '<div class="info-row"><span class="info-label">טלפון</span><span class="info-value">' + (list.contact_phone || '—') + '</span></div>';
-    html += '<div class="info-row"><span class="info-label">טלפון נוסף</span><span class="info-value">' + (list.extra_phone || '—') + '</span></div>';
-    html += '<div class="info-row"><span class="info-label">שעות פתיחה</span><span class="info-value">' + (list.opening_hours || '—') + '</span></div>';
-    html += '</div></div>';
-
-    html += '<div class="stats-grid" style="margin-top:16px">';
-    html += '<div class="stat-card"><div class="stat-label">החודש</div><div class="stat-value">₪' + fmtMoney(summary.current_month || 0) + '</div></div>';
-    html += '<div class="stat-card"><div class="stat-label">חודש שעבר</div><div class="stat-value">₪' + fmtMoney(summary.previous_month || 0) + '</div></div>';
-    html += '<div class="stat-card"><div class="stat-label">מתחילת השנה</div><div class="stat-value">₪' + fmtMoney(summary.year_total || 0) + '</div></div>';
-    html += '</div>';
-
-    html += '<div class="table-card" style="margin-top:16px">';
-    html += '<div class="table-toolbar"><strong>רשימת קניות פעילה</strong></div>';
-
-    if (!items.length) {
-      html += '<div class="dash-empty">אין מוצרים ברשימה</div>';
-    } else {
-      html += '<table><thead><tr><th>מוצר</th><th>כמות</th><th>מחיר</th><th>סטטוס</th></tr></thead><tbody>';
-      items.forEach(function(it) {
-        html += '<tr class="shopping-item-row" data-item-id="' + it.id + '" style="cursor:pointer">';
-        html += '<td>' + (it.item_name || '') + '</td>';
-        html += '<td>' + (it.quantity || '') + '</td>';
-        html += '<td>₪' + fmtMoney(it.price || 0) + '</td>';
-        html += '<td>' + shoppingStatusBadge(it.status) + '</td>';
-        html += '</tr>';
-      });
-      html += '</tbody></table>';
-    }
-
-    html += '</div></div>';
-
-    html += '<div class="table-card">';
-    html += '<div class="table-toolbar"><strong>עסקאות קודמות</strong></div>';
-
-    if (!purchases.length) {
-      html += '<div class="dash-empty">אין עסקאות קודמות</div>';
-    } else {
-      html += '<table><thead><tr><th>תאריך</th><th>סכום</th><th>הערות</th></tr></thead><tbody>';
-      purchases.forEach(function(p) {
-        html += '<tr><td>' + (p.purchase_date || '') + '</td><td>₪' + fmtMoney(p.total_amount || 0) + '</td><td>' + (p.notes || '') + '</td></tr>';
-      });
-      html += '</tbody></table>';
-    }
-
-    html += '</div></div>';
-
-    grid.innerHTML = html;
-
-    document.getElementById('back-to-shopping').onclick = loadShoppingLists;
-
-    var addBtn = document.getElementById('add-shopping-item-btn');
-    if (addBtn && typeof openShoppingItemModal === 'function') {
-      addBtn.onclick = openShoppingItemModal;
-    }
-
-    var purchasedBtn = document.getElementById('shopping-purchased-btn');
-    if (purchasedBtn) {
-      purchasedBtn.onclick = function() {
-        openShoppingPurchaseModal(id, items);
-      };
-    }
-
-    grid.querySelectorAll('.shopping-purchase-row').forEach(function(row) {
-      row.onclick = function() {
-        openShoppingPurchaseDetailsModal(parseInt(this.getAttribute('data-purchase-id')), id);
-      };
-    });
-
-    grid.querySelectorAll('.shopping-item-row').forEach(function(row) {
-      row.onclick = function() {
-        var itemId = parseInt(this.getAttribute('data-item-id'));
-        var item = items.find(function(x) { return Number(x.id) === itemId; });
-        if (item) openEditShoppingItemModal(id, item);
-      };
-    });
-  }).catch(function(e) {
-    toast(e.message, 'error');
-  });
-};
-
-
-window.openShoppingPurchaseModal = function(listId, items) {
-  if (!items || !items.length) {
-    toast('אין מוצרים ברשימה', 'error');
-    return;
-  }
-
-  var old = document.getElementById('shopping-purchase-modal');
-  if (old) old.remove();
-
-  var overlay = document.createElement('div');
-  overlay.className = 'modal-overlay open';
-  overlay.id = 'shopping-purchase-modal';
-
-  var defaultTotal = items.reduce(function(sum, it) {
-    return sum + Number(it.price || 0);
-  }, 0);
-
-  overlay.innerHTML =
-    '<div class="modal" style="width:520px">' +
-      '<div class="modal-header">' +
-        '<h2>סיום קנייה</h2>' +
-        '<button class="modal-close" id="purchase-close">✕</button>' +
-      '</div>' +
-      '<div class="modal-body">' +
-        '<div class="form-group"><label class="form-label">תאריך קנייה</label><input type="date" class="form-input" id="purchase-date" value="' + new Date().toISOString().slice(0,10) + '"></div>' +
-        '<div class="form-group"><label class="form-label">סכום קנייה</label><input type="number" class="form-input" id="purchase-total" value="' + defaultTotal + '"></div>' +
-        '<div class="form-group"><label class="form-label">תמונת חשבונית</label><input type="file" class="form-input" id="purchase-receipt" accept="image/*"></div>' +
-        '<div class="form-group"><label class="form-label">הערות</label><textarea class="form-input" id="purchase-notes" style="min-height:80px"></textarea></div>' +
-      '</div>' +
-      '<div class="modal-footer">' +
-        '<button class="btn btn-secondary" id="purchase-cancel">ביטול</button>' +
-        '<button class="btn btn-primary" id="purchase-save">קניתי</button>' +
-      '</div>' +
-    '</div>';
-
-  document.body.appendChild(overlay);
-
-  function close() { overlay.remove(); }
-
-  document.getElementById('purchase-close').onclick = close;
-  document.getElementById('purchase-cancel').onclick = close;
-
-  document.getElementById('purchase-save').onclick = function() {
-    var fileInput = document.getElementById('purchase-receipt');
-    var file = fileInput.files && fileInput.files[0];
-
-    function save(receiptData) {
-      apiCall('POST', '/api/shopping-lists/' + listId + '/purchases', {
-        purchase_date: document.getElementById('purchase-date').value,
-        total_amount: Number(document.getElementById('purchase-total').value || 0),
-        notes: document.getElementById('purchase-notes').value.trim(),
-        receipt_image: receiptData || null,
-        items: items.map(function(it) {
-          return {
-            item_name: it.item_name,
-            quantity: it.quantity,
-            price: it.price,
-            notes: it.notes
-          };
-        })
-      }).then(function() {
-        close();
-        toast('הקנייה נשמרה', 'success');
-        openShoppingList(listId);
-      }).catch(function(e) {
-        toast(e.message, 'error');
-      });
-    }
-
-    if (!file) {
-      save(null);
-      return;
-    }
-
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      save(e.target.result);
-    };
-    reader.readAsDataURL(file);
-  };
-};
-
-
-// force-purchased-button
-
-(function() {
-  var originalOpenShoppingList = window.openShoppingList || openShoppingList;
-
-  window.openShoppingList = openShoppingList = function(id) {
-    originalOpenShoppingList(id);
-
-    setTimeout(function() {
-      var grid = document.getElementById('shopping-grid');
-      if (!grid) return;
-
-      var toolbars = grid.querySelectorAll('.table-toolbar');
-      if (!toolbars.length) return;
-
-      var toolbar = toolbars[0];
-
-      if (document.getElementById('shopping-purchased-btn')) return;
-
-      var btn = document.createElement('button');
-      btn.className = 'btn btn-primary btn-sm';
-      btn.id = 'shopping-purchased-btn';
-      btn.textContent = 'קניתי';
-
-      btn.onclick = function() {
-        apiCall('GET', '/api/shopping-lists/' + id).then(function(data) {
-          var items = data.items || [];
-          openShoppingPurchaseModal(id, items);
-        }).catch(function(e) {
-          toast(e.message, 'error');
-        });
-      };
-
-      toolbar.style.justifyContent = 'space-between';
-      toolbar.appendChild(btn);
-    }, 500);
-  };
-})();
-
-
-window.openShoppingPurchaseDetailsModal = function(purchaseId, currentListId) {
-  apiCall('GET', '/api/shopping-purchases/' + purchaseId).then(function(data) {
-    var p = data.purchase || {};
-    var items = data.items || [];
-    var stores = data.stores || [];
-
-    var old = document.getElementById('shopping-purchase-details-modal');
-    if (old) old.remove();
-
-    var overlay = document.createElement('div');
-    overlay.className = 'modal-overlay open';
-    overlay.id = 'shopping-purchase-details-modal';
-
-    var itemsHtml = items.length ? items.map(function(it, idx) {
-      return '<div style="display:grid;grid-template-columns:1.4fr .7fr .7fr;gap:8px;margin-bottom:8px">' +
-        '<input class="form-input purchase-item-name" data-idx="' + idx + '" value="' + (it.item_name || '') + '">' +
-        '<input class="form-input purchase-item-qty" data-idx="' + idx + '" value="' + (it.quantity || '') + '">' +
-        '<input class="form-input purchase-item-price" data-idx="' + idx + '" type="number" value="' + (it.price || 0) + '">' +
-      '</div>';
-    }).join('') : '<div class="dash-empty">אין פריטים בעסקה</div>';
-
-    overlay.innerHTML =
-      '<div class="modal" style="width:720px">' +
-        '<div class="modal-header">' +
-          '<h2>עסקה קודמת</h2>' +
-          '<button class="modal-close" id="purchase-details-close">✕</button>' +
-        '</div>' +
-
-        '<div class="modal-body">' +
-
-          '<div class="form-group">' +
-            '<label class="form-label">חנות</label>' +
-            '<select class="form-input" id="purchase-store-id">' +
-              stores.map(function(st) {
-                return '<option value="' + st.id + '">' + st.name + '</option>';
-              }).join('') +
-            '</select>' +
-          '</div>' +
-
-          '<div class="form-group">' +
-            '<label class="form-label">תאריך קנייה</label>' +
-            '<input type="date" class="form-input" id="purchase-edit-date" value="' + (p.purchase_date || '') + '">' +
-          '</div>' +
-
-          '<div class="form-group">' +
-            '<label class="form-label">סכום קנייה</label>' +
-            '<input type="number" class="form-input" id="purchase-edit-total" value="' + (p.total_amount || 0) + '">' +
-          '</div>' +
-
-          '<div class="form-group">' +
-            '<label class="form-label">הערות</label>' +
-            '<textarea class="form-input" id="purchase-edit-notes" style="min-height:80px">' + (p.notes || '') + '</textarea>' +
-          '</div>' +
-
-          '<div class="info-section">' +
-            '<div class="info-section-title">פריטים שנקנו</div>' +
-            '<div style="display:grid;grid-template-columns:1.4fr .7fr .7fr;gap:8px;margin-bottom:6px;font-size:12px;color:var(--text3);font-weight:700">' +
-              '<div>מוצר</div><div>כמות</div><div>מחיר</div>' +
-            '</div>' +
-            itemsHtml +
-          '</div>' +
-
-          (p.receipt_image ? '<div class="info-section"><div class="info-section-title">חשבונית</div><img src="' + p.receipt_image + '" style="max-width:100%;border-radius:12px;border:1px solid var(--border)"></div>' : '') +
-
-        '</div>' +
-
-        '<div class="modal-footer">' +
-          '<button class="btn btn-danger" id="purchase-delete">מחק עסקה</button>' +
-          '<button class="btn btn-secondary" id="purchase-details-cancel">ביטול</button>' +
-          '<button class="btn btn-primary" id="purchase-details-save">שמור</button>' +
-        '</div>' +
-      '</div>';
-
-    document.body.appendChild(overlay);
-
-    document.getElementById('purchase-store-id').value = p.list_id;
-
-    function close() {
-      overlay.remove();
-    }
-
-    document.getElementById('purchase-details-close').onclick = close;
-    document.getElementById('purchase-details-cancel').onclick = close;
-
-    document.getElementById('purchase-details-save').onclick = function() {
-      var updatedItems = items.map(function(it, idx) {
-        return {
-          item_name: document.querySelector('.purchase-item-name[data-idx="' + idx + '"]').value.trim(),
-          quantity: document.querySelector('.purchase-item-qty[data-idx="' + idx + '"]').value.trim(),
-          price: Number(document.querySelector('.purchase-item-price[data-idx="' + idx + '"]').value || 0),
-          notes: it.notes || ''
-        };
-      }).filter(function(it) {
-        return it.item_name;
-      });
-
-      var newListId = document.getElementById('purchase-store-id').value;
-
-      apiCall('PUT', '/api/shopping-purchases/' + purchaseId, {
-        list_id: Number(newListId),
-        purchase_date: document.getElementById('purchase-edit-date').value,
-        total_amount: Number(document.getElementById('purchase-edit-total').value || 0),
-        notes: document.getElementById('purchase-edit-notes').value.trim(),
-        receipt_image: p.receipt_image || null,
-        items: updatedItems
-      }).then(function() {
-        close();
-        toast('העסקה עודכנה', 'success');
-        openShoppingList(Number(newListId));
-      }).catch(function(e) {
-        toast(e.message, 'error');
-      });
-    };
-
-    document.getElementById('purchase-delete').onclick = function() {
-      var ok = confirm('האם למחוק את העסקה הקודמת?');
-      if (!ok) return;
-
-      apiCall('DELETE', '/api/shopping-purchases/' + purchaseId).then(function() {
-        close();
-        toast('העסקה נמחקה', 'success');
-        openShoppingList(currentListId);
-      }).catch(function(e) {
-        toast(e.message, 'error');
-      });
-    };
-  }).catch(function(e) {
-    toast(e.message, 'error');
-  });
-};
-
-
-
-// force-purchase-click-final
-window.openShoppingPurchaseDetailsModal = function(purchaseId, currentListId) {
-  apiCall('GET', '/api/shopping-purchases/' + purchaseId).then(function(data) {
-    var p = data.purchase || {};
-    var items = data.items || [];
-    var stores = data.stores || [];
-
-    var old = document.getElementById('shopping-purchase-details-modal');
-    if (old) old.remove();
-
-    var overlay = document.createElement('div');
-    overlay.className = 'modal-overlay open';
-    overlay.id = 'shopping-purchase-details-modal';
-
-    var itemsHtml = items.map(function(it, idx) {
-      return '<div style="display:grid;grid-template-columns:1.4fr .7fr .7fr;gap:8px;margin-bottom:8px">' +
-        '<input class="form-input purchase-item-name" data-idx="' + idx + '" value="' + (it.item_name || '') + '">' +
-        '<input class="form-input purchase-item-qty" data-idx="' + idx + '" value="' + (it.quantity || '') + '">' +
-        '<input class="form-input purchase-item-price" data-idx="' + idx + '" type="number" value="' + (it.price || 0) + '">' +
-      '</div>';
-    }).join('');
-
-    overlay.innerHTML =
-      '<div class="modal" style="width:720px">' +
-        '<div class="modal-header"><h2>עסקה קודמת</h2><button class="modal-close" id="purchase-details-close">✕</button></div>' +
-        '<div class="modal-body">' +
-          '<div class="form-group"><label class="form-label">חנות</label><select class="form-input" id="purchase-store-id">' +
-            stores.map(function(st) { return '<option value="' + st.id + '">' + st.name + '</option>'; }).join('') +
-          '</select></div>' +
-          '<div class="form-group"><label class="form-label">תאריך קנייה</label><input type="date" class="form-input" id="purchase-edit-date" value="' + (p.purchase_date || '') + '"></div>' +
-          '<div class="form-group"><label class="form-label">סכום קנייה</label><input type="number" class="form-input" id="purchase-edit-total" value="' + (p.total_amount || 0) + '"></div>' +
-          '<div class="form-group"><label class="form-label">הערות</label><textarea class="form-input" id="purchase-edit-notes" style="min-height:80px">' + (p.notes || '') + '</textarea></div>' +
-          '<div class="info-section"><div class="info-section-title">פריטים שנקנו</div>' +
-            '<div style="display:grid;grid-template-columns:1.4fr .7fr .7fr;gap:8px;margin-bottom:6px;font-size:12px;color:var(--text3);font-weight:700"><div>מוצר</div><div>כמות</div><div>מחיר</div></div>' +
-            (itemsHtml || '<div class="dash-empty">אין פריטים בעסקה</div>') +
-          '</div>' +
-          (p.receipt_image ? '<div class="info-section"><div class="info-section-title">חשבונית</div><img src="' + p.receipt_image + '" style="max-width:100%;border-radius:12px;border:1px solid var(--border)"></div>' : '') +
-        '</div>' +
-        '<div class="modal-footer">' +
-          '<button class="btn btn-danger" id="purchase-delete">מחק עסקה</button>' +
-          '<button class="btn btn-secondary" id="purchase-details-cancel">ביטול</button>' +
-          '<button class="btn btn-primary" id="purchase-details-save">שמור</button>' +
-        '</div>' +
-      '</div>';
-
-    document.body.appendChild(overlay);
-    document.getElementById('purchase-store-id').value = p.list_id;
-
-    function close() { overlay.remove(); }
-
-    document.getElementById('purchase-details-close').onclick = close;
-    document.getElementById('purchase-details-cancel').onclick = close;
-
-    document.getElementById('purchase-details-save').onclick = function() {
-      var updatedItems = items.map(function(it, idx) {
-        return {
-          item_name: document.querySelector('.purchase-item-name[data-idx="' + idx + '"]').value.trim(),
-          quantity: document.querySelector('.purchase-item-qty[data-idx="' + idx + '"]').value.trim(),
-          price: Number(document.querySelector('.purchase-item-price[data-idx="' + idx + '"]').value || 0),
-          notes: it.notes || ''
-        };
-      }).filter(function(it) { return it.item_name; });
-
-      var newListId = Number(document.getElementById('purchase-store-id').value);
-
-      apiCall('PUT', '/api/shopping-purchases/' + purchaseId, {
-        list_id: newListId,
-        purchase_date: document.getElementById('purchase-edit-date').value,
-        total_amount: Number(document.getElementById('purchase-edit-total').value || 0),
-        notes: document.getElementById('purchase-edit-notes').value.trim(),
-        receipt_image: p.receipt_image || null,
-        items: updatedItems
-      }).then(function() {
-        close();
-        toast('העסקה עודכנה', 'success');
-        openShoppingList(newListId);
-      }).catch(function(e) { toast(e.message, 'error'); });
-    };
-
-    document.getElementById('purchase-delete').onclick = function() {
-      if (!confirm('האם למחוק את העסקה הקודמת?')) return;
-
-      apiCall('DELETE', '/api/shopping-purchases/' + purchaseId).then(function() {
-        close();
-        toast('העסקה נמחקה', 'success');
-        openShoppingList(currentListId);
-      }).catch(function(e) { toast(e.message, 'error'); });
-    };
-  }).catch(function(e) { toast(e.message, 'error'); });
-};
-
-(function() {
-  var oldOpenShoppingList = openShoppingList;
-
-  openShoppingList = window.openShoppingList = function(id) {
-    oldOpenShoppingList(id);
-
-    setTimeout(function() {
-      apiCall('GET', '/api/shopping-lists/' + id).then(function(data) {
-        var grid = document.getElementById('shopping-grid');
-        if (!grid) return;
-
-        var purchases = data.purchases || [];
-        if (!purchases.length) return;
-
-        var purchaseTables = Array.from(grid.querySelectorAll('.table-card')).filter(function(card) {
-          return card.textContent.indexOf('עסקאות קודמות') !== -1;
-        });
-
-        if (!purchaseTables.length) return;
-
-        var rows = purchaseTables[0].querySelectorAll('tbody tr');
-
-        rows.forEach(function(row, idx) {
-          var p = purchases[idx];
-          if (!p) return;
-
-          row.style.cursor = 'pointer';
-          row.onclick = function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            openShoppingPurchaseDetailsModal(p.id, id);
-          };
-        });
-      });
-    }, 500);
-  };
-})();
-
 </script>
 </body>
 </html>`;

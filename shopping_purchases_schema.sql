@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS shopping_purchases (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  list_id INTEGER NOT NULL,
+  purchase_date TEXT NOT NULL,
+  total_amount REAL DEFAULT 0,
+  notes TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS shopping_purchase_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  purchase_id INTEGER NOT NULL,
+  item_name TEXT NOT NULL,
+  quantity TEXT,
+  price REAL DEFAULT 0,
+  notes TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE shopping_items ADD COLUMN price REAL DEFAULT 0;
