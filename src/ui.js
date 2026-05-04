@@ -199,6 +199,10 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .note-input-row{display:flex;gap:8px;width:100%}
 .note-input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;font-family:var(--font);font-size:13px;color:var(--text);outline:none}
 .note-input:focus{border-color:var(--accent)}
+.activity-item{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px}
+.activity-date{font-size:10px;color:var(--text3);margin-bottom:4px}
+.activity-title{font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px}
+.activity-text{font-size:13px;color:var(--text2);line-height:1.5;white-space:pre-wrap}
 .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:4px}
 .dot-red{background:var(--red)}.dot-orange{background:var(--orange)}.dot-green{background:var(--green)}.dot-gray{background:var(--border2)}
 .customer-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:16px;cursor:pointer;transition:all 0.12s;display:flex;flex-direction:column;gap:8px}
@@ -2635,9 +2639,14 @@ var currentCustomer = null;
 function openCustomerModal(id) {
   document.getElementById('modal-customer').classList.add('open');
   document.getElementById('customer-modal-body').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3)">טוען...</div>';
-  apiCall('GET', '/api/contacts/' + id).then(function(data) {
+  Promise.all([
+    apiCall('GET', '/api/contacts/' + id),
+    apiCall('GET', '/api/contacts/' + id + '/timeline').catch(function() { return { timeline: [] }; })
+  ]).then(function(results) {
+    var data = results[0];
+    var timelineData = results[1] || { timeline: [] };
     currentCustomer = data.contact;
-    var c = data.contact, leads = data.leads, stats = data.stats;
+    var c = data.contact, leads = data.leads, stats = data.stats, timeline = timelineData.timeline || [];
     document.getElementById('customer-modal-title').textContent = c.name + ' · לקוח #' + (c.contact_num || c.id);
     var html = '';
     // כפתור הוסף אירוע
@@ -2677,6 +2686,21 @@ function openCustomerModal(id) {
       });
       html += '</tbody></table>';
     }
+    html += '</div>';
+    // יומן פעילות
+    html += '<div class="info-section"><div class="info-section-title">יומן פעילות</div>';
+    if (!timeline.length) {
+      html += '<div class="dash-empty">אין פעילות עדיין</div>';
+    } else {
+      timeline.forEach(function(item) {
+        html += '<div class="activity-item">';
+        html += '<div class="activity-date">' + fmtDT(item.created_at) + '</div>';
+        html += '<div class="activity-title">' + (item.title || 'פעילות') + '</div>';
+        html += '<div class="activity-text">' + (item.text || '') + '</div>';
+        html += '</div>';
+      });
+    }
+    html += '</div>';
     document.getElementById('customer-modal-body').innerHTML = html;
     document.querySelectorAll('#customer-modal-body tr[data-id]').forEach(function(row) {
       row.addEventListener('click', function() {
