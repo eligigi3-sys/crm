@@ -85,17 +85,21 @@ export async function syncEventToCalendar(lead, env) {
   // בנה תיאור האירוע
   let attrs = [];
   try { attrs = JSON.parse(lead.attractions || '[]'); } catch(e) {}
+  const venue = (lead.venue || '').trim();
+  const wazeUrl = venue ? `https://waze.com/ul?q=${encodeURIComponent(venue)}&navigate=yes` : '';
   
   const description = [
     `סוג אירוע: ${lead.event_type || '—'}`,
     `אולם: ${lead.venue || '—'}`,
+    venue ? `כתובת / אולם:\n${venue}` : '',
+    wazeUrl ? `ניווט ב-Waze:\n${wazeUrl}` : '',
     `טלפון: ${lead.phone || '—'}`,
     `אטרקציות: ${attrs.join(', ') || '—'}`,
     `מחיר: ₪${lead.price || 0}`,
     `סטטוס תשלום: ${lead.balance_paid ? 'שולם במלואו' : lead.deposit ? `מקדמה ₪${lead.deposit}` : 'טרם שולם'}`,
     lead.details ? `פרטים: ${lead.details}` : '',
     lead.notes ? `הערות: ${lead.notes}` : '',
-  ].filter(Boolean).join('\n');
+  ].filter(Boolean).join('\n\n');
 
   // בנה זמן האירוע
   const startTime = lead.event_time || '10:00';
