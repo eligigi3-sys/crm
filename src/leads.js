@@ -107,6 +107,35 @@ export async function handleLeads(request, env, path) {
     return { lead, notes };
   }
 
+  const noteMatch = path.match(/^\/api\/leads\/(\d+)\/notes$/);
+
+  // ===============================
+  // CREATE NOTE
+  // ===============================
+  if (noteMatch && method === 'POST') {
+    const leadId = noteMatch[1];
+    const b = await request.json();
+    const note = (b.note || '').trim();
+
+    if (!note) throw new Error('הערה חובה');
+
+    const existingLead = await env.DB.prepare(
+      'SELECT id FROM leads WHERE id = ?'
+    ).bind(leadId).first();
+
+    if (!existingLead) throw new Error('Lead not found');
+
+    const result = await env.DB.prepare(
+      'INSERT INTO lead_notes (lead_id, note, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)'
+    ).bind(leadId, note).run();
+
+    const created = await env.DB.prepare(
+      'SELECT * FROM lead_notes WHERE id = ?'
+    ).bind(result.meta.last_row_id).first();
+
+    return { success: true, note: created };
+  }
+
   // ===============================
   // CREATE EVENT
   // ===============================
