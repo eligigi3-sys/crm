@@ -539,6 +539,23 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     justify-content: center !important;
   }
 
+  #event-details-modal .info-row {
+    margin-bottom: 12px !important;
+  }
+
+  #event-details-modal .info-value {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  #event-details-modal .info-value .btn,
+  #event-details-modal .info-value a.btn {
+    min-width: 100%;
+    justify-content: center;
+  }
+
   .drawer {
     width: 100% !important;
   }
@@ -665,6 +682,84 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     padding-right: 16px !important;
   }
 
+  #back-to-customers,
+  #edit-customer-btn,
+  #add-event-btn,
+  #save-customer-tags,
+  #save-customer-type,
+  #save-customer-status,
+  #add-customer-note-btn,
+  #add-extra-contact-btn {
+    min-height: 42px;
+  }
+
+  #back-to-customers,
+  #edit-customer-btn,
+  #add-event-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  #customers-grid > div:first-child,
+  #customers-grid div[style*="margin-bottom:16px;display:flex"] {
+    gap: 10px !important;
+  }
+
+  #customers-grid div[style*="margin-bottom:16px;display:flex"] {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  #customers-grid .contact-card-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+
+  #customers-grid .info-value[style*="display:flex"],
+  #customers-grid .info-value > div,
+  #customers-grid .note-input-row {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  #customer-note-input,
+  #add-customer-note-btn {
+    width: 100% !important;
+  }
+
+  #customer-note-input {
+    min-height: 110px !important;
+  }
+
+  #customers-grid a.btn,
+  #customers-grid button.btn {
+    justify-content: center;
+  }
+
+  #customers-grid a[href^="https://wa.me"],
+  #customers-grid a[href^="tel:"],
+  #customers-grid a[href^="mailto:"],
+  #customers-grid #add-extra-contact-btn {
+    min-width: 42px;
+    min-height: 42px;
+    padding: 6px !important;
+  }
+
+  #customers-grid table {
+    min-width: 560px !important;
+  }
+
+  #customers-grid .activity-item {
+    padding: 12px 0;
+  }
+
+  #customers-grid .activity-date {
+    margin-bottom: 4px;
+  }
+
   a[href^="https://wa.me"] img,
   a[href^="tel:"] img,
   a[href^="mailto:"] img {
@@ -691,6 +786,22 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     flex-direction: column !important;
     align-items: flex-start !important;
     gap: 8px !important;
+  }
+
+  #event-details-modal .modal-header h2 {
+    font-size: 15px !important;
+  }
+
+  #event-details-modal .info-label {
+    font-size: 11px !important;
+  }
+
+  #customers-grid .info-section {
+    margin-bottom: 16px !important;
+  }
+
+  #customers-grid .badge {
+    max-width: 100%;
   }
 }
 
