@@ -563,6 +563,108 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     grid-template-columns: 1fr !important;
   }
 
+  body,
+  #main,
+  .page,
+  .table-card,
+  .dash-section,
+  .mini-cal,
+  .customer-card,
+  .contact-card,
+  .modal,
+  .drawer,
+  .info-value,
+  .info-section,
+  .modal-body,
+  .drawer-body {
+    overflow-wrap: anywhere;
+  }
+
+  .page-header,
+  .table-toolbar,
+  .modal-header,
+  .modal-footer,
+  .drawer-header,
+  .drawer-footer {
+    gap: 12px !important;
+  }
+
+  .btn,
+  .btn-sm,
+  .modal-close,
+  .logout-btn,
+  .calendar-add-btn,
+  .cal-nav {
+    min-height: 42px;
+  }
+
+  .btn,
+  .btn-sm {
+    padding: 10px 14px !important;
+  }
+
+  .search-input,
+  .filter-select,
+  .form-input,
+  .form-select,
+  .form-textarea {
+    min-height: 44px;
+    font-size: 16px !important;
+  }
+
+  .form-textarea {
+    min-height: 96px;
+  }
+
+  .dash-item,
+  .table-toolbar,
+  .stat-card,
+  .info-section,
+  .drawer-body,
+  .modal-body {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+  }
+
+  .dash-item {
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .dash-item-name,
+  .dash-item-sub,
+  td,
+  .info-value,
+  .activity-text {
+    overflow-wrap: anywhere;
+  }
+
+  .table-card {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 640px !important;
+  }
+
+  .modal {
+    width: min(96vw, 640px) !important;
+    margin: 8px !important;
+    max-height: calc(100vh - 16px) !important;
+  }
+
+  .modal-header,
+  .modal-footer {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  .drawer-body,
+  .drawer-footer {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
   a[href^="https://wa.me"] img,
   a[href^="tel:"] img,
   a[href^="mailto:"] img {
