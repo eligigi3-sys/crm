@@ -204,6 +204,40 @@ export async function handleGoogle(request, env, path) {
     return result;
   }
 
+  // POST /api/google/sync-backlog - סנכרון אירועים קיימים
+  if (path === '/api/google/sync-backlog' && request.method === 'POST') {
+    const leads = await env.DB.prepare(
+      `SELECT *
+       FROM leads
+       WHERE status = 'closed'
+         AND event_date IS NOT NULL
+         AND TRIM(event_date) != ''
+         AND (google_event_id IS NULL OR TRIM(google_event_id) = '')
+       ORDER BY event_date ASC, id ASC
+       LIMIT 50`
+    ).all();
+
+    const items = leads.results || [];
+    let synced = 0;
+    let skipped = 0;
+    let failed = 0;
+    const errors = [];
+
+    for (const lead of items) {
+      try {
+        const result = await syncEventToCalendar(lead, env);
+        if (result && result.skipped) skipped++;
+        else synced++;
+      } catch (e) {
+        failed++;
+        errors.push({ id: lead.id, name: lead.name || '', error: e.message });
+        console.log('Google backlog sync failed for lead', lead.id, e.message);
+      }
+    }
+
+    return { success: true, synced, skipped, failed, errors };
+  }
+
   // POST /api/google/disconnect - התנתק
   if (path === '/api/google/disconnect' && request.method === 'POST') {
     await env.DB.prepare("DELETE FROM app_settings WHERE key = 'google_tokens'").run();
