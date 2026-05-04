@@ -2388,7 +2388,7 @@ function openEventDetailsModal(id) {
           '<div class="info-row"><span class="info-label">סוג אירוע</span><span class="info-value">' + (l.event_type || '—') + '</span></div>' +
           '<div class="info-row"><span class="info-label">תאריך</span><span class="info-value">' + (l.event_date ? formatDate(l.event_date) : '—') + '</span></div>' +
           '<div class="info-row"><span class="info-label">שעה</span><span class="info-value">' + (l.event_time || '—') + '</span></div>' +
-          '<div class="info-row"><span class="info-label">אולם</span><span class="info-value">' + (l.venue || '—') + '</span></div>' +
+          '<div class="info-row"><span class="info-label">אולם</span><span class="info-value">' + (l.venue || '—') + ((l.venue && String(l.venue).trim()) ? ' <a class="btn btn-ghost btn-sm" target="_blank" rel="noopener noreferrer" href="https://waze.com/ul?q=' + encodeURIComponent(l.venue) + '&navigate=yes">נווט ב-Waze</a>' : '') + '</span></div>' +
           '<div class="info-row"><span class="info-label">סטטוס</span><span class="info-value">' + statusBadge(l.status) + '</span></div>' +
           '</div>' +
           '<div class="info-section"><div class="info-section-title">כספים</div>' +
