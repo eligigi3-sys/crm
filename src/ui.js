@@ -1094,7 +1094,7 @@ function loadDashboard() {
       return '<div class="dash-item" data-id="' + l.id + '"><div><div class="dash-item-name">' + l.name + '</div><div class="dash-item-sub">' + (l.phone||'') + (l.event_type ? ' - ' + l.event_type : '') + '</div></div>' + statusBadge(l.status) + '</div>';
     }).join('') : '<div class="dash-empty">אין לידים עדיין</div>';
     document.querySelectorAll('.dash-item[data-id]').forEach(function(el) {
-      el.addEventListener('click', function() { openDrawer(parseInt(this.getAttribute('data-id'))); });
+      el.addEventListener('click', function() { openEventDetailsModal(parseInt(this.getAttribute('data-id'))); });
     });
     allLeadsCache = d.allLeads || allLeadsCache;
     renderMiniCal(d.allLeads || []);
