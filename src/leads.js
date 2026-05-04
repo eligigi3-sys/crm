@@ -191,6 +191,12 @@ export async function handleLeads(request, env, path) {
       b.notes || null
     ).run();
 
+    try {
+      await autoSyncToCalendar(result.meta.last_row_id, b.status || 'lead', env);
+    } catch (e) {
+      console.log('Google auto-sync failed after create:', e.message);
+    }
+
     return {
       success: true,
       id: result.meta.last_row_id,
@@ -233,6 +239,12 @@ export async function handleLeads(request, env, path) {
       b.notes || null,
       id
     ).run();
+
+    try {
+      await autoSyncToCalendar(id, b.status || 'lead', env);
+    } catch (e) {
+      console.log('Google auto-sync failed after update:', e.message);
+    }
 
     return { success: true };
   }
