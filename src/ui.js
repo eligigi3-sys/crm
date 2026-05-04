@@ -1730,6 +1730,17 @@ function editLead(id) {
   }).catch(function(e) { toast(e.message, 'error'); });
 }
 
+function invalidatePages() {
+  // kept for future page-cache invalidation, no behavior change currently
+}
+
+function refreshAfterLeadMutation(successMessage) {
+  loadLeads();
+  loadDashboard();
+  preloadLeads();
+  toast(successMessage, 'success');
+}
+
 function saveLead() {
   var id = document.getElementById('lead-id').value;
   var attrs = [];
@@ -1757,16 +1768,14 @@ function saveLead() {
   var req = id ? apiCall('PUT', '/api/leads/' + id, body) : apiCall('POST', '/api/leads', body);
   req.then(function() {
     closeLeadModal();
-    loadLeads();
-    loadDashboard();
-    preloadLeads();
-    toast(id ? 'ליד עודכן בהצלחה' : 'ליד נוסף בהצלחה', 'success');
+    invalidatePages();
+    refreshAfterLeadMutation(id ? 'ליד עודכן בהצלחה' : 'ליד נוסף בהצלחה');
   }).catch(function(e) { toast(e.message, 'error'); });
 }
 
 function deleteLead(id) {
   if (!confirm('למחוק ליד זה?')) return;
-  apiCall('DELETE', '/api/leads/' + id).then(function() { loadLeads(); preloadLeads(); toast('נמחק', 'success'); }).catch(function(e) { toast(e.message, 'error'); });
+  apiCall('DELETE', '/api/leads/' + id).then(function() { invalidatePages(); refreshAfterLeadMutation('נמחק'); }).catch(function(e) { toast(e.message, 'error'); });
 }
 
 function formatDate(d) { if (!d) return '—'; var p = d.substring(0,10).split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
