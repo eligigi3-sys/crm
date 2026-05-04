@@ -2373,6 +2373,9 @@ function openEventDetailsModal(id) {
     var old = document.getElementById('event-details-modal');
     if (old) old.remove();
 
+    var drawerSyncBtn = document.getElementById('drawer-sync-btn');
+    var showGoogleSyncBtn = !!(drawerSyncBtn && drawerSyncBtn.style.display !== 'none');
+
     var overlay = document.createElement('div');
     overlay.className = 'modal-overlay open';
     overlay.id = 'event-details-modal';
@@ -2401,6 +2404,7 @@ function openEventDetailsModal(id) {
         '</div>' +
         '<div class="modal-footer">' +
           '<button class="btn btn-secondary" id="event-details-cancel">סגור</button>' +
+          (showGoogleSyncBtn ? '<button class="btn btn-secondary" id="event-details-sync-google">סנכרן ליומן Google</button>' : '') +
           '<button class="btn btn-primary" id="event-details-edit">✏️ עריכת אירוע</button>' +
         '</div>' +
       '</div>';
@@ -2411,6 +2415,11 @@ function openEventDetailsModal(id) {
 
     document.getElementById('event-details-close').onclick = close;
     document.getElementById('event-details-cancel').onclick = close;
+    if (showGoogleSyncBtn) {
+      document.getElementById('event-details-sync-google').onclick = function() {
+        syncToGoogle(id);
+      };
+    }
     document.getElementById('event-details-edit').onclick = function() {
       close();
       editLead(id);
