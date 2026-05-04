@@ -77,6 +77,7 @@ export async function handleContacts(request, env, path) {
   }
 
   const timelineMatch = path.match(/^\/api\/contacts\/(\d+)\/timeline$/);
+  const contactNoteMatch = path.match(/^\/api\/contacts\/(\d+)\/notes$/);
   const idMatch = path.match(/^\/api\/contacts\/(\d+)$/);
 
   // GET /api/contacts/:id/timeline
@@ -100,6 +101,12 @@ export async function handleContacts(request, env, path) {
        FROM lead_notes
        LEFT JOIN leads ON lead_notes.lead_id = leads.id
        WHERE leads.contact_id = ?`
+    ).bind(id).all();
+
+    const { results: contactNotes } = await env.DB.prepare(
+      `SELECT id, contact_id, note, created_at
+       FROM contact_notes
+       WHERE contact_id = ?`
     ).bind(id).all();
 
     const timeline = [];
@@ -155,6 +162,16 @@ export async function handleContacts(request, env, path) {
       });
     });
 
+    contactNotes.forEach(function(note) {
+      timeline.push({
+        type: 'contact_note_added',
+        created_at: note.created_at,
+        title: 'נוספה הערת לקוח',
+        text: note.note,
+        contact_id: contact.id
+      });
+    });
+
     timeline.sort(function(a, b) {
       return String(b.created_at || '').localeCompare(String(a.created_at || ''));
     });
@@ -163,6 +180,30 @@ export async function handleContacts(request, env, path) {
       contact_id: contact.id,
       timeline
     };
+  }
+
+  // POST /api/contacts/:id/notes
+  if (contactNoteMatch && method === 'POST') {
+    const id = contactNoteMatch[1];
+    const b = await request.json();
+    const note = (b.note || '').trim();
+
+    const contact = await env.DB.prepare(
+      'SELECT id FROM contacts WHERE id = ?'
+    ).bind(id).first();
+
+    if (!contact) throw new Error('לקוח לא נמצא');
+    if (!note) throw new Error('הערה חובה');
+
+    const result = await env.DB.prepare(
+      'INSERT INTO contact_notes (contact_id, note, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)'
+    ).bind(id, note).run();
+
+    const created = await env.DB.prepare(
+      'SELECT * FROM contact_notes WHERE id = ?'
+    ).bind(result.meta.last_row_id).first();
+
+    return { success: true, note: created };
   }
 
   // GET /api/contacts/:id
