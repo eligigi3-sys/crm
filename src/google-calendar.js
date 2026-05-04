@@ -238,6 +238,53 @@ export async function handleGoogle(request, env, path) {
     return { success: true, synced, skipped, failed, errors };
   }
 
+  // POST /api/google/resync-future - סנכרון מחדש של אירועים מהיום והלאה
+  if (path === '/api/google/resync-future' && request.method === 'POST') {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Jerusalem',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(new Date());
+    const today = parts.filter(p => p.type !== 'literal').map(p => p.value).join('-');
+
+    const leads = await env.DB.prepare(
+      `SELECT *
+       FROM leads
+       WHERE event_date IS NOT NULL
+         AND TRIM(event_date) != ''
+         AND event_date >= ?
+       ORDER BY event_date ASC, id ASC
+       LIMIT 100`
+    ).bind(today).all();
+
+    const items = leads.results || [];
+    const ids = items.map(lead => lead.id);
+    let synced = 0;
+    let failed = 0;
+    const errors = [];
+
+    if (ids.length) {
+      const placeholders = ids.map(function() { return '?'; }).join(', ');
+      await env.DB.prepare(
+        `UPDATE leads SET google_event_id = NULL WHERE id IN (${placeholders})`
+      ).bind(...ids).run();
+    }
+
+    for (const lead of items) {
+      try {
+        await syncEventToCalendar({ ...lead, google_event_id: null }, env);
+        synced++;
+      } catch (e) {
+        failed++;
+        errors.push({ id: lead.id, name: lead.name || '', error: e.message });
+        console.log('Google future resync failed for lead', lead.id, e.message);
+      }
+    }
+
+    return { success: true, total: items.length, synced, failed, errors };
+  }
+
   // POST /api/google/disconnect - התנתק
   if (path === '/api/google/disconnect' && request.method === 'POST') {
     await env.DB.prepare("DELETE FROM app_settings WHERE key = 'google_tokens'").run();

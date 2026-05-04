@@ -1814,10 +1814,10 @@ function checkGoogleStatus() {
       el.innerHTML = '<span style="color:#16a34a;font-weight:600">✓ Google Calendar מחובר</span><br><div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap"><button onclick="disconnectGoogle()" style="font-size:11px;background:none;border:none;color:#dc2626;cursor:pointer">נתק חיבור</button><button id="sync-google-backlog-btn" style="font-size:11px;background:var(--blue);color:white;border:none;border-radius:4px;padding:4px 8px;cursor:pointer">סנכרן את כל האירועים עכשיו</button></div>';
       document.getElementById('drawer-sync-btn').style.display = '';
       document.getElementById('sync-google-backlog-btn').onclick = function() {
-        if (!confirm('לסנכרן עכשיו את כל האירועים הסגורים שעדיין לא סונכרנו ל-Google Calendar?')) return;
-        toast('מסנכרן אירועים קיימים ל-Google Calendar...', 'success');
-        apiCall('POST', '/api/google/sync-backlog').then(function(result) {
-          toast('הסתיים: סונכרנו ' + (result.synced || 0) + ', דולגו ' + (result.skipped || 0) + ', נכשלו ' + (result.failed || 0), result.failed ? 'error' : 'success');
+        if (!confirm('זה יסנכרן מחדש את כל האירועים מהיום והלאה ליומן Google. להמשיך?')) return;
+        toast('מסנכרן מחדש אירועים מהיום והלאה ל-Google Calendar...', 'success');
+        apiCall('POST', '/api/google/resync-future').then(function(result) {
+          toast('הסתיים: סונכרנו ' + (result.synced || 0) + ' מתוך ' + (result.total || 0) + ', נכשלו ' + (result.failed || 0), result.failed ? 'error' : 'success');
         }).catch(function(e) { toast('שגיאה: ' + e.message, 'error'); });
       };
     } else {
