@@ -211,6 +211,14 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .customer-card-meta{font-size:12px;color:var(--text3)}
 .customer-card-stats{display:flex;gap:8px;margin-top:4px}
 .customer-stat-pill{background:var(--bg);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--text2);font-weight:600}
+.employee-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.employee-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:10px}
+.employee-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.employee-card-name{font-size:15px;font-weight:800;color:var(--text)}
+.employee-card-meta{font-size:12px;color:var(--text3)}
+.employee-card-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.employee-status-active{background:var(--green-light);color:var(--green)}
+.employee-status-inactive{background:var(--bg);color:var(--text3);border:1px solid var(--border)}
 .autocomplete-list{position:absolute;top:100%;right:0;left:0;background:var(--white);border:1px solid var(--accent);border-radius:var(--radius-sm);box-shadow:var(--shadow-md);z-index:300;max-height:200px;overflow-y:auto}
 .autocomplete-item{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)}
 .autocomplete-item:last-child{border-bottom:none}
@@ -760,6 +768,16 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     margin-bottom: 4px;
   }
 
+  .employee-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .employee-card-actions .btn,
+  .employee-card-actions a.btn {
+    width: 100%;
+    justify-content: center;
+  }
+
   a[href^="https://wa.me"] img,
   a[href^="tel:"] img,
   a[href^="mailto:"] img {
@@ -872,6 +890,7 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     <div class="nav-section">תפריט</div>
     <div class="nav-item active" id="nav-dashboard"><span class="nav-icon">📊</span> דאשבורד</div>
     <div class="nav-item" id="nav-leads"><span class="nav-icon">👥</span> לקוחות <span class="nav-badge" id="nav-leads-count" style="display:none">0</span></div>
+    <div class="nav-item" id="nav-employees"><span class="nav-icon">🧑‍💼</span> עובדים</div>
     <div class="nav-item" id="nav-shopping"><span class="nav-icon">🛒</span> רשימות קניות</div>
     <div class="nav-item" id="nav-calendar"><span class="nav-icon">📅</span> יומן אירועים</div>
     <div id="gcal-status" style="margin:8px;padding:10px 12px;border-radius:8px;font-size:12px;display:none"></div>
@@ -981,6 +1000,25 @@ id="customers-search">
         <table><thead><tr><th>תאריך</th><th>שם לקוח</th><th>סוג אירוע</th><th>אולם</th><th>שעה</th><th>אטרקציות</th><th>מחיר</th><th>סטטוס תשלום</th></tr></thead><tbody id="calendar-body"><tr class="empty-row"><td colspan="8">טוען...</td></tr></tbody></table>
       </div>
     </div>
+    <div id="page-employees" class="page">
+      <div class="page-header">
+        <div class="page-title">עובדים <small>ניהול עובדים פעילים ולא פעילים</small></div>
+        <button class="btn btn-primary" id="btn-new-employee">+ עובד חדש</button>
+      </div>
+      <div class="table-card">
+        <div class="table-toolbar">
+          <input class="search-input" type="text" placeholder="חיפוש לפי שם / טלפון / אימייל / תפקיד..." id="employees-search">
+          <select class="filter-select" id="employees-status-filter">
+            <option value="active">פעילים בלבד</option>
+            <option value="all">כל העובדים</option>
+            <option value="inactive">לא פעילים</option>
+          </select>
+        </div>
+        <div id="employees-grid" style="padding:16px">
+          <div class="dash-empty">טוען...</div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 <div class="modal-overlay" id="modal-lead">
@@ -1069,7 +1107,7 @@ id="customers-search">
 <script>
 var token = localStorage.getItem('crm_token');
 var currentUser = JSON.parse(localStorage.getItem('crm_user') || 'null');
-var searchTimer, currentLeadId, dupLeadId, selectedContactId = null;
+var searchTimer, currentLeadId, dupLeadId, selectedContactId = null, currentEmployeeId = null;
 var allLeadsCache = [];
 var calYear, calMonth;
 
@@ -1116,6 +1154,8 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   document.getElementById('add-note-btn').addEventListener('click', addNote);
   document.getElementById('nav-dashboard').addEventListener('click', function() { goTo('dashboard', this); });
   document.getElementById('nav-leads').addEventListener('click', function() { goTo('customers', this); });
+  var navEmployees = document.getElementById('nav-employees');
+  if (navEmployees) navEmployees.addEventListener('click', function() { goTo('employees', this); });
   var navShopping = document.getElementById('nav-shopping');
   if (navShopping) navShopping.addEventListener('click', function() { goTo('shopping', this); });
   document.getElementById('nav-calendar').addEventListener('click', function() { goTo('calendar', this); });
@@ -1161,6 +1201,7 @@ function goTo(page, el) {
   if (page === 'shopping') loadShoppingLists();
   if (page === 'calendar') loadCalendar();
   if (page === 'customers') loadCustomers();
+  if (page === 'employees') loadEmployees();
 }
 
 function apiCall(method, path, body) {
@@ -2260,6 +2301,190 @@ function loadCustomers() {
 }
 
 
+function employeeStatusBadge(isActive) {
+  return '<span class="badge ' + (Number(isActive) === 0 ? 'employee-status-inactive' : 'employee-status-active') + '">' + (Number(isActive) === 0 ? 'לא פעיל' : 'פעיל') + '</span>';
+}
+
+function getEmployeeWaPhone(phone) {
+  var cleanPhone = String(phone || '').replace(/[^0-9]/g, '');
+  return cleanPhone.charAt(0) === '0' ? '972' + cleanPhone.substring(1) : cleanPhone;
+}
+
+function loadEmployees() {
+  var grid = document.getElementById('employees-grid');
+  if (!grid) return;
+
+  var search = document.getElementById('employees-search') ? document.getElementById('employees-search').value.trim() : '';
+  var statusFilter = document.getElementById('employees-status-filter') ? document.getElementById('employees-status-filter').value : 'active';
+  var path = '/api/employees?search=' + encodeURIComponent(search);
+  if (statusFilter === 'all' || statusFilter === 'inactive') path += '&includeInactive=1';
+
+  grid.innerHTML = '<div class="dash-empty">טוען...</div>';
+
+  apiCall('GET', path).then(function(data) {
+    var employees = data.employees || [];
+
+    if (statusFilter === 'inactive') {
+      employees = employees.filter(function(emp) { return Number(emp.is_active) === 0; });
+    }
+
+    if (!employees.length) {
+      grid.innerHTML = '<div class="dash-empty">אין עובדים להצגה</div>';
+      return;
+    }
+
+    grid.innerHTML = '<div class="employee-grid">' + employees.map(function(emp) {
+      var waPhone = getEmployeeWaPhone(emp.phone || '');
+      var hourlyRate = emp.hourly_rate !== null && emp.hourly_rate !== undefined && emp.hourly_rate !== '' ? '₪' + fmtMoney(emp.hourly_rate) + ' לשעה' : 'לא הוגדר';
+      return '<div class="employee-card">' +
+        '<div class="employee-card-header">' +
+          '<div style="flex:1">' +
+            '<div class="employee-card-name">' + (emp.full_name || 'עובד ללא שם') + '</div>' +
+            '<div class="employee-card-meta" style="margin-top:4px">' + (emp.role || 'ללא תפקיד') + '</div>' +
+          '</div>' +
+          employeeStatusBadge(emp.is_active) +
+        '</div>' +
+        '<div class="employee-card-meta">📞 ' + (emp.phone || '—') + '</div>' +
+        (emp.email ? '<div class="employee-card-meta">✉️ ' + emp.email + '</div>' : '') +
+        '<div class="employee-card-meta">💸 ' + hourlyRate + '</div>' +
+        (emp.notes ? '<div style="font-size:13px;color:var(--text2);line-height:1.6;white-space:pre-wrap">' + emp.notes + '</div>' : '') +
+        '<div class="employee-card-actions">' +
+          (emp.phone ? '<a class="btn btn-ghost btn-sm" target="_blank" rel="noopener noreferrer" href="https://wa.me/' + waPhone + '"><img src="/whatsapp-icon.png" alt="WhatsApp" style="width:24px;height:24px;object-fit:contain;display:block"></a>' : '') +
+          (emp.phone ? '<a class="btn btn-ghost btn-sm" href="tel:' + emp.phone + '"><img src="/phone-icon.png" alt="Phone" style="width:24px;height:24px;object-fit:contain;display:block"></a>' : '') +
+          (emp.email ? '<a class="btn btn-ghost btn-sm" href="mailto:' + emp.email + '"><img src="/mail-icon.png" alt="Mail" style="width:24px;height:24px;object-fit:contain;display:block"></a>' : '') +
+          '<button class="btn btn-secondary btn-sm employee-edit-btn" data-id="' + emp.id + '">עריכה</button>' +
+          (Number(emp.is_active) === 0 ? '' : '<button class="btn btn-danger btn-sm employee-deactivate-btn" data-id="' + emp.id + '">השבת</button>') +
+        '</div>' +
+      '</div>';
+    }).join('') + '</div>';
+
+    grid.querySelectorAll('.employee-edit-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        openEmployeeModal(parseInt(this.getAttribute('data-id')));
+      });
+    });
+
+    grid.querySelectorAll('.employee-deactivate-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        deactivateEmployee(parseInt(this.getAttribute('data-id')));
+      });
+    });
+  }).catch(function(e) {
+    grid.innerHTML = '<div class="dash-empty">שגיאה בטעינת עובדים</div>';
+    toast(e.message, 'error');
+  });
+}
+
+function openEmployeeModal(id) {
+  currentEmployeeId = id || null;
+  var old = document.getElementById('employee-modal');
+  if (old) old.remove();
+
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'employee-modal';
+
+  overlay.innerHTML =
+    '<div class="modal" style="width:620px">' +
+      '<div class="modal-header">' +
+        '<h2>' + (id ? 'עריכת עובד' : 'עובד חדש') + '</h2>' +
+        '<button class="modal-close" id="employee-modal-close">✕</button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<div class="form-row">' +
+          '<div class="form-group"><label class="form-label">שם מלא *</label><input class="form-input" id="employee-full-name" placeholder="שם העובד"></div>' +
+          '<div class="form-group"><label class="form-label">טלפון *</label><input class="form-input" id="employee-phone" type="tel" placeholder="050-0000000"></div>' +
+        '</div>' +
+        '<div class="form-row">' +
+          '<div class="form-group"><label class="form-label">אימייל</label><input class="form-input" id="employee-email" type="email" placeholder="employee@example.com"></div>' +
+          '<div class="form-group"><label class="form-label">תפקיד</label><input class="form-input" id="employee-role" placeholder="תפקיד"></div>' +
+        '</div>' +
+        '<div class="form-row">' +
+          '<div class="form-group"><label class="form-label">שכר שעתי</label><input class="form-input" id="employee-hourly-rate" type="number" step="0.01" placeholder="0"></div>' +
+          '<div class="form-group"><label class="form-label">תאריך לידה</label><input class="form-input" id="employee-birth-date" type="date"></div>' +
+        '</div>' +
+        '<div class="form-row">' +
+          '<div class="form-group"><label class="form-label">איש קשר לחירום</label><input class="form-input" id="employee-emergency-name" placeholder="שם"></div>' +
+          '<div class="form-group"><label class="form-label">טלפון חירום</label><input class="form-input" id="employee-emergency-phone" type="tel" placeholder="050-0000000"></div>' +
+        '</div>' +
+        '<div class="form-row">' +
+          '<div class="form-group"><label class="form-label">אזור עבודה מועדף</label><input class="form-input" id="employee-work-area" placeholder="מרכז / צפון / דרום"></div>' +
+          '<div class="form-group"><label class="form-label">אופן תשלום</label><input class="form-input" id="employee-payment-method" placeholder="מזומן / העברה / ביט"></div>' +
+        '</div>' +
+        '<div class="form-group"><label class="form-label">הערות פרטי תשלום</label><textarea class="form-textarea" id="employee-bank-notes" placeholder="הערות בלבד"></textarea></div>' +
+        '<div class="form-group"><label class="form-label">הערות</label><textarea class="form-textarea" id="employee-notes" placeholder="הערות כלליות"></textarea></div>' +
+        '<div class="form-group"><label class="form-label">הערות פנימיות</label><textarea class="form-textarea" id="employee-internal-notes" placeholder="לשימוש פנימי"></textarea></div>' +
+        '<div class="form-group"><label class="check-item" style="display:inline-flex;width:auto"><input type="checkbox" id="employee-is-active" checked> עובד פעיל</label></div>' +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<button class="btn btn-secondary" id="employee-modal-cancel">ביטול</button>' +
+        '<button class="btn btn-primary" id="employee-modal-save">שמור</button>' +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+
+  function close() { overlay.remove(); currentEmployeeId = null; }
+  document.getElementById('employee-modal-close').onclick = close;
+  document.getElementById('employee-modal-cancel').onclick = close;
+
+  if (id) {
+    apiCall('GET', '/api/employees/' + id).then(function(data) {
+      var emp = data.employee || {};
+      document.getElementById('employee-full-name').value = emp.full_name || '';
+      document.getElementById('employee-phone').value = emp.phone || '';
+      document.getElementById('employee-email').value = emp.email || '';
+      document.getElementById('employee-role').value = emp.role || '';
+      document.getElementById('employee-hourly-rate').value = emp.hourly_rate || '';
+      document.getElementById('employee-birth-date').value = emp.birth_date || '';
+      document.getElementById('employee-emergency-name').value = emp.emergency_contact_name || '';
+      document.getElementById('employee-emergency-phone').value = emp.emergency_contact_phone || '';
+      document.getElementById('employee-work-area').value = emp.preferred_work_area || '';
+      document.getElementById('employee-payment-method').value = emp.payment_method || '';
+      document.getElementById('employee-bank-notes').value = emp.bank_details_notes || '';
+      document.getElementById('employee-notes').value = emp.notes || '';
+      document.getElementById('employee-internal-notes').value = emp.internal_notes || '';
+      document.getElementById('employee-is-active').checked = Number(emp.is_active) !== 0;
+    }).catch(function(e) { toast(e.message, 'error'); close(); });
+  }
+
+  document.getElementById('employee-modal-save').onclick = function() {
+    var body = {
+      full_name: document.getElementById('employee-full-name').value.trim(),
+      phone: document.getElementById('employee-phone').value.trim(),
+      email: document.getElementById('employee-email').value.trim(),
+      role: document.getElementById('employee-role').value.trim(),
+      hourly_rate: document.getElementById('employee-hourly-rate').value,
+      birth_date: document.getElementById('employee-birth-date').value,
+      notes: document.getElementById('employee-notes').value.trim(),
+      is_active: document.getElementById('employee-is-active').checked ? 1 : 0,
+      emergency_contact_name: document.getElementById('employee-emergency-name').value.trim(),
+      emergency_contact_phone: document.getElementById('employee-emergency-phone').value.trim(),
+      preferred_work_area: document.getElementById('employee-work-area').value.trim(),
+      payment_method: document.getElementById('employee-payment-method').value.trim(),
+      bank_details_notes: document.getElementById('employee-bank-notes').value.trim(),
+      internal_notes: document.getElementById('employee-internal-notes').value.trim()
+    };
+
+    if (!body.full_name) { toast('שם מלא חובה', 'error'); return; }
+    if (!body.phone) { toast('טלפון חובה', 'error'); return; }
+
+    apiCall(id ? 'PUT' : 'POST', id ? '/api/employees/' + id : '/api/employees', body).then(function() {
+      close();
+      toast(id ? 'העובד עודכן' : 'העובד נוסף', 'success');
+      loadEmployees();
+    }).catch(function(e) { toast(e.message, 'error'); });
+  };
+}
+
+function deactivateEmployee(id) {
+  if (!confirm('להשבית את העובד? ניתן להציג אותו שוב דרך מסנן כל העובדים.')) return;
+  apiCall('DELETE', '/api/employees/' + id).then(function() {
+    toast('העובד הושבת', 'success');
+    loadEmployees();
+  }).catch(function(e) { toast(e.message, 'error'); });
+}
+
 function parseExtraContactsSafe(value) {
   try {
     var arr = value ? JSON.parse(value) : [];
@@ -2983,6 +3208,19 @@ document.addEventListener('DOMContentLoaded', function() {
   if (custSearch) custSearch.addEventListener('input', function() {
     clearTimeout(searchTimer); searchTimer = setTimeout(loadCustomers, 300);
   });
+
+  var newEmployeeBtn = document.getElementById('btn-new-employee');
+  if (newEmployeeBtn) newEmployeeBtn.addEventListener('click', function() {
+    openEmployeeModal();
+  });
+
+  var employeesSearch = document.getElementById('employees-search');
+  if (employeesSearch) employeesSearch.addEventListener('input', function() {
+    clearTimeout(searchTimer); searchTimer = setTimeout(loadEmployees, 300);
+  });
+
+  var employeesStatusFilter = document.getElementById('employees-status-filter');
+  if (employeesStatusFilter) employeesStatusFilter.addEventListener('change', loadEmployees);
 });
 
 function openShoppingStoreModalV2() {
