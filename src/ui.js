@@ -1164,7 +1164,17 @@ var allLeadsCache = [];
 var calYear, calMonth;
 
 function getTodayYMD() {
-  return new Date().toISOString().split('T')[0];
+  var parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jerusalem',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date());
+  var map = {};
+  parts.forEach(function(part) {
+    if (part.type !== 'literal') map[part.type] = part.value;
+  });
+  return map.year + '-' + map.month + '-' + map.day;
 }
 
 function getMonthYearLabel(dateStr) {
