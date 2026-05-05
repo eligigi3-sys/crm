@@ -2626,6 +2626,13 @@ function formatProductMoney(value) {
   return value !== null && value !== undefined && value !== '' ? '₪' + fmtMoney(value) : '—';
 }
 
+function formatProductPurchaseMoney(value) {
+  if (value === null || value === undefined || value === '') return '—';
+  var num = Number(value);
+  if (!Number.isFinite(num)) return '—';
+  return '₪' + num.toFixed(2);
+}
+
 function loadProductPurchases(productId) {
   var summaryEl = document.getElementById('product-purchases-summary');
   var listEl = document.getElementById('product-purchases-list');
@@ -2675,11 +2682,11 @@ function getProductPurchaseChangeText(purchases, index) {
   var diff = Math.round((currentPrice - previousPrice) * 100) / 100;
 
   if (diff > 0.01) {
-    return { text: '+' + formatProductMoney(diff), className: 'product-purchase-change-up' };
+    return { text: '+' + formatProductPurchaseMoney(diff), className: 'product-purchase-change-up' };
   }
 
   if (diff < -0.01) {
-    return { text: '-' + formatProductMoney(Math.abs(diff)), className: 'product-purchase-change-down' };
+    return { text: '-' + formatProductPurchaseMoney(Math.abs(diff)), className: 'product-purchase-change-down' };
   }
 
   return { text: 'ללא שינוי', className: 'product-purchase-change-neutral' };
@@ -2687,17 +2694,17 @@ function getProductPurchaseChangeText(purchases, index) {
 
 function renderProductPurchaseSummary(summary) {
   if (!summary.count) {
-    return '<div class="product-purchases-empty">אין היסטוריית רכישות עדיין</div>';
+    return '';
   }
 
   var changeText = '—';
   var changeClass = 'product-purchase-change-neutral';
   if (summary.changeFromPrevious !== null && summary.changeFromPrevious !== undefined) {
     if (summary.changeFromPrevious > 0.01) {
-      changeText = '+' + formatProductMoney(summary.changeFromPrevious);
+      changeText = '+' + formatProductPurchaseMoney(summary.changeFromPrevious);
       changeClass = 'product-purchase-change-up';
     } else if (summary.changeFromPrevious < -0.01) {
-      changeText = '-' + formatProductMoney(Math.abs(summary.changeFromPrevious));
+      changeText = '-' + formatProductPurchaseMoney(Math.abs(summary.changeFromPrevious));
       changeClass = 'product-purchase-change-down';
     } else {
       changeText = 'ללא שינוי';
@@ -2705,10 +2712,10 @@ function renderProductPurchaseSummary(summary) {
   }
 
   return '<div class="product-purchase-summary-grid">' +
-    '<div class="product-purchase-summary-card"><div class="product-purchase-summary-label">מחיר אחרון</div><div class="product-purchase-summary-value">' + formatProductMoney(summary.lastPrice) + '</div></div>' +
-    '<div class="product-purchase-summary-card"><div class="product-purchase-summary-label">מחיר ממוצע</div><div class="product-purchase-summary-value">' + formatProductMoney(summary.avgPrice) + '</div></div>' +
-    '<div class="product-purchase-summary-card"><div class="product-purchase-summary-label">מחיר נמוך ביותר</div><div class="product-purchase-summary-value">' + formatProductMoney(summary.minPrice) + '</div></div>' +
-    '<div class="product-purchase-summary-card"><div class="product-purchase-summary-label">מחיר גבוה ביותר</div><div class="product-purchase-summary-value">' + formatProductMoney(summary.maxPrice) + '</div></div>' +
+    '<div class="product-purchase-summary-card"><div class="product-purchase-summary-label">מחיר אחרון</div><div class="product-purchase-summary-value">' + formatProductPurchaseMoney(summary.lastPrice) + '</div></div>' +
+    '<div class="product-purchase-summary-card"><div class="product-purchase-summary-label">מחיר ממוצע</div><div class="product-purchase-summary-value">' + formatProductPurchaseMoney(summary.avgPrice) + '</div></div>' +
+    '<div class="product-purchase-summary-card"><div class="product-purchase-summary-label">מחיר נמוך ביותר</div><div class="product-purchase-summary-value">' + formatProductPurchaseMoney(summary.minPrice) + '</div></div>' +
+    '<div class="product-purchase-summary-card"><div class="product-purchase-summary-label">מחיר גבוה ביותר</div><div class="product-purchase-summary-value">' + formatProductPurchaseMoney(summary.maxPrice) + '</div></div>' +
     '<div class="product-purchase-summary-card"><div class="product-purchase-summary-label">שינוי מהקנייה הקודמת</div><div class="product-purchase-summary-value"><span class="product-purchase-change ' + changeClass + '">' + changeText + '</span></div></div>' +
     '</div>';
 }
@@ -2731,8 +2738,8 @@ function renderProductPurchasesSection(productId, purchases) {
         '</div>' +
         '<div class="product-purchase-row-stats">' +
           '<span>כמות: ' + (purchase.quantity !== null && purchase.quantity !== undefined && purchase.quantity !== '' ? purchase.quantity : '—') + '</span>' +
-          '<span>מחיר יחידה: ' + formatProductMoney(purchase.unit_price) + '</span>' +
-          '<span>סה"כ: ' + formatProductMoney(purchase.total_price) + '</span>' +
+          '<span>מחיר יחידה: ' + formatProductPurchaseMoney(purchase.unit_price) + '</span>' +
+          '<span>סה"כ: ' + formatProductPurchaseMoney(purchase.total_price) + '</span>' +
         '</div>' +
         (purchase.notes ? '<div class="product-purchase-row-notes">' + purchase.notes + '</div>' : '') +
       '</div>' +
