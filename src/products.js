@@ -162,5 +162,28 @@ export async function handleProducts(request, env, path) {
     return { success: true, product };
   }
 
+  if (idMatch && method === 'DELETE') {
+    const id = idMatch[1];
+
+    const existing = await env.DB.prepare(
+      'SELECT * FROM products WHERE id = ?'
+    ).bind(id).first();
+
+    if (!existing) throw new Error('מוצר לא נמצא');
+
+    await env.DB.prepare(
+      `UPDATE products
+       SET is_active = 0,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`
+    ).bind(id).run();
+
+    const product = await env.DB.prepare(
+      'SELECT * FROM products WHERE id = ?'
+    ).bind(id).first();
+
+    return { success: true, product };
+  }
+
   throw new Error('Products route not found');
 }

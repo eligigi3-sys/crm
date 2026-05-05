@@ -2625,6 +2625,7 @@ function loadProducts() {
         (product.notes ? '<div class="product-card-notes">' + product.notes + '</div>' : '') +
         '<div class="product-card-actions">' +
           '<button class="btn btn-secondary btn-sm product-edit-btn" data-id="' + product.id + '">עריכה</button>' +
+          (Number(product.is_active) === 0 ? '' : '<button class="btn btn-danger btn-sm product-deactivate-btn" data-id="' + product.id + '">השבת</button>') +
         '</div>' +
       '</div>';
     }).join('') + '</div>';
@@ -2634,10 +2635,24 @@ function loadProducts() {
         openProductModal(parseInt(this.getAttribute('data-id')));
       });
     });
+
+    grid.querySelectorAll('.product-deactivate-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        deactivateProduct(parseInt(this.getAttribute('data-id')));
+      });
+    });
   }).catch(function(e) {
     grid.innerHTML = '<div class="dash-empty">שגיאה בטעינת מוצרים</div>';
     toast(e.message, 'error');
   });
+}
+
+function deactivateProduct(id) {
+  if (!confirm('להשבית את המוצר? המוצר יישאר במערכת אך יסומן כלא פעיל.')) return;
+  apiCall('DELETE', '/api/products/' + id).then(function() {
+    toast('המוצר הושבת', 'success');
+    loadProducts();
+  }).catch(function(e) { toast(e.message, 'error'); });
 }
 
 function openProductModal(id) {
