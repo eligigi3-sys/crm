@@ -1,27 +1,53 @@
+function json(body, status = 200, extraHeaders = {}) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json', ...extraHeaders }
+  });
+}
+
 export async function handleAuth(request, env, path) {
   const method = request.method;
 
-  if (path === '/api/auth/login' && method === 'POST') {
-    const { email, password } = await request.json();
+  if (path === '/api/auth/login') {
+    if (method !== 'POST') {
+      return json({ error: 'Method Not Allowed' }, 405, { Allow: 'POST' });
+    }
 
-    if (!email || !password) throw new Error('אימייל וסיסמה חובה');
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ error: 'בקשה לא תקינה' }, 400);
+    }
+
+    const email = (body.email || '').trim();
+    const password = body.password;
+
+    if (!email || !password) {
+      return json({ error: 'אימייל וסיסמה חובה' }, 400);
+    }
 
     const user = await env.DB.prepare(
       'SELECT * FROM users WHERE email = ?'
-    ).bind(email.trim().toLowerCase()).first();
+    ).bind(email.toLowerCase()).first();
 
     if (!user) {
-      // נסה גם בלי toLowerCase
       const user2 = await env.DB.prepare(
         'SELECT * FROM users WHERE email = ?'
-      ).bind(email.trim()).first();
-      if (!user2) throw new Error('משתמש לא נמצא');
-      if (user2.password_hash !== password) throw new Error('סיסמה שגויה');
+      ).bind(email).first();
+      if (!user2) return json({ error: 'אימייל או סיסמה שגויים' }, 401);
+      if (user2.password_hash !== password) return json({ error: 'אימייל או סיסמה שגויים' }, 401);
       const token = await createToken(user2.id, user2.email, env.JWT_SECRET);
-      return { success: true, token, user: { id: user2.id, name: user2.name, email: user2.email, role: user2.role } };
+      return {
+        success: true,
+        token,
+        user: { id: user2.id, name: user2.name, email: user2.email, role: user2.role }
+      };
     }
 
-    if (user.password_hash !== password) throw new Error('סיסמה שגויה');
+    if (user.password_hash !== password) {
+      return json({ error: 'אימייל או סיסמה שגויים' }, 401);
+    }
 
     const token = await createToken(user.id, user.email, env.JWT_SECRET);
     return {
@@ -36,7 +62,7 @@ export async function handleAuth(request, env, path) {
     return { valid: true, user: payload };
   }
 
-  throw new Error('Auth route not found');
+  return json({ error: 'Auth route not found' }, 404);
 }
 
 async function createToken(userId, email, secret) {

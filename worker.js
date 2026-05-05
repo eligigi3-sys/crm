@@ -58,6 +58,16 @@ export default {
           response = { error: 'Route not found' };
         }
 
+        if (response instanceof Response) {
+          const headers = new Headers(response.headers);
+          Object.entries(cors).forEach(([key, value]) => headers.set(key, value));
+          return new Response(response.body, {
+            status: response.status,
+            statusText: response.statusText,
+            headers,
+          });
+        }
+
         return new Response(JSON.stringify(response), {
           headers: { ...cors, 'Content-Type': 'application/json' },
         });
