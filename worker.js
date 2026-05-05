@@ -49,7 +49,7 @@ export default {
           response = await handleContacts(request, env, path);
         } else if (path.startsWith('/api/employees')) {
           response = await handleEmployees(request, env, path);
-        } else if (path.startsWith('/api/products')) {
+        } else if (path.startsWith('/api/products') || path.startsWith('/api/product-purchases')) {
           response = await handleProducts(request, env, path);
         } else if (
           path.startsWith('/api/shopping-lists') ||
