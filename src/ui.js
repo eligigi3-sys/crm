@@ -3300,16 +3300,130 @@ function openEventDetailsModal(id) {
 }
 
 
-function openCustomerCard(id) {\n  Promise.all([\n    apiCall('GET', '/api/contacts/' + id),\n    apiCall('GET', '/api/contacts/' + id + '/timeline').catch(function() { return { timeline: [] }; })\n  ]).then(function(results) {\n    var data = results[0] || {};\n    var timelineData = results[1] || { timeline: [] };\n    var c = data.contact || {};\n    var leads = data.leads || [];\n    var stats = data.stats || {};\n    var timeline = timelineData.timeline || [];\n    var grid = document.getElementById('customers-grid');\n    if (!grid) return;\n\n    var tags = dedupeCustomerTags(parseCustomerTags(c.tags));
-    var extraContacts = parseExtraContacts(c);\n\n    var cleanPhone = (c.phone || '').replace(/[^0-9]/g, '');\n    var waPhone = cleanPhone.charAt(0) === '0' ? '972' + cleanPhone.substring(1) : cleanPhone;\n\n    var html = '';\n\n    html += '<div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">';\n    html += '<button class="btn btn-secondary btn-sm" id="back-to-customers">← חזרה לרשימת לקוחות</button>';\n    html += '<button class="btn btn-secondary btn-sm" id="edit-customer-btn">✏️ עריכה</button>';
-    html += '<button class="btn btn-primary btn-sm" id="add-event-btn">+ אירוע חדש ללקוח</button>';\n    html += '</div>';\n\n    html += '<div style="display:grid;grid-template-columns:360px 1fr;gap:20px;align-items:start">';\n\n    html += '<div class="contact-card" style="position:sticky;top:20px">';\n    html += '<div class="contact-card-header"><div>';\n    html += '<div class="contact-card-name">' + (c.name || 'לקוח ללא שם') + '</div>';\n    html += '<div class="contact-card-meta">מספר לקוח #' + (c.contact_num || c.id || '') + '</div>';\n    html += '</div><div style="display:flex;gap:6px;flex-wrap:wrap">';
+function openCustomerCard(id) {
+  Promise.all([
+    apiCall('GET', '/api/contacts/' + id),
+    apiCall('GET', '/api/contacts/' + id + '/timeline').catch(function() { return { timeline: [] }; })
+  ]).then(function(results) {
+    var data = results[0] || {};
+    var timelineData = results[1] || { timeline: [] };
+    var c = data.contact || {};
+    var leads = data.leads || [];
+    var stats = data.stats || {};
+    var timeline = timelineData.timeline || [];
+    var grid = document.getElementById('customers-grid');
+    if (!grid) return;
+
+    var tags = dedupeCustomerTags(parseCustomerTags(c.tags));
+    var extraContacts = parseExtraContacts(c);
+
+    var cleanPhone = (c.phone || '').replace(/[^0-9]/g, '');
+    var waPhone = cleanPhone.charAt(0) === '0' ? '972' + cleanPhone.substring(1) : cleanPhone;
+
+    var html = '';
+
+    html += '<div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">';
+    html += '<button class="btn btn-secondary btn-sm" id="back-to-customers">← חזרה לרשימת לקוחות</button>';
+    html += '<button class="btn btn-secondary btn-sm" id="edit-customer-btn">✏️ עריכה</button>';
+    html += '<button class="btn btn-primary btn-sm" id="add-event-btn">+ אירוע חדש ללקוח</button>';
+    html += '</div>';
+
+    html += '<div style="display:grid;grid-template-columns:360px 1fr;gap:20px;align-items:start">';
+
+    html += '<div class="contact-card" style="position:sticky;top:20px">';
+    html += '<div class="contact-card-header"><div>';
+    html += '<div class="contact-card-name">' + (c.name || 'לקוח ללא שם') + '</div>';
+    html += '<div class="contact-card-meta">מספר לקוח #' + (c.contact_num || c.id || '') + '</div>';
+    html += '</div><div style="display:flex;gap:6px;flex-wrap:wrap">';
     html += '<span class="badge badge-purple">' + (c.customer_type || 'פרטי') + '</span>';
     html += '<span class="badge ' + getCustomerStatusBadgeClass(c.status || 'active') + '">' + getStatusLabel(c.status || 'active') + '</span>';
-    html += '</div></div>';\n\n    html += '<div class="info-section"><div class="info-section-title">תגיות לקוח</div>';\n    if (tags.length) {\n      html += '<div class="attraction-tags" style="margin-bottom:10px">';\n      tags.forEach(function(t, idx) { html += '<span class="customer-tag-pill">' + t + ' <button class="customer-tag-remove" data-tag-index="' + idx + '" title="הסר תגית">×</button></span>'; });\n      html += '</div>';\n    } else {\n      html += '<div style="font-size:12px;color:var(--text3);margin-bottom:8px">אין תגיות עדיין</div>';\n    }\n    html += '<div class="customer-tag-controls">';\n    html += '<select class="form-input" id="customer-tag-select" style="flex:1">';\n    html += '<option value="">בחר תגית</option>';\n    predefinedCustomerTags.forEach(function(tag) { html += '<option value="' + tag + '">' + tag + '</option>'; });\n    html += '</select>';\n    html += '<button class="btn btn-primary btn-sm" id="add-customer-tag-btn" style="white-space:nowrap">הוסף תגית</button>';\n    html += '</div>';\n    html += '</div>';\n\n    html += '<div class="info-section"><div class="info-section-title">פרטי לקוח</div>';\n    html += '<div class="info-row"><span class="info-label">טלפון</span><span class="info-value">' + (c.phone || '—');\n    if (c.phone) html += ' <a class="btn btn-ghost btn-sm" target="_blank" href="https://wa.me/' + waPhone + '"><img src="/whatsapp-icon.png" alt="WhatsApp" style="width:28px;height:28px;object-fit:contain;display:block"></a> <a class="btn btn-ghost btn-sm" href="tel:' + c.phone + '"><img src="/phone-icon.png" alt="Phone" style="width:28px;height:28px;object-fit:contain;display:block"></a> <button class="btn btn-ghost btn-sm" id="add-extra-contact-btn" style="padding:6px 10px;font-weight:800">+</button>';\n    html += '</span></div>';\n    html += '<div class="info-row"><span class="info-label">מייל</span><span class="info-value">' + (c.email || '—');\n    if (c.email) html += ' <a class="btn btn-ghost btn-sm" href="mailto:' + c.email + '">שלח מייל</a>';\n    html += '</span></div>';\n\n    html += '<div class="info-row"><span class="info-label">סוג לקוח</span><span class="info-value" style="display:flex;gap:8px;align-items:center">';\n    html += '<select id="customer-type-select" class="form-input" style="flex:1"><option value="פרטי">פרטי</option><option value="עסקי">עסקי</option><option value="מפיק/ספק">מפיק/ספק</option></select>';\n    html += '<button class="btn btn-primary btn-sm" id="save-customer-type" style="padding:4px 8px;font-size:11px">שמור</button>';\n    html += '</span></div>';\n\n    html += '<div class="info-row"><span class="info-label">סטטוס לקוח</span><span class="info-value" style="display:flex;gap:8px;align-items:center">';\n    html += '<select id="customer-status-select" class="form-input" style="flex:1"><option value="hot">🔥 חם</option><option value="cold">❄️ קר</option><option value="offer">⏳ בהצעה</option><option value="active">🟢 פעיל</option><option value="closed">✅ סגור</option><option value="cancelled">❌ בוטל</option></select>';\n    html += '<button class="btn btn-primary btn-sm" id="save-customer-status" style="padding:4px 8px;font-size:11px">שמור</button>';\n    html += '</span></div>';\n    html += '</div>';\n\n    html += '<div class="info-section"><div class="info-section-title">נתונים עסקיים</div>';\n    html += '<div class="info-row"><span class="info-label">מספר אירועים</span><span class="info-value">' + (stats.total || leads.length || 0) + '</span></div>';\n    html += '<div class="info-row"><span class="info-label">סך הכנסות</span><span class="info-value">₪' + fmtMoney(stats.revenue || 0) + '</span></div>';\n    html += '<div class="info-row"><span class="info-label">אירוע אחרון</span><span class="info-value">' + (stats.last_event_date ? formatDate(stats.last_event_date) : '—') + '</span></div>';\n    html += '<div class="info-row"><span class="info-label">אירוע בתאריך</span><span class="info-value">' + (stats.next_event_date ? formatDate(stats.next_event_date) : '—') + '</span></div>';\n    html += '</div>';\n\n    html += '<div class="info-section"><div class="info-section-title">מעקב</div>';\n    html += '<div class="info-row"><span class="info-label">קשר אחרון</span><span class="info-value">' + (c.last_contact_date ? formatDate(c.last_contact_date) : '—') + '</span></div>';\n    html += '<div class="info-row"><span class="info-label">קשר קרוב</span><span class="info-value">' + (c.next_contact_date ? formatDate(c.next_contact_date) : '—') + '</span></div>';\n    html += '</div>';\n\n    html += '<div class="info-section"><div class="info-section-title">הערות כלליות</div>';\n    html += '<div style="font-size:13px;color:var(--text2);line-height:1.7;white-space:pre-wrap">' + (c.general_notes || c.notes || 'אין הערות כלליות') + '</div>';\n    html += '</div>';\n    html += '</div>';\n\n    html += '<div class="table-card"><div class="table-toolbar" style="justify-content:space-between"><strong>אירועים של הלקוח</strong><span class="badge badge-gray">' + leads.length + ' אירועים</span></div>';\n    if (!leads.length) { html += '<div class="dash-empty">אין אירועים ללקוח הזה</div>'; }\n    else {\n      html += '<table><thead><tr><th>מספר אירוע</th><th>תאריך</th><th>סוג</th><th>אולם</th><th>מחיר</th><th>סטטוס</th></tr></thead><tbody>';\n      leads.forEach(function(l) {\n        html += '<tr data-event-id="' + l.id + '"><td class="bold" style="color:var(--accent)">אירוע #' + (l.lead_num || l.id) + '</td><td>' + (l.event_date ? formatDate(l.event_date) : '—') + '</td><td>' + (l.event_type || '—') + '</td><td>' + (l.venue || '—') + '</td><td>' + (l.price ? '₪' + fmtMoney(l.price) : '—') + '</td><td>' + statusBadge(l.status) + '</td></tr>';\n      });\n      html += '</tbody></table>';\n    }\n    html += '</div>';\n\n    html += '<div class=\"info-section\"><div class=\"info-section-title\">יומן פעילות</div>';\n    html += '<div class=\"note-input-row\" style=\"margin-bottom:12px;align-items:flex-start\">';
+    html += '</div></div>';
+
+    html += '<div class="info-section"><div class="info-section-title">תגיות לקוח</div>';
+    if (tags.length) {
+      html += '<div class="attraction-tags" style="margin-bottom:10px">';
+      tags.forEach(function(t, idx) { html += '<span class="customer-tag-pill">' + t + ' <button class="customer-tag-remove" data-tag-index="' + idx + '" title="הסר תגית">×</button></span>'; });
+      html += '</div>';
+    } else {
+      html += '<div style="font-size:12px;color:var(--text3);margin-bottom:8px">אין תגיות עדיין</div>';
+    }
+    html += '<div class="customer-tag-controls">';
+    html += '<select class="form-input" id="customer-tag-select" style="flex:1">';
+    html += '<option value="">בחר תגית</option>';
+    predefinedCustomerTags.forEach(function(tag) { html += '<option value="' + tag + '">' + tag + '</option>'; });
+    html += '</select>';
+    html += '<input class="form-input" id="customer-tag-custom" placeholder="תגית חדשה..." style="flex:1">';
+    html += '<button class="btn btn-primary btn-sm" id="add-customer-tag-btn" style="white-space:nowrap">הוסף תגית</button>';
+    html += '</div>';
+    html += '</div>';
+
+    html += '<div class="info-section"><div class="info-section-title">פרטי לקוח</div>';
+    html += '<div class="info-row"><span class="info-label">טלפון</span><span class="info-value">' + (c.phone || '—');
+    if (c.phone) html += ' <a class="btn btn-ghost btn-sm" target="_blank" href="https://wa.me/' + waPhone + '"><img src="/whatsapp-icon.png" alt="WhatsApp" style="width:28px;height:28px;object-fit:contain;display:block"></a> <a class="btn btn-ghost btn-sm" href="tel:' + c.phone + '"><img src="/phone-icon.png" alt="Phone" style="width:28px;height:28px;object-fit:contain;display:block"></a> <button class="btn btn-ghost btn-sm" id="add-extra-contact-btn" style="padding:6px 10px;font-weight:800">+</button>';
+    html += '</span></div>';
+    html += '<div class="info-row"><span class="info-label">מייל</span><span class="info-value">' + (c.email || '—');
+    if (c.email) html += ' <a class="btn btn-ghost btn-sm" href="mailto:' + c.email + '">שלח מייל</a>';
+    html += '</span></div>';
+
+    html += '<div class="info-row"><span class="info-label">סוג לקוח</span><span class="info-value" style="display:flex;gap:8px;align-items:center">';
+    html += '<select id="customer-type-select" class="form-input" style="flex:1"><option value="פרטי">פרטי</option><option value="עסקי">עסקי</option><option value="מפיק/ספק">מפיק/ספק</option></select>';
+    html += '<button class="btn btn-primary btn-sm" id="save-customer-type" style="padding:4px 8px;font-size:11px">שמור</button>';
+    html += '</span></div>';
+
+    html += '<div class="info-row"><span class="info-label">סטטוס לקוח</span><span class="info-value" style="display:flex;gap:8px;align-items:center">';
+    html += '<select id="customer-status-select" class="form-input" style="flex:1"><option value="hot">🔥 חם</option><option value="cold">❄️ קר</option><option value="offer">⏳ בהצעה</option><option value="active">🟢 פעיל</option><option value="closed">✅ סגור</option><option value="cancelled">❌ בוטל</option></select>';
+    html += '<button class="btn btn-primary btn-sm" id="save-customer-status" style="padding:4px 8px;font-size:11px">שמור</button>';
+    html += '</span></div>';
+    html += '</div>';
+
+    html += '<div class="info-section"><div class="info-section-title">נתונים עסקיים</div>';
+    html += '<div class="info-row"><span class="info-label">מספר אירועים</span><span class="info-value">' + (stats.total || leads.length || 0) + '</span></div>';
+    html += '<div class="info-row"><span class="info-label">סך הכנסות</span><span class="info-value">₪' + fmtMoney(stats.revenue || 0) + '</span></div>';
+    html += '<div class="info-row"><span class="info-label">אירוע אחרון</span><span class="info-value">' + (stats.last_event_date ? formatDate(stats.last_event_date) : '—') + '</span></div>';
+    html += '<div class="info-row"><span class="info-label">אירוע בתאריך</span><span class="info-value">' + (stats.next_event_date ? formatDate(stats.next_event_date) : '—') + '</span></div>';
+    html += '</div>';
+
+    html += '<div class="info-section"><div class="info-section-title">מעקב</div>';
+    html += '<div class="info-row"><span class="info-label">קשר אחרון</span><span class="info-value">' + (c.last_contact_date ? formatDate(c.last_contact_date) : '—') + '</span></div>';
+    html += '<div class="info-row"><span class="info-label">קשר קרוב</span><span class="info-value">' + (c.next_contact_date ? formatDate(c.next_contact_date) : '—') + '</span></div>';
+    html += '</div>';
+
+    html += '<div class="info-section"><div class="info-section-title">הערות כלליות</div>';
+    html += '<div style="font-size:13px;color:var(--text2);line-height:1.7;white-space:pre-wrap">' + (c.general_notes || c.notes || 'אין הערות כלליות') + '</div>';
+    html += '</div>';
+    html += '</div>';
+
+    html += '<div class="table-card"><div class="table-toolbar" style="justify-content:space-between"><strong>אירועים של הלקוח</strong><span class="badge badge-gray">' + leads.length + ' אירועים</span></div>';
+    if (!leads.length) { html += '<div class="dash-empty">אין אירועים ללקוח הזה</div>'; }
+    else {
+      html += '<table><thead><tr><th>מספר אירוע</th><th>תאריך</th><th>סוג</th><th>אולם</th><th>מחיר</th><th>סטטוס</th></tr></thead><tbody>';
+      leads.forEach(function(l) {
+        html += '<tr data-event-id="' + l.id + '"><td class="bold" style="color:var(--accent)">אירוע #' + (l.lead_num || l.id) + '</td><td>' + (l.event_date ? formatDate(l.event_date) : '—') + '</td><td>' + (l.event_type || '—') + '</td><td>' + (l.venue || '—') + '</td><td>' + (l.price ? '₪' + fmtMoney(l.price) : '—') + '</td><td>' + statusBadge(l.status) + '</td></tr>';
+      });
+      html += '</tbody></table>';
+    }
+    html += '</div>';
+
+    html += '<div class=\"info-section\"><div class=\"info-section-title\">יומן פעילות</div>';
+    html += '<div class=\"note-input-row\" style=\"margin-bottom:12px;align-items:flex-start\">';
     html += '<textarea class=\"note-input\" id=\"customer-note-input\" placeholder=\"הוסף הערת לקוח...\" style=\"min-height:74px;resize:vertical\"></textarea>';
     html += '<button class=\"btn btn-primary btn-sm\" id=\"add-customer-note-btn\" style=\"white-space:nowrap\">הוסף הערה</button>';
     html += '</div>';
-    if (!timeline.length) {\n      html += '<div class=\"dash-empty\">אין פעילות עדיין</div>';\n    } else {\n      timeline.forEach(function(item) {\n        html += '<div class=\"activity-item\">';\n        html += '<div class=\"activity-date\">' + fmtDT(item.created_at) + '</div>';\n        html += '<div class=\"activity-title\">' + (item.title || 'פעילות') + '</div>';\n        html += '<div class=\"activity-text\">' + (item.text || '') + '</div>';\n        html += '</div>';\n      });\n    }\n\n    html += '</div></div>';\n\n    grid.innerHTML = html;
+    if (!timeline.length) {
+      html += '<div class=\"dash-empty\">אין פעילות עדיין</div>';
+    } else {
+      timeline.forEach(function(item) {
+        html += '<div class=\"activity-item\">';
+        html += '<div class=\"activity-date\">' + fmtDT(item.created_at) + '</div>';
+        html += '<div class=\"activity-title\">' + (item.title || 'פעילות') + '</div>';
+        html += '<div class=\"activity-text\">' + (item.text || '') + '</div>';
+        html += '</div>';
+      });
+    }
+
+    html += '</div></div>';
+
+    grid.innerHTML = html;
 
     // force-event-modal-from-customer-card
     setTimeout(function() {
@@ -3475,7 +3589,9 @@ function openCustomerCard(id) {\n  Promise.all([\n    apiCall('GET', '/api/conta
         }
       }
     }, 0);
-\n\n    document.getElementById('back-to-customers').addEventListener('click', loadCustomers);
+
+
+    document.getElementById('back-to-customers').addEventListener('click', loadCustomers);
 
     var editBtn = document.getElementById('edit-customer-btn');
     if (editBtn) {
@@ -3486,7 +3602,64 @@ function openCustomerCard(id) {\n  Promise.all([\n    apiCall('GET', '/api/conta
     var addExtraBtn = document.getElementById('add-extra-contact-btn');
     if (addExtraBtn) addExtraBtn.addEventListener('click', function() {
       openExtraContactModal(c.id);
-    });\n    document.getElementById('customer-type-select').value = c.customer_type || 'פרטי';\n    document.getElementById('customer-status-select').value = c.status || 'active';\n\n    function saveContact(extra) {\n      apiCall('PUT', '/api/contacts/' + c.id, {\n        name: c.name, phone: c.phone, email: c.email, notes: c.notes,\n        customer_type: extra.customer_type !== undefined ? extra.customer_type : (c.customer_type || 'פרטי'),\n        status: extra.status !== undefined ? extra.status : (c.status || 'active'),\n        tags: extra.tags !== undefined ? extra.tags : c.tags,\n        last_contact_date: c.last_contact_date, next_contact_date: c.next_contact_date, general_notes: c.general_notes\n      }).then(function() { toast('נשמר בהצלחה', 'success'); openCustomerCard(c.id); }).catch(function(e) { toast(e.message, 'error'); });\n    }\n\n    document.getElementById('save-customer-type').addEventListener('click', function() {\n      saveContact({ customer_type: document.getElementById('customer-type-select').value });\n    });\n    document.getElementById('save-customer-status').addEventListener('click', function() {\n      saveContact({ status: document.getElementById('customer-status-select').value });\n    });\n    var addCustomerTagBtn = document.getElementById('add-customer-tag-btn');\n    if (addCustomerTagBtn) {\n      addCustomerTagBtn.addEventListener('click', function() {\n        var select = document.getElementById('customer-tag-select');\n        var selectedTag = select ? String(select.value || '').trim() : '';\n        if (!selectedTag) { toast('בחר תגית להוספה', 'error'); return; }\n        var updatedTags = dedupeCustomerTags(tags.concat([selectedTag]));\n        if (updatedTags.length === tags.length) { toast('התגית כבר קיימת', 'error'); return; }\n        saveContact({ tags: JSON.stringify(updatedTags) });\n      });\n    }\n    grid.querySelectorAll('.customer-tag-remove[data-tag-index]').forEach(function(btn) {\n      btn.addEventListener('click', function(e) {\n        e.stopPropagation();\n        var idx = Number(this.getAttribute('data-tag-index'));\n        var updatedTags = tags.filter(function(_, tagIndex) { return tagIndex !== idx; });\n        saveContact({ tags: JSON.stringify(updatedTags) });\n      });\n    });\n\n    document.getElementById('add-event-btn').addEventListener('click', function() {\n      openLeadModal();\n      setTimeout(function() {\n        document.getElementById('l-name').value = c.name || '';\n        document.getElementById('l-phone').value = c.phone || '';\n        document.getElementById('l-email').value = c.email || '';\n      }, 50);\n    });\n\n    grid.querySelectorAll('tr[data-event-id]').forEach(function(row) {\n      row.addEventListener('click', function() { openDrawer(parseInt(this.getAttribute('data-event-id'))); });\n    });\n  }).catch(function(e) { toast(e.message, 'error'); });\n}\n
+    });
+    document.getElementById('customer-type-select').value = c.customer_type || 'פרטי';
+    document.getElementById('customer-status-select').value = c.status || 'active';
+
+    function saveContact(extra) {
+      apiCall('PUT', '/api/contacts/' + c.id, {
+        name: c.name, phone: c.phone, email: c.email, notes: c.notes,
+        customer_type: extra.customer_type !== undefined ? extra.customer_type : (c.customer_type || 'פרטי'),
+        status: extra.status !== undefined ? extra.status : (c.status || 'active'),
+        tags: extra.tags !== undefined ? extra.tags : c.tags,
+        last_contact_date: c.last_contact_date, next_contact_date: c.next_contact_date, general_notes: c.general_notes
+      }).then(function() { toast('נשמר בהצלחה', 'success'); openCustomerCard(c.id); }).catch(function(e) { toast(e.message, 'error'); });
+    }
+
+    document.getElementById('save-customer-type').addEventListener('click', function() {
+      saveContact({ customer_type: document.getElementById('customer-type-select').value });
+    });
+    document.getElementById('save-customer-status').addEventListener('click', function() {
+      saveContact({ status: document.getElementById('customer-status-select').value });
+    });
+    var addCustomerTagBtn = document.getElementById('add-customer-tag-btn');
+    if (addCustomerTagBtn) {
+      addCustomerTagBtn.addEventListener('click', function() {
+        var select = document.getElementById('customer-tag-select');
+        var customInput = document.getElementById('customer-tag-custom');
+        var selectedTag = select ? String(select.value || '').trim() : '';
+        var customTag = customInput ? String(customInput.value || '').trim() : '';
+        var tagToAdd = customTag || selectedTag;
+        if (!tagToAdd) { toast('בחר או כתוב תגית להוספה', 'error'); return; }
+        var updatedTags = dedupeCustomerTags(tags.concat([tagToAdd]));
+        if (updatedTags.length === tags.length) { toast('התגית כבר קיימת', 'error'); return; }
+        saveContact({ tags: JSON.stringify(updatedTags) });
+      });
+    }
+    grid.querySelectorAll('.customer-tag-remove[data-tag-index]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var idx = Number(this.getAttribute('data-tag-index'));
+        var updatedTags = tags.filter(function(_, tagIndex) { return tagIndex !== idx; });
+        saveContact({ tags: JSON.stringify(updatedTags) });
+      });
+    });
+
+    document.getElementById('add-event-btn').addEventListener('click', function() {
+      openLeadModal();
+      setTimeout(function() {
+        document.getElementById('l-name').value = c.name || '';
+        document.getElementById('l-phone').value = c.phone || '';
+        document.getElementById('l-email').value = c.email || '';
+      }, 50);
+    });
+
+    grid.querySelectorAll('tr[data-event-id]').forEach(function(row) {
+      row.addEventListener('click', function() { openDrawer(parseInt(this.getAttribute('data-event-id'))); });
+    });
+  }).catch(function(e) { toast(e.message, 'error'); });
+}
+
 function parseExtraContacts(c) {
   try {
     var arr = c.extra_contacts ? JSON.parse(c.extra_contacts) : [];
