@@ -238,6 +238,14 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .customer-type-empty{font-size:13px;color:var(--text3);padding:10px 12px;border:1px dashed var(--border);border-radius:var(--radius-sm);background:var(--white)}
 .leads-section-row td{background:#fafbfc;font-size:13px;font-weight:800;color:var(--text);padding:12px 10px;border-top:1px solid var(--border)}
 .dash-subsection-title{padding:10px 12px;font-size:12px;font-weight:800;color:var(--text);background:#fafbfc;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.archive-month-section{margin-bottom:18px}
+.archive-month-title{font-size:16px;font-weight:800;color:var(--text);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.archive-event-item{border:1px solid var(--border);border-radius:var(--radius-sm);background:#fafbfc;padding:12px;margin-bottom:10px;cursor:pointer}
+.archive-event-item:hover{border-color:var(--accent);box-shadow:var(--shadow)}
+.archive-event-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.archive-event-name{font-size:14px;font-weight:800;color:var(--text)}
+.archive-event-meta{font-size:12px;color:var(--text3);margin-top:4px}
+.archive-event-pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .autocomplete-list{position:absolute;top:100%;right:0;left:0;background:var(--white);border:1px solid var(--accent);border-radius:var(--radius-sm);box-shadow:var(--shadow-md);z-index:300;max-height:200px;overflow-y:auto}
 .autocomplete-item{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)}
 .autocomplete-item:last-child{border-bottom:none}
@@ -806,6 +814,11 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     grid-template-columns: 1fr !important;
   }
 
+  .archive-event-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   a[href^="https://wa.me"] img,
   a[href^="tel:"] img,
   a[href^="mailto:"] img {
@@ -921,6 +934,7 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     <div class="nav-item" id="nav-employees"><span class="nav-icon">🧑‍💼</span> עובדים</div>
     <div class="nav-item" id="nav-shopping"><span class="nav-icon">🛒</span> רשימות קניות</div>
     <div class="nav-item" id="nav-calendar"><span class="nav-icon">📅</span> יומן אירועים</div>
+    <div class="nav-item" id="nav-archive"><span class="nav-icon">🗂️</span> ארכיון אירועים</div>
     <div id="gcal-status" style="margin:8px;padding:10px 12px;border-radius:8px;font-size:12px;display:none"></div>
     <div class="sidebar-bottom">
       <div class="user-row">
@@ -1047,6 +1061,16 @@ id="customers-search">
         </div>
       </div>
     </div>
+    <div id="page-archive" class="page">
+      <div class="page-header">
+        <div class="page-title">ארכיון אירועים <small>אירועים שחלף התאריך שלהם</small></div>
+      </div>
+      <div class="table-card">
+        <div id="archive-events-grid" style="padding:16px">
+          <div class="dash-empty">טוען...</div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 <div class="modal-overlay" id="modal-lead">
@@ -1139,6 +1163,19 @@ var searchTimer, currentLeadId, dupLeadId, selectedContactId = null, currentEmpl
 var allLeadsCache = [];
 var calYear, calMonth;
 
+function getTodayYMD() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function getMonthYearLabel(dateStr) {
+  if (!dateStr) return 'ללא חודש';
+  var parts = String(dateStr).substring(0, 10).split('-');
+  if (parts.length !== 3) return 'ללא חודש';
+  var monthNames = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+  var monthIndex = Number(parts[1]) - 1;
+  return (monthNames[monthIndex] || parts[1]) + ' ' + parts[0];
+}
+
 
 function getCustomerStatusBadgeClass(status) { var map = { hot:"badge-red", cold:"badge-blue", offer:"badge-orange", active:"badge-green", closed:"badge-green", cancelled:"badge-gray" }; return map[status] || "badge-green"; }
 
@@ -1187,6 +1224,8 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   var navShopping = document.getElementById('nav-shopping');
   if (navShopping) navShopping.addEventListener('click', function() { goTo('shopping', this); });
   document.getElementById('nav-calendar').addEventListener('click', function() { goTo('calendar', this); });
+  var navArchive = document.getElementById('nav-archive');
+  if (navArchive) navArchive.addEventListener('click', function() { goTo('archive', this); });
   var navCustomers = document.getElementById('nav-customers');
   if (navCustomers) navCustomers.addEventListener('click', function() { goTo('customers', this); });
   document.getElementById('leads-search').addEventListener('input', function() {
@@ -1230,6 +1269,7 @@ function goTo(page, el) {
   if (page === 'calendar') loadCalendar();
   if (page === 'customers') loadCustomers();
   if (page === 'employees') loadEmployees();
+  if (page === 'archive') loadEventArchive();
 }
 
 function apiCall(method, path, body) {
@@ -1368,13 +1408,13 @@ function loadDashboard() {
       return '<div class="dash-item" data-id="' + l.id + '"><div><div class="dash-item-name">' + l.name + '</div><div class="dash-item-sub">' + (l.event_type||'') + (l.event_date ? ' - ' + formatDate(l.event_date) : '') + '</div></div>' + statusBadge(l.status) + '</div>';
     }).join('') : '<div class="dash-empty">אין מעקבים להיום</div>';
     var upEl = document.getElementById('dash-upcoming');
-    var today = new Date().toISOString().split('T')[0];
+    var today = getTodayYMD();
+    var todayEvents = [];
     var futureEvents = [];
-    var archivedEvents = [];
     (d.upcoming || []).forEach(function(l) {
       var eventDate = (l.event_date || '').substring(0, 10);
-      if (eventDate && eventDate < today) archivedEvents.push(l);
-      else futureEvents.push(l);
+      if (eventDate === today) todayEvents.push(l);
+      else if (!eventDate || eventDate > today) futureEvents.push(l);
     });
     function renderDashboardEvent(l) {
       return '<div class="dash-item" data-id="' + l.id + '"><div><div class="dash-item-name">' + l.name + '</div><div class="dash-item-sub">' + (l.event_type||'') + ' - ' + (l.venue||'') + '</div></div><span style="font-size:12px;font-weight:700;color:var(--accent)">' + formatDate(l.event_date) + '</span></div>';
@@ -1382,7 +1422,7 @@ function loadDashboard() {
     function renderDashboardSection(title, items, emptyText) {
       return '<div class="dash-subsection-title">' + title + '</div>' + (items.length ? items.map(renderDashboardEvent).join('') : '<div class="dash-empty">' + emptyText + '</div>');
     }
-    upEl.innerHTML = renderDashboardSection('אירועים עתידיים', futureEvents, 'אין אירועים עתידיים להצגה') + renderDashboardSection('ארכיון אירועים', archivedEvents, 'אין אירועים בארכיון');
+    upEl.innerHTML = renderDashboardSection('אירועים היום', todayEvents, 'אין אירועים להיום') + renderDashboardSection('אירועים עתידיים', futureEvents, 'אין אירועים עתידיים להצגה');
     var recEl = document.getElementById('dash-recent');
     recEl.innerHTML = d.recentLeads.length ? d.recentLeads.map(function(l) {
       return '<div class="dash-item" data-id="' + l.id + '"><div><div class="dash-item-name">' + l.name + '</div><div class="dash-item-sub">' + (l.phone||'') + (l.event_type ? ' - ' + l.event_type : '') + '</div></div>' + statusBadge(l.status) + '</div>';
@@ -1487,6 +1527,77 @@ function loadLeads() {
 
 
 
+
+function loadEventArchive() {
+  var grid = document.getElementById('archive-events-grid');
+  if (!grid) return;
+
+  grid.innerHTML = '<div class="dash-empty">טוען...</div>';
+
+  apiCall('GET', '/api/leads').then(function(data) {
+    var today = getTodayYMD();
+    var leads = (data.leads || []).filter(function(l) {
+      var eventDate = (l.event_date || '').substring(0, 10);
+      return eventDate && eventDate < today;
+    });
+
+    if (!leads.length) {
+      grid.innerHTML = '<div class="dash-empty">אין אירועים בארכיון</div>';
+      return;
+    }
+
+    leads.sort(function(a, b) {
+      var ad = (a.event_date || '').substring(0, 10);
+      var bd = (b.event_date || '').substring(0, 10);
+      return String(bd).localeCompare(String(ad));
+    });
+
+    var grouped = {};
+    var monthKeys = [];
+
+    leads.forEach(function(l) {
+      var key = String(l.event_date || '').substring(0, 7);
+      if (!grouped[key]) {
+        grouped[key] = [];
+        monthKeys.push(key);
+      }
+      grouped[key].push(l);
+    });
+
+    grid.innerHTML = monthKeys.map(function(key) {
+      var monthLeads = grouped[key] || [];
+      return '<div class="archive-month-section">' +
+        '<div class="archive-month-title">' + getMonthYearLabel(key + '-01') + '</div>' +
+        monthLeads.map(function(l) {
+          return '<div class="archive-event-item" data-id="' + l.id + '">' +
+            '<div class="archive-event-top">' +
+              '<div>' +
+                '<div class="archive-event-name">' + (l.name || 'ללא שם') + '</div>' +
+                '<div class="archive-event-meta">' + (l.event_type || 'אירוע') + (l.venue ? ' · ' + l.venue : '') + '</div>' +
+              '</div>' +
+              '<div class="archive-event-meta" style="font-weight:800;color:var(--accent)">' + formatDate(l.event_date) + (l.event_time ? ' · ' + l.event_time : '') + '</div>' +
+            '</div>' +
+            '<div class="archive-event-pills">' +
+              '<span class="customer-stat-pill">אירוע #' + (l.lead_num || l.id) + '</span>' +
+              '<span class="customer-stat-pill">' + (l.phone || 'ללא טלפון') + '</span>' +
+              '<span class="customer-stat-pill">' + statusBadge(l.status) + '</span>' +
+              '<span class="customer-stat-pill">₪' + fmtMoney(l.price || 0) + '</span>' +
+            '</div>' +
+          '</div>';
+        }).join('') +
+      '</div>';
+    }).join('');
+
+    grid.querySelectorAll('.archive-event-item[data-id]').forEach(function(card) {
+      card.addEventListener('click', function() {
+        openEventDetailsModal(parseInt(this.getAttribute('data-id')));
+      });
+    });
+  }).catch(function(e) {
+    grid.innerHTML = '<div class="dash-empty">שגיאה בטעינת ארכיון האירועים</div>';
+    toast(e.message, 'error');
+  });
+}
 
 function loadShoppingLists() {
   var grid = document.getElementById('shopping-grid');
