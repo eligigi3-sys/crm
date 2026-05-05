@@ -237,6 +237,7 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .customer-type-header{font-size:16px;font-weight:800;color:var(--text);padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:#fafbfc}
 .customer-type-empty{font-size:13px;color:var(--text3);padding:10px 12px;border:1px dashed var(--border);border-radius:var(--radius-sm);background:var(--white)}
 .leads-section-row td{background:#fafbfc;font-size:13px;font-weight:800;color:var(--text);padding:12px 10px;border-top:1px solid var(--border)}
+.dash-subsection-title{padding:10px 12px;font-size:12px;font-weight:800;color:var(--text);background:#fafbfc;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
 .autocomplete-list{position:absolute;top:100%;right:0;left:0;background:var(--white);border:1px solid var(--accent);border-radius:var(--radius-sm);box-shadow:var(--shadow-md);z-index:300;max-height:200px;overflow-y:auto}
 .autocomplete-item{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)}
 .autocomplete-item:last-child{border-bottom:none}
@@ -1367,9 +1368,21 @@ function loadDashboard() {
       return '<div class="dash-item" data-id="' + l.id + '"><div><div class="dash-item-name">' + l.name + '</div><div class="dash-item-sub">' + (l.event_type||'') + (l.event_date ? ' - ' + formatDate(l.event_date) : '') + '</div></div>' + statusBadge(l.status) + '</div>';
     }).join('') : '<div class="dash-empty">אין מעקבים להיום</div>';
     var upEl = document.getElementById('dash-upcoming');
-    upEl.innerHTML = d.upcoming.length ? d.upcoming.map(function(l) {
+    var today = new Date().toISOString().split('T')[0];
+    var futureEvents = [];
+    var archivedEvents = [];
+    (d.upcoming || []).forEach(function(l) {
+      var eventDate = (l.event_date || '').substring(0, 10);
+      if (eventDate && eventDate < today) archivedEvents.push(l);
+      else futureEvents.push(l);
+    });
+    function renderDashboardEvent(l) {
       return '<div class="dash-item" data-id="' + l.id + '"><div><div class="dash-item-name">' + l.name + '</div><div class="dash-item-sub">' + (l.event_type||'') + ' - ' + (l.venue||'') + '</div></div><span style="font-size:12px;font-weight:700;color:var(--accent)">' + formatDate(l.event_date) + '</span></div>';
-    }).join('') : '<div class="dash-empty">אין אירועים בתאריכים קרובים</div>';
+    }
+    function renderDashboardSection(title, items, emptyText) {
+      return '<div class="dash-subsection-title">' + title + '</div>' + (items.length ? items.map(renderDashboardEvent).join('') : '<div class="dash-empty">' + emptyText + '</div>');
+    }
+    upEl.innerHTML = renderDashboardSection('אירועים עתידיים', futureEvents, 'אין אירועים עתידיים להצגה') + renderDashboardSection('ארכיון אירועים', archivedEvents, 'אין אירועים בארכיון');
     var recEl = document.getElementById('dash-recent');
     recEl.innerHTML = d.recentLeads.length ? d.recentLeads.map(function(l) {
       return '<div class="dash-item" data-id="' + l.id + '"><div><div class="dash-item-name">' + l.name + '</div><div class="dash-item-sub">' + (l.phone||'') + (l.event_type ? ' - ' + l.event_type : '') + '</div></div>' + statusBadge(l.status) + '</div>';
