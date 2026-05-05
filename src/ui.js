@@ -219,6 +219,11 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .employee-card-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .employee-status-active{background:var(--green-light);color:var(--green)}
 .employee-status-inactive{background:var(--bg);color:var(--text3);border:1px solid var(--border)}
+.assignment-card{border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;background:#fafbfc;margin-bottom:12px}
+.assignment-card-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.assignment-card-title{font-size:14px;font-weight:700;color:var(--text)}
+.assignment-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.assignment-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .autocomplete-list{position:absolute;top:100%;right:0;left:0;background:var(--white);border:1px solid var(--accent);border-radius:var(--radius-sm);box-shadow:var(--shadow-md);z-index:300;max-height:200px;overflow-y:auto}
 .autocomplete-item{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)}
 .autocomplete-item:last-child{border-bottom:none}
@@ -773,9 +778,15 @@ tr:hover td{background:#fafbfc;cursor:pointer}
   }
 
   .employee-card-actions .btn,
-  .employee-card-actions a.btn {
+  .employee-card-actions a.btn,
+  .assignment-actions .btn,
+  .assignment-grid .btn {
     width: 100%;
     justify-content: center;
+  }
+
+  .assignment-grid {
+    grid-template-columns: 1fr !important;
   }
 
   a[href^="https://wa.me"] img,
@@ -2485,6 +2496,116 @@ function deactivateEmployee(id) {
   }).catch(function(e) { toast(e.message, 'error'); });
 }
 
+function buildAssignmentEmployeeOptions(employees, selectedId, assignedIds) {
+  selectedId = Number(selectedId || 0);
+  assignedIds = assignedIds || [];
+  var html = '<option value="">בחר עובד</option>';
+  employees.forEach(function(emp) {
+    var id = Number(emp.id);
+    if (selectedId !== id && assignedIds.indexOf(id) !== -1) return;
+    html += '<option value="' + id + '"' + (selectedId === id ? ' selected' : '') + '>' + (emp.full_name || 'ללא שם') + (emp.role ? ' · ' + emp.role : '') + '</option>';
+  });
+  return html;
+}
+
+function renderEventAssignments(container, eventId, assignments, employees) {
+  if (!container) return;
+
+  assignments = assignments || [];
+  employees = employees || [];
+  var assignedIds = assignments.map(function(a) { return Number(a.employee_id); });
+
+  var html = '<div class="info-section"><div class="info-section-title">צוות לאירוע</div>';
+
+  if (!assignments.length) {
+    html += '<div style="font-size:13px;color:var(--text3);margin-bottom:12px">אין עובדים משויכים עדיין</div>';
+  } else {
+    assignments.forEach(function(a) {
+      html += '<div class="assignment-card" data-assignment-id="' + a.id + '">';
+      html += '<div class="assignment-card-header">';
+      html += '<div class="assignment-card-title">' + (a.full_name || 'עובד') + '</div>';
+      html += '<span class="badge ' + (Number(a.is_active) === 0 ? 'badge-gray' : 'badge-green') + '">' + (Number(a.is_active) === 0 ? 'לא פעיל' : 'פעיל') + '</span>';
+      html += '</div>';
+      html += '<div class="assignment-grid">';
+      html += '<div class="form-group"><label class="form-label">עובד</label><select class="form-input assignment-employee-id">' + buildAssignmentEmployeeOptions(employees, a.employee_id, assignedIds) + '</select></div>';
+      html += '<div class="form-group"><label class="form-label">תפקיד באירוע</label><input class="form-input assignment-role" value="' + (a.role_on_event || '') + '"></div>';
+      html += '<div class="form-group"><label class="form-label">תעריף שעתי</label><input class="form-input assignment-rate" type="number" step="0.01" value="' + (a.hourly_rate_override || '') + '"></div>';
+      html += '<div class="form-group"><label class="form-label">שעות מתוכננות</label><input class="form-input assignment-hours-planned" type="number" step="0.1" value="' + (a.hours_planned || '') + '"></div>';
+      html += '<div class="form-group"><label class="form-label">שעות בפועל</label><input class="form-input assignment-hours-actual" type="number" step="0.1" value="' + (a.hours_actual || '') + '"></div>';
+      html += '<div class="form-group"><label class="form-label">סטטוס תשלום</label><select class="form-input assignment-payment-status"><option value="pending"' + (String(a.payment_status || 'pending') === 'pending' ? ' selected' : '') + '>ממתין</option><option value="approved"' + (String(a.payment_status || '') === 'approved' ? ' selected' : '') + '>מאושר</option><option value="paid"' + (String(a.payment_status || '') === 'paid' ? ' selected' : '') + '>שולם</option></select></div>';
+      html += '</div>';
+      html += '<div class="form-group"><label class="form-label">הערות</label><textarea class="form-textarea assignment-notes">' + (a.notes || '') + '</textarea></div>';
+      html += '<div class="assignment-actions"><button class="btn btn-primary btn-sm assignment-save-btn" data-id="' + a.id + '">שמור שיוך</button><button class="btn btn-danger btn-sm assignment-remove-btn" data-id="' + a.id + '">הסר מהאירוע</button></div>';
+      html += '</div>';
+    });
+  }
+
+  html += '<div class="assignment-card">';
+  html += '<div class="assignment-card-header"><div class="assignment-card-title">הוסף עובד לאירוע</div></div>';
+  html += '<div class="assignment-grid">';
+  html += '<div class="form-group"><label class="form-label">עובד</label><select class="form-input" id="new-assignment-employee">' + buildAssignmentEmployeeOptions(employees, null, assignedIds) + '</select></div>';
+  html += '<div class="form-group"><label class="form-label">תפקיד באירוע</label><input class="form-input" id="new-assignment-role"></div>';
+  html += '<div class="form-group"><label class="form-label">תעריף שעתי</label><input class="form-input" id="new-assignment-rate" type="number" step="0.01"></div>';
+  html += '<div class="form-group"><label class="form-label">שעות מתוכננות</label><input class="form-input" id="new-assignment-hours-planned" type="number" step="0.1"></div>';
+  html += '<div class="form-group"><label class="form-label">שעות בפועל</label><input class="form-input" id="new-assignment-hours-actual" type="number" step="0.1"></div>';
+  html += '<div class="form-group"><label class="form-label">סטטוס תשלום</label><select class="form-input" id="new-assignment-payment-status"><option value="pending">ממתין</option><option value="approved">מאושר</option><option value="paid">שולם</option></select></div>';
+  html += '</div>';
+  html += '<div class="form-group"><label class="form-label">הערות</label><textarea class="form-textarea" id="new-assignment-notes"></textarea></div>';
+  html += '<div class="assignment-actions"><button class="btn btn-primary btn-sm" id="add-assignment-btn">הוסף עובד</button></div>';
+  html += '</div>';
+  html += '</div>';
+
+  container.innerHTML = html;
+
+  var addBtn = document.getElementById('add-assignment-btn');
+  if (addBtn) {
+    addBtn.onclick = function() {
+      apiCall('POST', '/api/leads/' + eventId + '/employees', {
+        employee_id: Number(document.getElementById('new-assignment-employee').value || 0),
+        role_on_event: document.getElementById('new-assignment-role').value.trim(),
+        hourly_rate_override: document.getElementById('new-assignment-rate').value,
+        hours_planned: document.getElementById('new-assignment-hours-planned').value,
+        hours_actual: document.getElementById('new-assignment-hours-actual').value,
+        payment_status: document.getElementById('new-assignment-payment-status').value,
+        notes: document.getElementById('new-assignment-notes').value.trim()
+      }).then(function() {
+        toast('העובד שויך לאירוע', 'success');
+        openEventDetailsModal(eventId);
+      }).catch(function(e) { toast(e.message, 'error'); });
+    };
+  }
+
+  container.querySelectorAll('.assignment-save-btn').forEach(function(btn) {
+    btn.onclick = function() {
+      var card = this.closest('.assignment-card');
+      var assignmentId = this.getAttribute('data-id');
+      apiCall('PUT', '/api/lead-employees/' + assignmentId, {
+        employee_id: Number(card.querySelector('.assignment-employee-id').value || 0),
+        role_on_event: card.querySelector('.assignment-role').value.trim(),
+        hourly_rate_override: card.querySelector('.assignment-rate').value,
+        hours_planned: card.querySelector('.assignment-hours-planned').value,
+        hours_actual: card.querySelector('.assignment-hours-actual').value,
+        payment_status: card.querySelector('.assignment-payment-status').value,
+        notes: card.querySelector('.assignment-notes').value.trim()
+      }).then(function() {
+        toast('שיוך העובד עודכן', 'success');
+        openEventDetailsModal(eventId);
+      }).catch(function(e) { toast(e.message, 'error'); });
+    };
+  });
+
+  container.querySelectorAll('.assignment-remove-btn').forEach(function(btn) {
+    btn.onclick = function() {
+      var assignmentId = this.getAttribute('data-id');
+      if (!confirm('להסיר את העובד מהאירוע?')) return;
+      apiCall('DELETE', '/api/lead-employees/' + assignmentId).then(function() {
+        toast('העובד הוסר מהאירוע', 'success');
+        openEventDetailsModal(eventId);
+      }).catch(function(e) { toast(e.message, 'error'); });
+    };
+  });
+}
+
 function parseExtraContactsSafe(value) {
   try {
     var arr = value ? JSON.parse(value) : [];
@@ -2813,8 +2934,17 @@ function makeTinyEditButton(c, field, label, inputType) {
 
 
 function openEventDetailsModal(id) {
-  apiCall('GET', '/api/leads/' + id).then(function(data) {
+  Promise.all([
+    apiCall('GET', '/api/leads/' + id),
+    apiCall('GET', '/api/leads/' + id + '/employees').catch(function() { return { assignments: [] }; }),
+    apiCall('GET', '/api/employees').catch(function() { return { employees: [] }; })
+  ]).then(function(results) {
+    var data = results[0] || {};
+    var assignmentsData = results[1] || { assignments: [] };
+    var employeesData = results[2] || { employees: [] };
     var l = data.lead || {};
+    var assignments = assignmentsData.assignments || [];
+    var employees = employeesData.employees || [];
     var old = document.getElementById('event-details-modal');
     if (old) old.remove();
 
@@ -2846,6 +2976,7 @@ function openEventDetailsModal(id) {
           '<div class="info-section"><div class="info-section-title">הערות</div>' +
           '<div style="font-size:13px;color:var(--text2);line-height:1.7;white-space:pre-wrap">' + (l.details || l.notes || 'אין הערות') + '</div>' +
           '</div>' +
+          '<div id="event-assignments-section"></div>' +
         '</div>' +
         '<div class="modal-footer">' +
           '<button class="btn btn-secondary" id="event-details-cancel">סגור</button>' +
@@ -2855,6 +2986,7 @@ function openEventDetailsModal(id) {
       '</div>';
 
     document.body.appendChild(overlay);
+    renderEventAssignments(document.getElementById('event-assignments-section'), id, assignments, employees);
 
     function close() { overlay.remove(); }
 
