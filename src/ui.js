@@ -236,6 +236,7 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .customer-type-section{background:transparent;display:flex;flex-direction:column;gap:12px}
 .customer-type-header{font-size:16px;font-weight:800;color:var(--text);padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:#fafbfc}
 .customer-type-empty{font-size:13px;color:var(--text3);padding:10px 12px;border:1px dashed var(--border);border-radius:var(--radius-sm);background:var(--white)}
+.leads-section-row td{background:#fafbfc;font-size:13px;font-weight:800;color:var(--text);padding:12px 10px;border-top:1px solid var(--border)}
 .autocomplete-list{position:absolute;top:100%;right:0;left:0;background:var(--white);border:1px solid var(--accent);border-radius:var(--radius-sm);box-shadow:var(--shadow-md);z-index:300;max-height:200px;overflow-y:auto}
 .autocomplete-item{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)}
 .autocomplete-item:last-child{border-bottom:none}
@@ -1436,10 +1437,32 @@ function loadLeads() {
     if (eventType) leads = leads.filter(function(l) { return l.event_type === eventType; });
     var tbody = document.getElementById('leads-body');
     if (!leads.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="10">לא נמצאו לידים</td></tr>'; return; }
-    tbody.innerHTML = leads.map(function(l) {
+
+    var today = new Date().toISOString().split('T')[0];
+    var futureLeads = [];
+    var archivedLeads = [];
+
+    leads.forEach(function(l) {
+      var eventDate = (l.event_date || '').substring(0, 10);
+      if (eventDate && eventDate < today) archivedLeads.push(l);
+      else futureLeads.push(l);
+    });
+
+    function renderLeadRow(l) {
       var payBadge = l.price > 0 ? (l.balance_paid ? '<span class="badge badge-green">שולם</span>' : (l.deposit > 0 ? '<span class="badge badge-yellow">מקדמה</span>' : '<span class="badge badge-red">טרם שולם</span>')) : '';
       return '<tr data-id="' + l.id + '"><td><div class="dot ' + getUrgencyDot(l.next_contact) + '"></div></td><td class="bold">' + l.name + '</td><td>' + (l.phone||'—') + '</td><td>' + (l.event_type||'—') + '</td><td>' + (l.event_date?formatDate(l.event_date):'—') + '</td><td>' + (l.venue||'—') + '</td><td>' + (l.price?'₪'+fmtMoney(l.price):payBadge||'—') + '</td><td>' + statusBadge(l.status) + '</td><td style="font-size:12px;' + (isOverdue(l.next_contact)?'color:var(--red);font-weight:700':'') + '">' + (l.next_contact?formatDate(l.next_contact):'—') + '</td><td><button class="btn btn-ghost btn-sm edit-btn" data-id="' + l.id + '">עריכה</button> <button class="btn btn-danger btn-sm del-btn" data-id="' + l.id + '">מחיקה</button></td></tr>';
-    }).join('');
+    }
+
+    function renderLeadSection(title, sectionLeads, emptyText) {
+      var html = '<tr class="leads-section-row"><td colspan="10">' + title + '</td></tr>';
+      html += sectionLeads.length ? sectionLeads.map(renderLeadRow).join('') : '<tr class="empty-row"><td colspan="10">' + emptyText + '</td></tr>';
+      return html;
+    }
+
+    tbody.innerHTML =
+      renderLeadSection('אירועים עתידיים', futureLeads, 'אין אירועים עתידיים להצגה') +
+      renderLeadSection('ארכיון אירועים', archivedLeads, 'אין אירועים בארכיון');
+
     tbody.querySelectorAll('tr[data-id]').forEach(function(row) {
       row.addEventListener('click', function(e) { if (!e.target.classList.contains('edit-btn') && !e.target.classList.contains('del-btn')) openDrawer(parseInt(this.getAttribute('data-id'))); });
     });
