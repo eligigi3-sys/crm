@@ -232,6 +232,28 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .product-card-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .product-status-active{background:var(--green-light);color:var(--green)}
 .product-status-inactive{background:var(--bg);color:var(--text3);border:1px solid var(--border)}
+.product-purchases-section{margin-top:18px;padding-top:18px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:14px}
+.product-purchases-header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.product-purchases-title{font-size:16px;font-weight:800;color:var(--text)}
+.product-purchases-summary{display:flex;flex-direction:column;gap:10px}
+.product-purchase-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.product-purchase-summary-card{background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.product-purchase-summary-label{font-size:12px;color:var(--text3)}
+.product-purchase-summary-value{font-size:16px;font-weight:800;color:var(--text)}
+.product-purchases-list{display:flex;flex-direction:column;gap:10px}
+.product-purchase-row{background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.product-purchase-row-main{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
+.product-purchase-row-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.product-purchase-row-stats{display:flex;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--text2)}
+.product-purchase-row-notes{font-size:13px;color:var(--text2);line-height:1.6;white-space:pre-wrap}
+.product-purchase-row-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.product-purchase-date{font-weight:700;color:var(--text)}
+.product-purchase-type,.product-purchase-supplier{font-size:12px;color:var(--text3);background:#f8fafc;border:1px solid var(--border);border-radius:999px;padding:3px 8px}
+.product-purchase-change{font-size:12px;font-weight:700;border-radius:999px;padding:3px 8px}
+.product-purchase-change-up{background:#fef3f2;color:#b42318}
+.product-purchase-change-down{background:#ecfdf3;color:#027a48}
+.product-purchase-change-neutral{background:#f8fafc;color:var(--text3)}
+.product-purchases-empty{padding:18px;border:1px dashed var(--border);border-radius:12px;background:#f8fafc;color:var(--text3);text-align:center}
 .assignment-card{border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;background:#fafbfc;margin-bottom:12px}
 .assignment-card-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap}
 .assignment-card-title{font-size:14px;font-weight:700;color:var(--text)}
@@ -829,6 +851,22 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     justify-content: center;
   }
 
+  .product-purchase-row {
+    flex-direction: column;
+  }
+
+  .product-purchase-row-actions {
+    width: 100%;
+  }
+
+  .product-purchase-row-actions .btn {
+    width: 100%;
+  }
+
+  .product-purchase-summary-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
   .assignment-grid,
   .employee-profile-summary,
   .employee-assignment-grid,
@@ -1197,7 +1235,7 @@ id="customers-search">
 <script>
 var token = localStorage.getItem('crm_token');
 var currentUser = JSON.parse(localStorage.getItem('crm_user') || 'null');
-var searchTimer, currentLeadId, dupLeadId, selectedContactId = null, currentEmployeeId = null, currentProductId = null;
+var searchTimer, currentLeadId, dupLeadId, selectedContactId = null, currentEmployeeId = null, currentProductId = null, currentProductPurchases = [];
 var allLeadsCache = [];
 var calYear, calMonth;
 var predefinedCustomerTags = [
@@ -2588,6 +2626,120 @@ function formatProductMoney(value) {
   return value !== null && value !== undefined && value !== '' ? '₪' + fmtMoney(value) : '—';
 }
 
+function loadProductPurchases(productId) {
+  var summaryEl = document.getElementById('product-purchases-summary');
+  var listEl = document.getElementById('product-purchases-list');
+  if (!summaryEl || !listEl) return;
+
+  summaryEl.innerHTML = '<div class="dash-empty">טוען...</div>';
+  listEl.innerHTML = '';
+
+  apiCall('GET', '/api/products/' + productId + '/purchases').then(function(data) {
+    currentProductPurchases = (data && data.purchases) || [];
+    summaryEl.innerHTML = renderProductPurchaseSummary(calculateProductPurchaseSummary(currentProductPurchases));
+    listEl.innerHTML = renderProductPurchasesSection(productId, currentProductPurchases);
+  }).catch(function(e) {
+    currentProductPurchases = [];
+    summaryEl.innerHTML = '<div class="dash-empty">שגיאה בטעינת סיכום רכישות</div>';
+    listEl.innerHTML = '<div class="product-purchases-empty">לא ניתן לטעון את היסטוריית הרכישות</div>';
+    toast(e.message, 'error');
+  });
+}
+
+function calculateProductPurchaseSummary(purchases) {
+  var unitPrices = purchases.map(function(p) { return Number(p.unit_price || 0); }).filter(function(price) { return Number.isFinite(price); });
+  var count = purchases.length;
+  var lastPrice = count ? Number(purchases[0].unit_price || 0) : null;
+  var avgPrice = unitPrices.length ? unitPrices.reduce(function(sum, price) { return sum + price; }, 0) / unitPrices.length : null;
+  var minPrice = unitPrices.length ? Math.min.apply(null, unitPrices) : null;
+  var maxPrice = unitPrices.length ? Math.max.apply(null, unitPrices) : null;
+  var changeFromPrevious = count >= 2 ? Number(purchases[0].unit_price || 0) - Number(purchases[1].unit_price || 0) : null;
+
+  return {
+    count: count,
+    lastPrice: lastPrice,
+    avgPrice: avgPrice,
+    minPrice: minPrice,
+    maxPrice: maxPrice,
+    changeFromPrevious: changeFromPrevious
+  };
+}
+
+function getProductPurchaseChangeText(purchases, index) {
+  if (!purchases[index + 1]) {
+    return { text: '—', className: 'product-purchase-change-neutral' };
+  }
+
+  var currentPrice = Number(purchases[index].unit_price || 0);
+  var previousPrice = Number(purchases[index + 1].unit_price || 0);
+  var diff = Math.round((currentPrice - previousPrice) * 100) / 100;
+
+  if (diff > 0.01) {
+    return { text: '+' + formatProductMoney(diff), className: 'product-purchase-change-up' };
+  }
+
+  if (diff < -0.01) {
+    return { text: '-' + formatProductMoney(Math.abs(diff)), className: 'product-purchase-change-down' };
+  }
+
+  return { text: 'ללא שינוי', className: 'product-purchase-change-neutral' };
+}
+
+function renderProductPurchaseSummary(summary) {
+  if (!summary.count) {
+    return '<div class="product-purchases-empty">אין היסטוריית רכישות עדיין</div>';
+  }
+
+  var changeText = '—';
+  var changeClass = 'product-purchase-change-neutral';
+  if (summary.changeFromPrevious !== null && summary.changeFromPrevious !== undefined) {
+    if (summary.changeFromPrevious > 0.01) {
+      changeText = '+' + formatProductMoney(summary.changeFromPrevious);
+      changeClass = 'product-purchase-change-up';
+    } else if (summary.changeFromPrevious < -0.01) {
+      changeText = '-' + formatProductMoney(Math.abs(summary.changeFromPrevious));
+      changeClass = 'product-purchase-change-down';
+    } else {
+      changeText = 'ללא שינוי';
+    }
+  }
+
+  return '<div class="product-purchase-summary-grid">' +
+    '<div class="product-purchase-summary-card"><div class="product-purchase-summary-label">מחיר אחרון</div><div class="product-purchase-summary-value">' + formatProductMoney(summary.lastPrice) + '</div></div>' +
+    '<div class="product-purchase-summary-card"><div class="product-purchase-summary-label">מחיר ממוצע</div><div class="product-purchase-summary-value">' + formatProductMoney(summary.avgPrice) + '</div></div>' +
+    '<div class="product-purchase-summary-card"><div class="product-purchase-summary-label">מחיר נמוך ביותר</div><div class="product-purchase-summary-value">' + formatProductMoney(summary.minPrice) + '</div></div>' +
+    '<div class="product-purchase-summary-card"><div class="product-purchase-summary-label">מחיר גבוה ביותר</div><div class="product-purchase-summary-value">' + formatProductMoney(summary.maxPrice) + '</div></div>' +
+    '<div class="product-purchase-summary-card"><div class="product-purchase-summary-label">שינוי מהקנייה הקודמת</div><div class="product-purchase-summary-value"><span class="product-purchase-change ' + changeClass + '">' + changeText + '</span></div></div>' +
+    '</div>';
+}
+
+function renderProductPurchasesSection(productId, purchases) {
+  if (!purchases.length) {
+    return '<div class="product-purchases-empty">אין היסטוריית רכישות עדיין</div>';
+  }
+
+  return '<div class="product-purchases-list">' + purchases.map(function(purchase, index) {
+    var change = getProductPurchaseChangeText(purchases, index);
+    var purchaseTypeMap = { manual: 'ידני', shopping: 'Shopping', import: 'ייבוא' };
+    return '<div class="product-purchase-row">' +
+      '<div class="product-purchase-row-main">' +
+        '<div class="product-purchase-row-top">' +
+          '<span class="product-purchase-date">' + (purchase.purchase_date || '—') + '</span>' +
+          '<span class="product-purchase-type">' + (purchaseTypeMap[purchase.purchase_type] || purchase.purchase_type || '—') + '</span>' +
+          (purchase.supplier_name ? '<span class="product-purchase-supplier">' + purchase.supplier_name + '</span>' : '') +
+          '<span class="product-purchase-change ' + change.className + '">' + change.text + '</span>' +
+        '</div>' +
+        '<div class="product-purchase-row-stats">' +
+          '<span>כמות: ' + (purchase.quantity !== null && purchase.quantity !== undefined && purchase.quantity !== '' ? purchase.quantity : '—') + '</span>' +
+          '<span>מחיר יחידה: ' + formatProductMoney(purchase.unit_price) + '</span>' +
+          '<span>סה"כ: ' + formatProductMoney(purchase.total_price) + '</span>' +
+        '</div>' +
+        (purchase.notes ? '<div class="product-purchase-row-notes">' + purchase.notes + '</div>' : '') +
+      '</div>' +
+    '</div>';
+  }).join('') + '</div>';
+}
+
 function loadProducts() {
   var grid = document.getElementById('products-grid');
   if (!grid) return;
@@ -2689,6 +2841,13 @@ function openProductModal(id) {
         '</div>' +
         '<div class="form-group"><label class="form-label">הערות</label><textarea class="form-textarea" id="product-notes" placeholder="הערות על המוצר"></textarea></div>' +
         '<div class="form-group"><label class="check-item" style="display:inline-flex;width:auto"><input type="checkbox" id="product-is-active" checked> מוצר פעיל</label></div>' +
+        (id ? '<div class="product-purchases-section" id="product-purchases-section">' +
+          '<div class="product-purchases-header">' +
+            '<div class="product-purchases-title">היסטוריית רכישות</div>' +
+          '</div>' +
+          '<div class="product-purchases-summary" id="product-purchases-summary"><div class="dash-empty">טוען...</div></div>' +
+          '<div id="product-purchases-list"></div>' +
+        '</div>' : '') +
       '</div>' +
       '<div class="modal-footer">' +
         '<button class="btn btn-secondary" id="product-modal-cancel">ביטול</button>' +
@@ -2715,6 +2874,7 @@ function openProductModal(id) {
       document.getElementById('product-min-stock-alert').value = (product.min_stock_alert !== null && product.min_stock_alert !== undefined) ? product.min_stock_alert : '';
       document.getElementById('product-notes').value = product.notes || '';
       document.getElementById('product-is-active').checked = Number(product.is_active) !== 0;
+      loadProductPurchases(id);
     }).catch(function(e) { toast(e.message, 'error'); close(); });
   }
 
