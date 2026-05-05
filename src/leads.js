@@ -60,9 +60,196 @@ async function findOrCreateContact(name, phone, email, env) {
   return contact;
 }
 
+function normalizeAssignmentText(value) {
+  if (value === undefined || value === null) return null;
+  const text = String(value).trim();
+  return text ? text : null;
+}
+
+function normalizeAssignmentNumber(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
+async function getLeadById(leadId, env) {
+  return env.DB.prepare('SELECT * FROM leads WHERE id = ?').bind(leadId).first();
+}
+
+async function getEmployeeById(employeeId, env) {
+  return env.DB.prepare('SELECT * FROM employees WHERE id = ?').bind(employeeId).first();
+}
+
 export async function handleLeads(request, env, path) {
   const method = request.method;
   const url = new URL(request.url);
+  const assignmentIdMatch = path.match(/^\/api\/lead-employees\/(\d+)$/);
+  const leadEmployeesMatch = path.match(/^\/api\/leads\/(\d+)\/employees$/);
+
+  if (leadEmployeesMatch && method === 'GET') {
+    const leadId = leadEmployeesMatch[1];
+    const lead = await getLeadById(leadId, env);
+
+    if (!lead) throw new Error('Lead not found');
+
+    const { results } = await env.DB.prepare(`
+      SELECT
+        lead_employees.*,
+        employees.full_name,
+        employees.phone,
+        employees.email,
+        employees.role AS employee_role,
+        employees.hourly_rate AS employee_hourly_rate,
+        employees.is_active
+      FROM lead_employees
+      INNER JOIN employees ON employees.id = lead_employees.employee_id
+      WHERE lead_employees.lead_id = ?
+      ORDER BY lead_employees.created_at DESC, lead_employees.id DESC
+    `).bind(leadId).all();
+
+    return { assignments: results };
+  }
+
+  if (leadEmployeesMatch && method === 'POST') {
+    const leadId = leadEmployeesMatch[1];
+    const lead = await getLeadById(leadId, env);
+
+    if (!lead) throw new Error('Lead not found');
+
+    const b = await request.json();
+    const employeeId = Number(b.employee_id);
+    if (!Number.isInteger(employeeId) || employeeId <= 0) throw new Error('employee_id חובה');
+
+    const employee = await getEmployeeById(employeeId, env);
+    if (!employee) throw new Error('עובד לא נמצא');
+    if (Number(employee.is_active) === 0) throw new Error('לא ניתן לשייך עובד לא פעיל');
+
+    const existingAssignment = await env.DB.prepare(
+      'SELECT id FROM lead_employees WHERE lead_id = ? AND employee_id = ?'
+    ).bind(leadId, employeeId).first();
+
+    if (existingAssignment) throw new Error('העובד כבר משויך לאירוע');
+
+    const result = await env.DB.prepare(`
+      INSERT INTO lead_employees (
+        lead_id,
+        employee_id,
+        role_on_event,
+        hourly_rate_override,
+        hours_planned,
+        hours_actual,
+        payment_status,
+        notes,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).bind(
+      leadId,
+      employeeId,
+      normalizeAssignmentText(b.role_on_event),
+      normalizeAssignmentNumber(b.hourly_rate_override),
+      normalizeAssignmentNumber(b.hours_planned),
+      normalizeAssignmentNumber(b.hours_actual),
+      normalizeAssignmentText(b.payment_status) || 'pending',
+      normalizeAssignmentText(b.notes)
+    ).run();
+
+    const assignment = await env.DB.prepare(`
+      SELECT
+        lead_employees.*,
+        employees.full_name,
+        employees.phone,
+        employees.email,
+        employees.role AS employee_role,
+        employees.hourly_rate AS employee_hourly_rate,
+        employees.is_active
+      FROM lead_employees
+      INNER JOIN employees ON employees.id = lead_employees.employee_id
+      WHERE lead_employees.id = ?
+    `).bind(result.meta.last_row_id).first();
+
+    return { success: true, assignment };
+  }
+
+  if (assignmentIdMatch && method === 'PUT') {
+    const assignmentId = assignmentIdMatch[1];
+    const b = await request.json();
+
+    const existingAssignment = await env.DB.prepare(
+      'SELECT * FROM lead_employees WHERE id = ?'
+    ).bind(assignmentId).first();
+
+    if (!existingAssignment) throw new Error('שיוך עובד לא נמצא');
+
+    const employeeId = b.employee_id !== undefined ? Number(b.employee_id) : Number(existingAssignment.employee_id);
+    if (!Number.isInteger(employeeId) || employeeId <= 0) throw new Error('employee_id חובה');
+
+    const employee = await getEmployeeById(employeeId, env);
+    if (!employee) throw new Error('עובד לא נמצא');
+    if (Number(employee.is_active) === 0) throw new Error('לא ניתן לשייך עובד לא פעיל');
+
+    const lead = await getLeadById(existingAssignment.lead_id, env);
+    if (!lead) throw new Error('Lead not found');
+
+    const duplicateAssignment = await env.DB.prepare(
+      'SELECT id FROM lead_employees WHERE lead_id = ? AND employee_id = ? AND id != ?'
+    ).bind(existingAssignment.lead_id, employeeId, assignmentId).first();
+
+    if (duplicateAssignment) throw new Error('העובד כבר משויך לאירוע');
+
+    await env.DB.prepare(`
+      UPDATE lead_employees
+      SET
+        employee_id = ?,
+        role_on_event = ?,
+        hourly_rate_override = ?,
+        hours_planned = ?,
+        hours_actual = ?,
+        payment_status = ?,
+        notes = ?
+      WHERE id = ?
+    `).bind(
+      employeeId,
+      normalizeAssignmentText(b.role_on_event),
+      normalizeAssignmentNumber(b.hourly_rate_override),
+      normalizeAssignmentNumber(b.hours_planned),
+      normalizeAssignmentNumber(b.hours_actual),
+      normalizeAssignmentText(b.payment_status) || 'pending',
+      normalizeAssignmentText(b.notes),
+      assignmentId
+    ).run();
+
+    const assignment = await env.DB.prepare(`
+      SELECT
+        lead_employees.*,
+        employees.full_name,
+        employees.phone,
+        employees.email,
+        employees.role AS employee_role,
+        employees.hourly_rate AS employee_hourly_rate,
+        employees.is_active
+      FROM lead_employees
+      INNER JOIN employees ON employees.id = lead_employees.employee_id
+      WHERE lead_employees.id = ?
+    `).bind(assignmentId).first();
+
+    return { success: true, assignment };
+  }
+
+  if (assignmentIdMatch && method === 'DELETE') {
+    const assignmentId = assignmentIdMatch[1];
+
+    const existingAssignment = await env.DB.prepare(
+      'SELECT id FROM lead_employees WHERE id = ?'
+    ).bind(assignmentId).first();
+
+    if (!existingAssignment) throw new Error('שיוך עובד לא נמצא');
+
+    await env.DB.prepare(
+      'DELETE FROM lead_employees WHERE id = ?'
+    ).bind(assignmentId).run();
+
+    return { success: true };
+  }
 
   // ===============================
   // GET ALL

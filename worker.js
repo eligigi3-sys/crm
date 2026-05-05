@@ -40,7 +40,7 @@ export default {
           response = await handleAuth(request, env, path);
         } else if (path.startsWith('/api/dashboard')) {
           response = await handleDashboard(request, env, path);
-        } else if (path.startsWith('/api/leads')) {
+        } else if (path.startsWith('/api/leads') || path.startsWith('/api/lead-employees')) {
           response = await handleLeads(request, env, path);
         } else if (path.startsWith('/api/google')) {
           response = await handleGoogle(request, env, path);
