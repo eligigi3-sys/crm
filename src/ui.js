@@ -219,6 +219,19 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .employee-card-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .employee-status-active{background:var(--green-light);color:var(--green)}
 .employee-status-inactive{background:var(--bg);color:var(--text3);border:1px solid var(--border)}
+.product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.product-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:10px}
+.product-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.product-card-name{font-size:15px;font-weight:800;color:var(--text)}
+.product-card-meta{font-size:12px;color:var(--text3)}
+.product-card-notes{font-size:13px;color:var(--text2);line-height:1.6;white-space:pre-wrap}
+.product-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.product-stat{background:#fafbfc;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px}
+.product-stat-label{font-size:11px;color:var(--text3);margin-bottom:4px}
+.product-stat-value{font-size:13px;font-weight:700;color:var(--text)}
+.product-card-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.product-status-active{background:var(--green-light);color:var(--green)}
+.product-status-inactive{background:var(--bg);color:var(--text3);border:1px solid var(--border)}
 .assignment-card{border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;background:#fafbfc;margin-bottom:12px}
 .assignment-card-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap}
 .assignment-card-title{font-size:14px;font-weight:700;color:var(--text)}
@@ -802,8 +815,14 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     grid-template-columns: 1fr !important;
   }
 
+  .product-grid,
+  .product-stats {
+    grid-template-columns: 1fr !important;
+  }
+
   .employee-card-actions .btn,
   .employee-card-actions a.btn,
+  .product-card-actions .btn,
   .assignment-actions .btn,
   .assignment-grid .btn {
     width: 100%;
@@ -936,6 +955,7 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     <div class="nav-item active" id="nav-dashboard"><span class="nav-icon">📊</span> דאשבורד</div>
     <div class="nav-item" id="nav-leads"><span class="nav-icon">👥</span> לקוחות <span class="nav-badge" id="nav-leads-count" style="display:none">0</span></div>
     <div class="nav-item" id="nav-employees"><span class="nav-icon">🧑‍💼</span> עובדים</div>
+    <div class="nav-item" id="nav-products"><span class="nav-icon">📦</span> מוצרים</div>
     <div class="nav-item" id="nav-shopping"><span class="nav-icon">🛒</span> רשימות קניות</div>
     <div class="nav-item" id="nav-calendar"><span class="nav-icon">📅</span> יומן אירועים</div>
     <div class="nav-item" id="nav-archive"><span class="nav-icon">🗂️</span> ארכיון אירועים</div>
@@ -1065,6 +1085,20 @@ id="customers-search">
         </div>
       </div>
     </div>
+    <div id="page-products" class="page">
+      <div class="page-header">
+        <div class="page-title">מוצרים / מלאי</div>
+        <button class="btn btn-primary" id="btn-new-product">+ מוצר חדש</button>
+      </div>
+      <div class="table-card">
+        <div class="table-toolbar">
+          <input class="search-input" type="text" placeholder="חיפוש לפי שם / קטגוריה / SKU..." id="products-search">
+        </div>
+        <div id="products-grid" style="padding:16px">
+          <div class="dash-empty">טוען...</div>
+        </div>
+      </div>
+    </div>
     <div id="page-archive" class="page">
       <div class="page-header">
         <div class="page-title">ארכיון אירועים <small>אירועים שחלף התאריך שלהם</small></div>
@@ -1163,7 +1197,7 @@ id="customers-search">
 <script>
 var token = localStorage.getItem('crm_token');
 var currentUser = JSON.parse(localStorage.getItem('crm_user') || 'null');
-var searchTimer, currentLeadId, dupLeadId, selectedContactId = null, currentEmployeeId = null;
+var searchTimer, currentLeadId, dupLeadId, selectedContactId = null, currentEmployeeId = null, currentProductId = null;
 var allLeadsCache = [];
 var calYear, calMonth;
 var predefinedCustomerTags = [
@@ -1260,6 +1294,8 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   document.getElementById('nav-leads').addEventListener('click', function() { goTo('customers', this); });
   var navEmployees = document.getElementById('nav-employees');
   if (navEmployees) navEmployees.addEventListener('click', function() { goTo('employees', this); });
+  var navProducts = document.getElementById('nav-products');
+  if (navProducts) navProducts.addEventListener('click', function() { goTo('products', this); });
   var navShopping = document.getElementById('nav-shopping');
   if (navShopping) navShopping.addEventListener('click', function() { goTo('shopping', this); });
   document.getElementById('nav-calendar').addEventListener('click', function() { goTo('calendar', this); });
@@ -1308,6 +1344,7 @@ function goTo(page, el) {
   if (page === 'calendar') loadCalendar();
   if (page === 'customers') loadCustomers();
   if (page === 'employees') loadEmployees();
+  if (page === 'products') loadProducts();
   if (page === 'archive') loadEventArchive();
 }
 
@@ -2541,6 +2578,153 @@ function employeeStatusBadge(isActive) {
 function getEmployeeWaPhone(phone) {
   var cleanPhone = String(phone || '').replace(/[^0-9]/g, '');
   return cleanPhone.charAt(0) === '0' ? '972' + cleanPhone.substring(1) : cleanPhone;
+}
+
+function productStatusBadge(isActive) {
+  return '<span class="status-badge ' + (Number(isActive) === 0 ? 'product-status-inactive">לא פעיל' : 'product-status-active">פעיל') + '</span>';
+}
+
+function formatProductMoney(value) {
+  return value !== null && value !== undefined && value !== '' ? '₪' + fmtMoney(value) : '—';
+}
+
+function loadProducts() {
+  var grid = document.getElementById('products-grid');
+  if (!grid) return;
+
+  var search = document.getElementById('products-search') ? document.getElementById('products-search').value.trim() : '';
+  var path = '/api/products?search=' + encodeURIComponent(search) + '&includeInactive=1';
+
+  grid.innerHTML = '<div class="dash-empty">טוען...</div>';
+
+  apiCall('GET', path).then(function(data) {
+    var products = data.products || [];
+
+    if (!products.length) {
+      grid.innerHTML = '<div class="dash-empty">אין מוצרים להצגה</div>';
+      return;
+    }
+
+    grid.innerHTML = '<div class="product-grid">' + products.map(function(product) {
+      return '<div class="product-card">' +
+        '<div class="product-card-header">' +
+          '<div style="flex:1">' +
+            '<div class="product-card-name">' + (product.name || 'מוצר ללא שם') + '</div>' +
+            '<div class="product-card-meta" style="margin-top:4px">' + (product.category || 'ללא קטגוריה') + '</div>' +
+          '</div>' +
+          productStatusBadge(product.is_active) +
+        '</div>' +
+        '<div class="product-card-meta">SKU: ' + (product.sku || '—') + '</div>' +
+        '<div class="product-card-meta">יחידה: ' + (product.unit || '—') + '</div>' +
+        '<div class="product-stats">' +
+          '<div class="product-stat"><div class="product-stat-label">עלות</div><div class="product-stat-value">' + formatProductMoney(product.cost_price) + '</div></div>' +
+          '<div class="product-stat"><div class="product-stat-label">מחיר מכירה</div><div class="product-stat-value">' + formatProductMoney(product.sale_price) + '</div></div>' +
+          '<div class="product-stat"><div class="product-stat-label">מלאי</div><div class="product-stat-value">' + (product.stock_quantity !== null && product.stock_quantity !== undefined && product.stock_quantity !== '' ? product.stock_quantity : '—') + '</div></div>' +
+          '<div class="product-stat"><div class="product-stat-label">מינימום התראה</div><div class="product-stat-value">' + (product.min_stock_alert !== null && product.min_stock_alert !== undefined && product.min_stock_alert !== '' ? product.min_stock_alert : '—') + '</div></div>' +
+        '</div>' +
+        (product.notes ? '<div class="product-card-notes">' + product.notes + '</div>' : '') +
+        '<div class="product-card-actions">' +
+          '<button class="btn btn-secondary btn-sm product-edit-btn" data-id="' + product.id + '">עריכה</button>' +
+        '</div>' +
+      '</div>';
+    }).join('') + '</div>';
+
+    grid.querySelectorAll('.product-edit-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        openProductModal(parseInt(this.getAttribute('data-id')));
+      });
+    });
+  }).catch(function(e) {
+    grid.innerHTML = '<div class="dash-empty">שגיאה בטעינת מוצרים</div>';
+    toast(e.message, 'error');
+  });
+}
+
+function openProductModal(id) {
+  currentProductId = id || null;
+  var old = document.getElementById('product-modal');
+  if (old) old.remove();
+
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'product-modal';
+
+  overlay.innerHTML =
+    '<div class="modal" style="width:620px">' +
+      '<div class="modal-header">' +
+        '<h2>' + (id ? 'עריכת מוצר' : 'מוצר חדש') + '</h2>' +
+        '<button class="modal-close" id="product-modal-close">✕</button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<div class="form-row">' +
+          '<div class="form-group"><label class="form-label">שם מוצר *</label><input class="form-input" id="product-name" placeholder="שם המוצר"></div>' +
+          '<div class="form-group"><label class="form-label">קטגוריה</label><input class="form-input" id="product-category" placeholder="קטגוריה"></div>' +
+        '</div>' +
+        '<div class="form-row">' +
+          '<div class="form-group"><label class="form-label">SKU</label><input class="form-input" id="product-sku" placeholder="SKU"></div>' +
+          '<div class="form-group"><label class="form-label">יחידה</label><input class="form-input" id="product-unit" placeholder="יחידה"></div>' +
+        '</div>' +
+        '<div class="form-row">' +
+          '<div class="form-group"><label class="form-label">עלות</label><input class="form-input" id="product-cost-price" type="number" step="0.01" placeholder="0"></div>' +
+          '<div class="form-group"><label class="form-label">מחיר מכירה</label><input class="form-input" id="product-sale-price" type="number" step="0.01" placeholder="0"></div>' +
+        '</div>' +
+        '<div class="form-row">' +
+          '<div class="form-group"><label class="form-label">כמות במלאי</label><input class="form-input" id="product-stock-quantity" type="number" step="1" placeholder="0"></div>' +
+          '<div class="form-group"><label class="form-label">מינימום התראה</label><input class="form-input" id="product-min-stock-alert" type="number" step="1" placeholder="0"></div>' +
+        '</div>' +
+        '<div class="form-group"><label class="form-label">הערות</label><textarea class="form-textarea" id="product-notes" placeholder="הערות על המוצר"></textarea></div>' +
+        '<div class="form-group"><label class="check-item" style="display:inline-flex;width:auto"><input type="checkbox" id="product-is-active" checked> מוצר פעיל</label></div>' +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<button class="btn btn-secondary" id="product-modal-cancel">ביטול</button>' +
+        '<button class="btn btn-primary" id="product-modal-save">שמור</button>' +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+
+  function close() { overlay.remove(); currentProductId = null; }
+  document.getElementById('product-modal-close').onclick = close;
+  document.getElementById('product-modal-cancel').onclick = close;
+
+  if (id) {
+    apiCall('GET', '/api/products/' + id).then(function(data) {
+      var product = (data || {}).product || {};
+      document.getElementById('product-name').value = product.name || '';
+      document.getElementById('product-category').value = product.category || '';
+      document.getElementById('product-sku').value = product.sku || '';
+      document.getElementById('product-unit').value = product.unit || '';
+      document.getElementById('product-cost-price').value = product.cost_price || '';
+      document.getElementById('product-sale-price').value = product.sale_price || '';
+      document.getElementById('product-stock-quantity').value = (product.stock_quantity !== null && product.stock_quantity !== undefined) ? product.stock_quantity : '';
+      document.getElementById('product-min-stock-alert').value = (product.min_stock_alert !== null && product.min_stock_alert !== undefined) ? product.min_stock_alert : '';
+      document.getElementById('product-notes').value = product.notes || '';
+      document.getElementById('product-is-active').checked = Number(product.is_active) !== 0;
+    }).catch(function(e) { toast(e.message, 'error'); close(); });
+  }
+
+  document.getElementById('product-modal-save').onclick = function() {
+    var body = {
+      name: document.getElementById('product-name').value.trim(),
+      category: document.getElementById('product-category').value.trim(),
+      sku: document.getElementById('product-sku').value.trim(),
+      unit: document.getElementById('product-unit').value.trim(),
+      cost_price: document.getElementById('product-cost-price').value,
+      sale_price: document.getElementById('product-sale-price').value,
+      stock_quantity: document.getElementById('product-stock-quantity').value,
+      min_stock_alert: document.getElementById('product-min-stock-alert').value,
+      notes: document.getElementById('product-notes').value.trim(),
+      is_active: document.getElementById('product-is-active').checked ? 1 : 0
+    };
+
+    if (!body.name) { toast('שם מוצר חובה', 'error'); return; }
+
+    apiCall(id ? 'PUT' : 'POST', id ? '/api/products/' + id : '/api/products', body).then(function() {
+      close();
+      toast(id ? 'המוצר עודכן' : 'המוצר נוסף', 'success');
+      loadProducts();
+    }).catch(function(e) { toast(e.message, 'error'); });
+  };
 }
 
 function loadEmployees() {
@@ -3819,6 +4003,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
   var employeesStatusFilter = document.getElementById('employees-status-filter');
   if (employeesStatusFilter) employeesStatusFilter.addEventListener('change', loadEmployees);
+
+  var newProductBtn = document.getElementById('btn-new-product');
+  if (newProductBtn) newProductBtn.addEventListener('click', function() {
+    openProductModal();
+  });
+
+  var productsSearch = document.getElementById('products-search');
+  if (productsSearch) productsSearch.addEventListener('input', function() {
+    clearTimeout(searchTimer); searchTimer = setTimeout(loadProducts, 300);
+  });
 });
 
 function openShoppingStoreModalV2() {
