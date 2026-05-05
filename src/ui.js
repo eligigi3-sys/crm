@@ -232,6 +232,10 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .employee-assignment-title{font-size:14px;font-weight:700;color:var(--text)}
 .employee-assignment-meta{font-size:12px;color:var(--text3);margin-top:4px}
 .employee-assignment-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+.customers-type-layout{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start}
+.customer-type-section{background:transparent;display:flex;flex-direction:column;gap:12px}
+.customer-type-header{font-size:16px;font-weight:800;color:var(--text);padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:#fafbfc}
+.customer-type-empty{font-size:13px;color:var(--text3);padding:10px 12px;border:1px dashed var(--border);border-radius:var(--radius-sm);background:var(--white)}
 .autocomplete-list{position:absolute;top:100%;right:0;left:0;background:var(--white);border:1px solid var(--accent);border-radius:var(--radius-sm);box-shadow:var(--shadow-md);z-index:300;max-height:200px;overflow-y:auto}
 .autocomplete-item{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)}
 .autocomplete-item:last-child{border-bottom:none}
@@ -795,7 +799,8 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 
   .assignment-grid,
   .employee-profile-summary,
-  .employee-assignment-grid {
+  .employee-assignment-grid,
+  .customers-type-layout {
     grid-template-columns: 1fr !important;
   }
 
@@ -2224,6 +2229,42 @@ function loadCustomers() {
   var typeFilter = document.getElementById('customers-filter-type') ? document.getElementById('customers-filter-type').value : '';
   var sortBy = document.getElementById('customers-sort') ? document.getElementById('customers-sort').value : '';
 
+  function getCustomerTypeGroup(value) {
+    var type = String(value || 'פרטי').trim();
+    if (type === 'עסקי') return 'business';
+    if (type === 'ספק' || type === 'מפיק/ספק' || type === 'מפיק') return 'supplier';
+    return 'private';
+  }
+
+  function renderCustomerCard(c) {
+    var phone = c.phone || '';
+    var cleanPhone = String(phone).replace(/[^0-9]/g, '');
+    var waPhone = cleanPhone.replace(/^0/, '972');
+
+    return '<div class="customer-card" data-cid="' + c.id + '">' +
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">' +
+        '<div style="flex:1">' +
+          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-start">' +
+            '<div class="customer-card-name">' + (c.name || 'לקוח ללא שם') + '</div>' +
+            '<span class="badge badge-purple">' + (c.customer_type || 'פרטי') + '</span>' +
+            '<span class="badge ' + getCustomerStatusBadgeClass(c.status || 'active') + '">' + getStatusLabel(c.status || 'active') + '</span>' +
+          '</div>' +
+          '<div class="customer-card-meta" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px">' +
+            '<span style="color:var(--text);font-weight:700;font-size:13px">' + phone + '</span>' +
+            (phone ? '<a title="WhatsApp" onclick="event.stopPropagation()" target="_blank" href="https://wa.me/' + waPhone + '" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center"><img src="/whatsapp-icon.png" alt="WhatsApp" style="width:30px;height:30px;object-fit:contain;display:block"></a>' : '') +
+            (phone ? '<a title="התקשר" onclick="event.stopPropagation()" href="tel:' + phone + '" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center"><img src="/phone-icon.png" alt="Phone" style="width:30px;height:30px;object-fit:contain;display:block"></a>' : '') +
+          '</div>' +
+          (c.email ? '<div class="customer-card-meta" style="margin-top:2px;color:var(--text3);font-size:12px">' + c.email + '</div>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div class="customer-card-stats" style="margin-top:12px">' +
+        '<span class="customer-stat-pill">' + (c.events_count || 0) + ' אירועים</span>' +
+        '<span class="customer-stat-pill" style="color:var(--green);font-weight:800">₪' + fmtMoney(c.revenue || 0) + ' סה״כ הכנסות</span>' +
+      '</div>' +
+      (c.next_event_date ? '<div class="customer-card-meta" style="color:var(--blue);font-weight:800;margin-top:10px;font-size:13px">אירוע בתאריך: ' + formatDate(c.next_event_date) + '</div>' : '') +
+    '</div>';
+  }
+
   apiCall('GET', '/api/contacts?search=' + encodeURIComponent(search)).then(function(data) {
     var grid = document.getElementById('customers-grid');
     if (!grid) return;
@@ -2277,39 +2318,24 @@ function loadCustomers() {
       return;
     }
 
-    grid.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">' +
-      contacts.map(function(c) {
-        var phone = c.phone || '';
-        var cleanPhone = String(phone).replace(/[^0-9]/g, '');
-        var waPhone = cleanPhone.replace(/^0/, '972');
+    var grouped = {
+      private: contacts.filter(function(c) { return getCustomerTypeGroup(c.customer_type) === 'private'; }),
+      business: contacts.filter(function(c) { return getCustomerTypeGroup(c.customer_type) === 'business'; }),
+      supplier: contacts.filter(function(c) { return getCustomerTypeGroup(c.customer_type) === 'supplier'; })
+    };
 
-        return '<div class="customer-card" data-cid="' + c.id + '">' +
-          '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">' +
-            '<div style="flex:1">' +
-              '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-start">' +
-                '<div class="customer-card-name">' + (c.name || 'לקוח ללא שם') + '</div>' +
-                '<span class="badge badge-purple">' + (c.customer_type || 'פרטי') + '</span>' +
-                '<span class="badge ' + getCustomerStatusBadgeClass(c.status || 'active') + '">' + getStatusLabel(c.status || 'active') + '</span>' +
-              '</div>' +
+    function renderSection(title, items, emptyText) {
+      return '<div class="customer-type-section">' +
+        '<div class="customer-type-header">' + title + '</div>' +
+        (items.length ? items.map(renderCustomerCard).join('') : '<div class="customer-type-empty">' + emptyText + '</div>') +
+      '</div>';
+    }
 
-              '<div class="customer-card-meta" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px">' +
-                '<span style="color:var(--text);font-weight:700;font-size:13px">' + phone + '</span>' +
-                (phone ? '<a title="WhatsApp" onclick="event.stopPropagation()" target="_blank" href="https://wa.me/' + waPhone + '" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center"><img src="/whatsapp-icon.png" alt="WhatsApp" style="width:30px;height:30px;object-fit:contain;display:block"></a>' : '') +
-                (phone ? '<a title="התקשר" onclick="event.stopPropagation()" href="tel:' + phone + '" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center"><img src="/phone-icon.png" alt="Phone" style="width:30px;height:30px;object-fit:contain;display:block"></a>' : '') +
-              '</div>' +
-
-              (c.email ? '<div class="customer-card-meta" style="margin-top:2px;color:var(--text3);font-size:12px">' + c.email + '</div>' : '') +
-            '</div>' +
-          '</div>' +
-
-          '<div class="customer-card-stats" style="margin-top:12px">' +
-            '<span class="customer-stat-pill">' + (c.events_count || 0) + ' אירועים</span>' +
-            '<span class="customer-stat-pill" style="color:var(--green);font-weight:800">₪' + fmtMoney(c.revenue || 0) + ' סה״כ הכנסות</span>' +
-          '</div>' +
-
-          (c.next_event_date ? '<div class="customer-card-meta" style="color:var(--blue);font-weight:800;margin-top:10px;font-size:13px">אירוע בתאריך: ' + formatDate(c.next_event_date) + '</div>' : '') +
-        '</div>';
-      }).join('') + '</div>';
+    grid.innerHTML = '<div class="customers-type-layout">' +
+      renderSection('לקוחות פרטיים', grouped.private, 'אין לקוחות פרטיים להצגה') +
+      renderSection('לקוחות עסקיים', grouped.business, 'אין לקוחות עסקיים להצגה') +
+      renderSection('ספקים / מפיקים', grouped.supplier, 'אין ספקים או מפיקים להצגה') +
+    '</div>';
 
     grid.querySelectorAll('.customer-card[data-cid]').forEach(function(card) {
       card.addEventListener('click', function() {
