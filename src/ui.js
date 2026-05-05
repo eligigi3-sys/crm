@@ -224,6 +224,14 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .assignment-card-title{font-size:14px;font-weight:700;color:var(--text)}
 .assignment-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 .assignment-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.employee-profile-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0 14px}
+.employee-summary-card{background:#fafbfc;border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;text-align:center}
+.employee-summary-value{font-size:18px;font-weight:800;color:var(--accent)}
+.employee-summary-label{font-size:11px;color:var(--text3);margin-top:4px}
+.employee-assignment-row{border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;background:#fafbfc;margin-bottom:10px}
+.employee-assignment-title{font-size:14px;font-weight:700;color:var(--text)}
+.employee-assignment-meta{font-size:12px;color:var(--text3);margin-top:4px}
+.employee-assignment-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
 .autocomplete-list{position:absolute;top:100%;right:0;left:0;background:var(--white);border:1px solid var(--accent);border-radius:var(--radius-sm);box-shadow:var(--shadow-md);z-index:300;max-height:200px;overflow-y:auto}
 .autocomplete-item{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)}
 .autocomplete-item:last-child{border-bottom:none}
@@ -785,7 +793,9 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     justify-content: center;
   }
 
-  .assignment-grid {
+  .assignment-grid,
+  .employee-profile-summary,
+  .employee-assignment-grid {
     grid-template-columns: 1fr !important;
   }
 
@@ -2426,6 +2436,7 @@ function openEmployeeModal(id) {
         '<div class="form-group"><label class="form-label">הערות</label><textarea class="form-textarea" id="employee-notes" placeholder="הערות כלליות"></textarea></div>' +
         '<div class="form-group"><label class="form-label">הערות פנימיות</label><textarea class="form-textarea" id="employee-internal-notes" placeholder="לשימוש פנימי"></textarea></div>' +
         '<div class="form-group"><label class="check-item" style="display:inline-flex;width:auto"><input type="checkbox" id="employee-is-active" checked> עובד פעיל</label></div>' +
+        (id ? '<div id="employee-assignments-profile"><div class="info-section"><div class="info-section-title">אירועים ושכר</div><div style="font-size:13px;color:var(--text3)">טוען נתונים...</div></div></div>' : '') +
       '</div>' +
       '<div class="modal-footer">' +
         '<button class="btn btn-secondary" id="employee-modal-cancel">ביטול</button>' +
@@ -2440,8 +2451,12 @@ function openEmployeeModal(id) {
   document.getElementById('employee-modal-cancel').onclick = close;
 
   if (id) {
-    apiCall('GET', '/api/employees/' + id).then(function(data) {
-      var emp = data.employee || {};
+    Promise.all([
+      apiCall('GET', '/api/employees/' + id),
+      apiCall('GET', '/api/employees/' + id + '/assignments').catch(function() { return { assignments: [] }; })
+    ]).then(function(results) {
+      var emp = (results[0] || {}).employee || {};
+      var assignments = (results[1] || {}).assignments || [];
       document.getElementById('employee-full-name').value = emp.full_name || '';
       document.getElementById('employee-phone').value = emp.phone || '';
       document.getElementById('employee-email').value = emp.email || '';
@@ -2456,6 +2471,7 @@ function openEmployeeModal(id) {
       document.getElementById('employee-notes').value = emp.notes || '';
       document.getElementById('employee-internal-notes').value = emp.internal_notes || '';
       document.getElementById('employee-is-active').checked = Number(emp.is_active) !== 0;
+      renderEmployeeAssignmentsProfile(document.getElementById('employee-assignments-profile'), emp, assignments);
     }).catch(function(e) { toast(e.message, 'error'); close(); });
   }
 
@@ -2506,6 +2522,71 @@ function buildAssignmentEmployeeOptions(employees, selectedId, assignedIds) {
     html += '<option value="' + id + '"' + (selectedId === id ? ' selected' : '') + '>' + (emp.full_name || 'ללא שם') + (emp.role ? ' · ' + emp.role : '') + '</option>';
   });
   return html;
+}
+
+function renderEmployeeAssignmentsProfile(container, employee, assignments) {
+  if (!container) return;
+  employee = employee || {};
+  assignments = assignments || [];
+
+  var today = new Date().toISOString().split('T')[0];
+  var upcoming = [];
+  var past = [];
+  var totalPlanned = 0;
+  var totalActual = 0;
+  var totalPayout = 0;
+
+  assignments.forEach(function(a) {
+    var planned = Number(a.hours_planned || 0);
+    var actual = Number(a.hours_actual || 0);
+    var effectiveRate = Number(a.hourly_rate_override || a.employee_hourly_rate || employee.hourly_rate || 0);
+    a._effectiveRate = effectiveRate;
+    a._calculatedPayout = actual * effectiveRate;
+    totalPlanned += planned;
+    totalActual += actual;
+    totalPayout += a._calculatedPayout;
+
+    if (a.event_date && String(a.event_date).substring(0, 10) < today) past.push(a);
+    else upcoming.push(a);
+  });
+
+  function section(title, rows, emptyText) {
+    var html = '<div class="info-section"><div class="info-section-title">' + title + '</div>';
+    if (!rows.length) {
+      html += '<div style="font-size:13px;color:var(--text3)">' + emptyText + '</div>';
+    } else {
+      rows.forEach(function(a) {
+        var eventName = a.contact_name || a.customer_name || 'ללא שם';
+        html += '<div class="employee-assignment-row">';
+        html += '<div class="employee-assignment-title">' + eventName + ' · ' + (a.event_type || 'אירוע') + '</div>';
+        html += '<div class="employee-assignment-meta">' + (a.event_date ? formatDate(a.event_date) : 'ללא תאריך') + (a.event_time ? ' · ' + a.event_time : '') + '</div>';
+        html += '<div class="employee-assignment-grid">';
+        html += '<div class="info-row"><span class="info-label">תפקיד</span><span class="info-value">' + (a.role_on_event || '—') + '</span></div>';
+        html += '<div class="info-row"><span class="info-label">שעות מתוכננות</span><span class="info-value">' + (a.hours_planned || 0) + '</span></div>';
+        html += '<div class="info-row"><span class="info-label">שעות בפועל</span><span class="info-value">' + (a.hours_actual || 0) + '</span></div>';
+        html += '<div class="info-row"><span class="info-label">סטטוס תשלום</span><span class="info-value">' + (a.payment_status || 'pending') + '</span></div>';
+        html += '<div class="info-row"><span class="info-label">תעריף בשימוש</span><span class="info-value">₪' + fmtMoney(a._effectiveRate || 0) + '</span></div>';
+        html += '<div class="info-row"><span class="info-label">תשלום מחושב</span><span class="info-value">₪' + fmtMoney(a._calculatedPayout || 0) + '</span></div>';
+        html += '</div>';
+        if (a.notes) html += '<div style="font-size:12px;color:var(--text2);line-height:1.6;white-space:pre-wrap;margin-top:8px">' + a.notes + '</div>';
+        html += '</div>';
+      });
+    }
+    html += '</div>';
+    return html;
+  }
+
+  container.innerHTML =
+    '<div class="info-section">' +
+      '<div class="info-section-title">סיכום שכר בסיסי</div>' +
+      '<div class="employee-profile-summary">' +
+        '<div class="employee-summary-card"><div class="employee-summary-value">' + totalPlanned.toFixed(1).replace(/\.0$/, '') + '</div><div class="employee-summary-label">סה"כ שעות מתוכננות</div></div>' +
+        '<div class="employee-summary-card"><div class="employee-summary-value">' + totalActual.toFixed(1).replace(/\.0$/, '') + '</div><div class="employee-summary-label">סה"כ שעות בפועל</div></div>' +
+        '<div class="employee-summary-card"><div class="employee-summary-value">₪' + fmtMoney(totalPayout) + '</div><div class="employee-summary-label">סה"כ תשלום מחושב</div></div>' +
+      '</div>' +
+    '</div>' +
+    section('אירועים קרובים', upcoming, 'אין אירועים קרובים משויכים') +
+    section('אירועים קודמים', past, 'אין אירועים קודמים משויכים');
 }
 
 function renderEventAssignments(container, eventId, assignments, employees) {

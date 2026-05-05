@@ -23,6 +23,7 @@ export async function handleEmployees(request, env, path) {
   const method = request.method;
   const url = new URL(request.url);
   const idMatch = path.match(/^\/api\/employees\/(\d+)$/);
+  const assignmentsMatch = path.match(/^\/api\/employees\/(\d+)\/assignments$/);
 
   // GET /api/employees
   if (path === '/api/employees' && method === 'GET') {
@@ -68,6 +69,43 @@ export async function handleEmployees(request, env, path) {
     if (!employee) throw new Error('עובד לא נמצא');
 
     return { employee };
+  }
+
+  // GET /api/employees/:id/assignments
+  if (assignmentsMatch && method === 'GET') {
+    const id = assignmentsMatch[1];
+
+    const employee = await env.DB.prepare(
+      'SELECT * FROM employees WHERE id = ?'
+    ).bind(id).first();
+
+    if (!employee) throw new Error('עובד לא נמצא');
+
+    const { results } = await env.DB.prepare(`
+      SELECT
+        lead_employees.*,
+        leads.lead_num,
+        leads.name AS customer_name,
+        leads.event_type,
+        leads.event_date,
+        leads.event_time,
+        leads.status AS lead_status,
+        leads.venue,
+        contacts.name AS contact_name,
+        employees.full_name,
+        employees.hourly_rate AS employee_hourly_rate
+      FROM lead_employees
+      INNER JOIN leads ON leads.id = lead_employees.lead_id
+      INNER JOIN employees ON employees.id = lead_employees.employee_id
+      LEFT JOIN contacts ON contacts.id = leads.contact_id
+      WHERE lead_employees.employee_id = ?
+      ORDER BY
+        CASE WHEN leads.event_date IS NULL OR TRIM(leads.event_date) = '' THEN 1 ELSE 0 END,
+        leads.event_date DESC,
+        lead_employees.id DESC
+    `).bind(id).all();
+
+    return { assignments: results };
   }
 
   // POST /api/employees
