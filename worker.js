@@ -4,6 +4,7 @@ import { handleLeads, handleDashboard } from './src/leads.js';
 import { handleGoogle, handleGoogleCallback } from './src/google-calendar.js';
 import { handleContacts } from './src/contacts.js';
 import { handleEmployees } from './src/employees.js';
+import { handleProducts } from './src/products.js';
 import { serveHTML } from './src/ui.js';
 
 export default {
@@ -48,6 +49,8 @@ export default {
           response = await handleContacts(request, env, path);
         } else if (path.startsWith('/api/employees')) {
           response = await handleEmployees(request, env, path);
+        } else if (path.startsWith('/api/products')) {
+          response = await handleProducts(request, env, path);
         } else if (
           path.startsWith('/api/shopping-lists') ||
           path.startsWith('/api/shopping-items') ||
