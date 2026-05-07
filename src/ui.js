@@ -1758,6 +1758,87 @@ function loadShoppingLists() {
 
 var currentShoppingListId = null;
 
+var shoppingProductOptionsCache = null;
+var shoppingProductOptionsPromise = null;
+
+function escapeShoppingProductText(value) {
+  return String(value === undefined || value === null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function getShoppingProductLabel(productId) {
+  if (!productId || !shoppingProductOptionsCache || !shoppingProductOptionsCache.length) {
+    return 'מוצר #' + productId;
+  }
+  var product = shoppingProductOptionsCache.find(function(p) { return Number(p.id) === Number(productId); });
+  if (!product) return 'מוצר #' + productId;
+  return product.name + (Number(product.is_active) === 0 ? ' (מושבת)' : '');
+}
+
+function buildShoppingProductOptions(selectedProductId) {
+  var html = '<option value="">ללא קישור</option>';
+  (shoppingProductOptionsCache || []).forEach(function(product) {
+    html += '<option value="' + product.id + '"' + (Number(selectedProductId) === Number(product.id) ? ' selected' : '') + '>' +
+      escapeShoppingProductText(product.name + (Number(product.is_active) === 0 ? ' (מושבת)' : '')) +
+      '</option>';
+  });
+  return html;
+}
+
+function ensureShoppingProductOptions() {
+  if (shoppingProductOptionsCache) return Promise.resolve(shoppingProductOptionsCache);
+  if (shoppingProductOptionsPromise) return shoppingProductOptionsPromise;
+
+  shoppingProductOptionsPromise = apiCall('GET', '/api/products?includeInactive=1').then(function(data) {
+    shoppingProductOptionsCache = Array.isArray(data.products) ? data.products.slice() : [];
+    shoppingProductOptionsCache.sort(function(a, b) {
+      return String(a.name || '').localeCompare(String(b.name || ''), 'he');
+    });
+    return shoppingProductOptionsCache;
+  }).catch(function(error) {
+    shoppingProductOptionsPromise = null;
+    throw error;
+  });
+
+  return shoppingProductOptionsPromise;
+}
+
+function populateShoppingProductSelect(selectId, selectedProductId) {
+  var select = document.getElementById(selectId);
+  if (!select) return;
+  select.innerHTML = '<option value="">טוען מוצרים...</option>';
+  select.disabled = true;
+
+  ensureShoppingProductOptions().then(function() {
+    var currentSelect = document.getElementById(selectId);
+    if (!currentSelect) return;
+    currentSelect.innerHTML = buildShoppingProductOptions(selectedProductId);
+    currentSelect.disabled = false;
+  }).catch(function(error) {
+    var currentSelect = document.getElementById(selectId);
+    if (!currentSelect) return;
+    currentSelect.innerHTML = '<option value="">שגיאה בטעינת מוצרים</option>';
+    currentSelect.disabled = false;
+    toast(error.message || 'שגיאה בטעינת מוצרים', 'error');
+  });
+}
+
+function getShoppingSelectedProductId(selectId) {
+  var select = document.getElementById(selectId);
+  if (!select) return null;
+  var value = String(select.value || '').trim();
+  return value ? Number(value) : null;
+}
+
+function renderShoppingLinkedProductBadge(item) {
+  if (!item || !item.product_id) return '';
+  return '<div style="margin-top:4px"><span class="badge badge-purple">מוצר מקושר: ' + escapeShoppingProductText(getShoppingProductLabel(item.product_id)) + '</span></div>';
+}
+
 function openShoppingItemModal() {
 
   if (!currentShoppingListId) {
@@ -1806,6 +1887,11 @@ function openShoppingItemModal() {
         '</div>' +
 
         '<div class="form-group">' +
+          '<label class="form-label">מוצר מקושר</label>' +
+          '<select class="form-input" id="shopping-item-product"><option value="">טוען מוצרים...</option></select>' +
+        '</div>' +
+
+        '<div class="form-group">' +
           '<label class="form-label">הערות</label>' +
           '<textarea class="form-input" id="shopping-item-notes" style="min-height:80px"></textarea>' +
         '</div>' +
@@ -1827,6 +1913,7 @@ function openShoppingItemModal() {
 
   document.getElementById('shopping-item-close').onclick = closeModal;
   document.getElementById('shopping-item-cancel').onclick = closeModal;
+  populateShoppingProductSelect('shopping-item-product', null);
 
   document.getElementById('shopping-item-save').onclick = function() {
 
@@ -1845,6 +1932,7 @@ function openShoppingItemModal() {
         quantity: document.getElementById('shopping-item-quantity').value.trim(),
         price: Number(document.getElementById('shopping-item-price').value || 0),
         status: document.getElementById('shopping-item-status').value,
+        product_id: getShoppingSelectedProductId('shopping-item-product'),
         notes: document.getElementById('shopping-item-notes').value.trim()
       }
     )
@@ -4527,6 +4615,7 @@ window.openEditShoppingItemModal = function(listId, item) {
         '<div class="form-group"><label class="form-label">כמות</label><input class="form-input" id="shopping-edit-quantity" value="' + (item.quantity || '') + '"></div>' +
         '<div class="form-group"><label class="form-label">מחיר</label><input class="form-input" type="number" id="shopping-edit-price" value="' + (item.price || 0) + '"></div>' +
         '<div class="form-group"><label class="form-label">סטטוס</label><select class="form-input" id="shopping-edit-status"><option value="pending">ממתין</option><option value="done">נקנה</option></select></div>' +
+        '<div class="form-group"><label class="form-label">מוצר מקושר</label><select class="form-input" id="shopping-edit-product"><option value="">טוען מוצרים...</option></select></div>' +
         '<div class="form-group"><label class="form-label">הערות</label><textarea class="form-input" id="shopping-edit-notes" style="min-height:90px">' + (item.notes || '') + '</textarea></div>' +
       '</div>' +
       '<div class="modal-footer">' +
@@ -4538,6 +4627,7 @@ window.openEditShoppingItemModal = function(listId, item) {
 
   document.body.appendChild(overlay);
   document.getElementById('shopping-edit-status').value = item.status || 'pending';
+  populateShoppingProductSelect('shopping-edit-product', item.product_id || null);
 
   function close() { overlay.remove(); }
 
@@ -4550,6 +4640,7 @@ window.openEditShoppingItemModal = function(listId, item) {
       quantity: document.getElementById('shopping-edit-quantity').value.trim(),
       price: Number(document.getElementById('shopping-edit-price').value || 0),
       status: document.getElementById('shopping-edit-status').value,
+      product_id: getShoppingSelectedProductId('shopping-edit-product'),
       notes: document.getElementById('shopping-edit-notes').value.trim()
     }).then(function() {
       close();
@@ -4580,6 +4671,8 @@ openShoppingList = function(id) {
     var items = data.items || [];
     var purchases = data.purchases || [];
     var summary = data.summary || {};
+
+    ensureShoppingProductOptions().catch(function() { return null; });
 
     var html = '';
 
@@ -4619,8 +4712,8 @@ openShoppingList = function(id) {
       html += '<table><thead><tr><th>מוצר</th><th>כמות</th><th>מחיר</th><th>סטטוס</th></tr></thead><tbody>';
       items.forEach(function(it) {
         html += '<tr class="shopping-item-row" data-item-id="' + it.id + '" style="cursor:pointer">';
-        html += '<td>' + (it.item_name || '') + '</td>';
-        html += '<td>' + (it.quantity || '') + '</td>';
+        html += '<td>' + escapeShoppingProductText(it.item_name || '') + renderShoppingLinkedProductBadge(it) + '</td>';
+        html += '<td>' + escapeShoppingProductText(it.quantity || '') + '</td>';
         html += '<td>₪' + fmtMoney(it.price || 0) + '</td>';
         html += '<td>' + shoppingStatusBadge(it.status) + '</td>';
         html += '</tr>';
