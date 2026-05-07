@@ -238,8 +238,10 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .product-purchases-summary{display:flex;flex-direction:column;gap:10px}
 .product-purchase-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
 .product-purchase-summary-card{background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.product-purchase-summary-card-alert{background:#fff7ed;border-color:#fdba74}
 .product-purchase-summary-label{font-size:12px;color:var(--text3)}
 .product-purchase-summary-value{font-size:16px;font-weight:800;color:var(--text)}
+.product-purchase-summary-subtext{font-size:12px;color:var(--text3);line-height:1.5}
 .product-purchase-inline-form{border:1px solid var(--border);border-radius:12px;background:#f8fafc;padding:14px;display:flex;flex-direction:column;gap:12px}
 .product-purchase-inline-title{font-size:14px;font-weight:800;color:var(--text)}
 .product-purchase-inline-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
@@ -2862,25 +2864,60 @@ function saveProductPurchaseInline(productId) {
 function calculateProductPurchaseSummary(purchases) {
   var unitPrices = purchases.map(function(p) { return Number(p.unit_price || 0); }).filter(function(price) { return Number.isFinite(price); });
   var count = purchases.length;
-  var lastPrice = count ? Number(purchases[0].unit_price || 0) : null;
+  var latestPurchase = count ? purchases[0] : null;
+  var lastPrice = latestPurchase ? Number(latestPurchase.unit_price || 0) : null;
   var avgPrice = unitPrices.length ? unitPrices.reduce(function(sum, price) { return sum + price; }, 0) / unitPrices.length : null;
   var minPrice = unitPrices.length ? Math.min.apply(null, unitPrices) : null;
   var maxPrice = unitPrices.length ? Math.max.apply(null, unitPrices) : null;
   var changeFromPrevious = count >= 2 ? Number(purchases[0].unit_price || 0) - Number(purchases[1].unit_price || 0) : null;
+  var latestAboveAverage = lastPrice !== null && avgPrice !== null && lastPrice > avgPrice + 0.01;
+  var priceTrendText = 'אין מספיק נתונים למגמה';
+
+  if (changeFromPrevious !== null) {
+    if (changeFromPrevious > 0.01) {
+      priceTrendText = 'מגמת עלייה במחיר';
+    } else if (changeFromPrevious < -0.01) {
+      priceTrendText = 'מגמת ירידה במחיר';
+    } else {
+      priceTrendText = 'המחיר יציב לעומת הרכישה הקודמת';
+    }
+  }
 
   return {
     count: count,
+    latestPurchase: latestPurchase,
     lastPrice: lastPrice,
     avgPrice: avgPrice,
     minPrice: minPrice,
     maxPrice: maxPrice,
-    changeFromPrevious: changeFromPrevious
+    changeFromPrevious: changeFromPrevious,
+    latestAboveAverage: latestAboveAverage,
+    priceTrendText: priceTrendText,
+    bestPrice: minPrice,
+    lastPurchaseDate: latestPurchase ? (latestPurchase.purchase_date || '—') : '—',
+    lastSupplier: latestPurchase && latestPurchase.supplier_name ? latestPurchase.supplier_name : 'לא צוין'
   };
+}
+
+function getProductPurchaseTrendWording(diff) {
+  if (diff === null || diff === undefined) {
+    return { text: 'ללא רכישה קודמת להשוואה', className: 'product-purchase-change-neutral' };
+  }
+
+  if (diff > 0.01) {
+    return { text: 'עלייה של ' + formatProductPurchaseMoney(diff) + ' לעומת הרכישה הקודמת', className: 'product-purchase-change-up' };
+  }
+
+  if (diff < -0.01) {
+    return { text: 'ירידה של ' + formatProductPurchaseMoney(Math.abs(diff)) + ' לעומת הרכישה הקודמת', className: 'product-purchase-change-down' };
+  }
+
+  return { text: 'ללא שינוי לעומת הרכישה הקודמת', className: 'product-purchase-change-neutral' };
 }
 
 function getProductPurchaseChangeText(purchases, index) {
   if (!purchases[index + 1]) {
-    return { text: '—', className: 'product-purchase-change-neutral' };
+    return { text: 'ללא רכישה קודמת', className: 'product-purchase-change-neutral' };
   }
 
   var currentPrice = Number(purchases[index].unit_price || 0);
@@ -2888,14 +2925,14 @@ function getProductPurchaseChangeText(purchases, index) {
   var diff = Math.round((currentPrice - previousPrice) * 100) / 100;
 
   if (diff > 0.01) {
-    return { text: '+' + formatProductPurchaseMoney(diff), className: 'product-purchase-change-up' };
+    return { text: 'יקר יותר ב-' + formatProductPurchaseMoney(diff), className: 'product-purchase-change-up' };
   }
 
   if (diff < -0.01) {
-    return { text: '-' + formatProductPurchaseMoney(Math.abs(diff)), className: 'product-purchase-change-down' };
+    return { text: 'זול יותר ב-' + formatProductPurchaseMoney(Math.abs(diff)), className: 'product-purchase-change-down' };
   }
 
-  return { text: 'ללא שינוי', className: 'product-purchase-change-neutral' };
+  return { text: 'ללא שינוי במחיר', className: 'product-purchase-change-neutral' };
 }
 
 function renderProductPurchaseSummary(summary) {
@@ -2903,26 +2940,14 @@ function renderProductPurchaseSummary(summary) {
     return '';
   }
 
-  var changeText = '—';
-  var changeClass = 'product-purchase-change-neutral';
-  if (summary.changeFromPrevious !== null && summary.changeFromPrevious !== undefined) {
-    if (summary.changeFromPrevious > 0.01) {
-      changeText = '+' + formatProductPurchaseMoney(summary.changeFromPrevious);
-      changeClass = 'product-purchase-change-up';
-    } else if (summary.changeFromPrevious < -0.01) {
-      changeText = '-' + formatProductPurchaseMoney(Math.abs(summary.changeFromPrevious));
-      changeClass = 'product-purchase-change-down';
-    } else {
-      changeText = 'ללא שינוי';
-    }
-  }
+  var trend = getProductPurchaseTrendWording(summary.changeFromPrevious);
 
   return '<div class="product-purchase-summary-grid">' +
-    '<div class="product-purchase-summary-card"><div class="product-purchase-summary-label">מחיר אחרון</div><div class="product-purchase-summary-value">' + formatProductPurchaseMoney(summary.lastPrice) + '</div></div>' +
-    '<div class="product-purchase-summary-card"><div class="product-purchase-summary-label">מחיר ממוצע</div><div class="product-purchase-summary-value">' + formatProductPurchaseMoney(summary.avgPrice) + '</div></div>' +
-    '<div class="product-purchase-summary-card"><div class="product-purchase-summary-label">מחיר נמוך ביותר</div><div class="product-purchase-summary-value">' + formatProductPurchaseMoney(summary.minPrice) + '</div></div>' +
-    '<div class="product-purchase-summary-card"><div class="product-purchase-summary-label">מחיר גבוה ביותר</div><div class="product-purchase-summary-value">' + formatProductPurchaseMoney(summary.maxPrice) + '</div></div>' +
-    '<div class="product-purchase-summary-card"><div class="product-purchase-summary-label">שינוי מהקנייה הקודמת</div><div class="product-purchase-summary-value"><span class="product-purchase-change ' + changeClass + '">' + changeText + '</span></div></div>' +
+    '<div class="product-purchase-summary-card' + (summary.latestAboveAverage ? ' product-purchase-summary-card-alert' : '') + '"><div class="product-purchase-summary-label">מחיר אחרון</div><div class="product-purchase-summary-value">' + formatProductPurchaseMoney(summary.lastPrice) + '</div>' + (summary.latestAboveAverage ? '<div class="product-purchase-summary-subtext">המחיר האחרון גבוה מהממוצע</div>' : '<div class="product-purchase-summary-subtext">רכישה אחרונה ב-' + summary.lastPurchaseDate + '</div>') + '</div>' +
+    '<div class="product-purchase-summary-card"><div class="product-purchase-summary-label">ספק אחרון</div><div class="product-purchase-summary-value">' + summary.lastSupplier + '</div><div class="product-purchase-summary-subtext">תאריך רכישה אחרון: ' + summary.lastPurchaseDate + '</div></div>' +
+    '<div class="product-purchase-summary-card"><div class="product-purchase-summary-label">המחיר הטוב ביותר</div><div class="product-purchase-summary-value">' + formatProductPurchaseMoney(summary.bestPrice) + '</div><div class="product-purchase-summary-subtext">המחיר הנמוך ביותר שנרשם</div></div>' +
+    '<div class="product-purchase-summary-card"><div class="product-purchase-summary-label">מחיר ממוצע</div><div class="product-purchase-summary-value">' + formatProductPurchaseMoney(summary.avgPrice) + '</div><div class="product-purchase-summary-subtext">מחושב מכל הרכישות</div></div>' +
+    '<div class="product-purchase-summary-card"><div class="product-purchase-summary-label">מגמת מחיר</div><div class="product-purchase-summary-value"><span class="product-purchase-change ' + trend.className + '">' + summary.priceTrendText + '</span></div><div class="product-purchase-summary-subtext">' + trend.text + '</div></div>' +
     '</div>';
 }
 
