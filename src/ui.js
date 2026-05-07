@@ -240,6 +240,9 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .product-purchase-summary-card{background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px}
 .product-purchase-summary-label{font-size:12px;color:var(--text3)}
 .product-purchase-summary-value{font-size:16px;font-weight:800;color:var(--text)}
+.product-purchase-inline-form{border:1px solid var(--border);border-radius:12px;background:#f8fafc;padding:14px;display:flex;flex-direction:column;gap:12px}
+.product-purchase-inline-title{font-size:14px;font-weight:800;color:var(--text)}
+.product-purchase-inline-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 .product-purchases-list{display:flex;flex-direction:column;gap:10px}
 .product-purchase-row{background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
 .product-purchase-row-main{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
@@ -1235,7 +1238,7 @@ id="customers-search">
 <script>
 var token = localStorage.getItem('crm_token');
 var currentUser = JSON.parse(localStorage.getItem('crm_user') || 'null');
-var searchTimer, currentLeadId, dupLeadId, selectedContactId = null, currentEmployeeId = null, currentProductId = null, currentProductPurchases = [];
+var searchTimer, currentLeadId, dupLeadId, selectedContactId = null, currentEmployeeId = null, currentProductId = null, currentProductPurchases = [], currentProductPurchaseEditId = null, currentProductPurchaseFormMode = null, currentProductPurchaseSaving = false;
 var allLeadsCache = [];
 var calYear, calMonth;
 var predefinedCustomerTags = [
@@ -2633,22 +2636,225 @@ function formatProductPurchaseMoney(value) {
   return '₪' + num.toFixed(2);
 }
 
+function escapeProductPurchaseFormValue(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function renderProductPurchasesUI(productId) {
+  var summaryEl = document.getElementById('product-purchases-summary');
+  var formEl = document.getElementById('product-purchase-inline-form');
+  var listEl = document.getElementById('product-purchases-list');
+  var addBtn = document.getElementById('btn-add-product-purchase');
+  if (!summaryEl || !formEl || !listEl) return;
+
+  summaryEl.innerHTML = renderProductPurchaseSummary(calculateProductPurchaseSummary(currentProductPurchases));
+  formEl.innerHTML = renderProductPurchaseInlineForm();
+  listEl.innerHTML = renderProductPurchasesSection(productId, currentProductPurchases);
+
+  if (addBtn) {
+    addBtn.disabled = currentProductPurchaseSaving;
+    addBtn.onclick = function() {
+      startProductPurchaseCreate(productId);
+    };
+  }
+
+  var cancelBtn = document.getElementById('btn-cancel-product-purchase');
+  if (cancelBtn) {
+    cancelBtn.onclick = function() {
+      cancelProductPurchaseInlineForm(productId);
+    };
+  }
+
+  var saveBtn = document.getElementById('btn-save-product-purchase');
+  if (saveBtn) {
+    saveBtn.disabled = currentProductPurchaseSaving;
+    saveBtn.onclick = function() {
+      saveProductPurchaseInline(productId);
+    };
+  }
+
+  var quantityEl = document.getElementById('product-purchase-quantity');
+  var unitPriceEl = document.getElementById('product-purchase-unit-price');
+  if (quantityEl) quantityEl.oninput = calculateInlineProductPurchaseTotal;
+  if (unitPriceEl) unitPriceEl.oninput = calculateInlineProductPurchaseTotal;
+  if (quantityEl || unitPriceEl) calculateInlineProductPurchaseTotal();
+
+  listEl.querySelectorAll('.product-purchase-edit-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      startProductPurchaseEdit(productId, parseInt(this.getAttribute('data-id')));
+    });
+  });
+}
+
 function loadProductPurchases(productId) {
   var summaryEl = document.getElementById('product-purchases-summary');
+  var formEl = document.getElementById('product-purchase-inline-form');
   var listEl = document.getElementById('product-purchases-list');
-  if (!summaryEl || !listEl) return;
+  if (!summaryEl || !formEl || !listEl) return;
 
   summaryEl.innerHTML = '<div class="dash-empty">טוען...</div>';
+  formEl.innerHTML = '';
   listEl.innerHTML = '';
 
   apiCall('GET', '/api/products/' + productId + '/purchases').then(function(data) {
     currentProductPurchases = (data && data.purchases) || [];
-    summaryEl.innerHTML = renderProductPurchaseSummary(calculateProductPurchaseSummary(currentProductPurchases));
-    listEl.innerHTML = renderProductPurchasesSection(productId, currentProductPurchases);
+    renderProductPurchasesUI(productId);
   }).catch(function(e) {
     currentProductPurchases = [];
+    currentProductPurchaseFormMode = null;
+    currentProductPurchaseEditId = null;
+    currentProductPurchaseSaving = false;
     summaryEl.innerHTML = '<div class="dash-empty">שגיאה בטעינת סיכום רכישות</div>';
+    formEl.innerHTML = '';
     listEl.innerHTML = '<div class="product-purchases-empty">לא ניתן לטעון את היסטוריית הרכישות</div>';
+    toast(e.message, 'error');
+  });
+}
+
+function getCurrentProductPurchaseFormData() {
+  if (currentProductPurchaseFormMode === 'edit' && currentProductPurchaseEditId !== null) {
+    var purchase = currentProductPurchases.find(function(item) { return Number(item.id) === Number(currentProductPurchaseEditId); });
+    if (purchase) {
+      return {
+        purchase_date: purchase.purchase_date || getTodayYMD(),
+        purchase_type: purchase.purchase_type || 'manual',
+        quantity: purchase.quantity !== null && purchase.quantity !== undefined ? String(purchase.quantity) : '',
+        unit_price: purchase.unit_price !== null && purchase.unit_price !== undefined ? String(purchase.unit_price) : '',
+        total_price: purchase.total_price !== null && purchase.total_price !== undefined ? String(purchase.total_price) : '',
+        supplier_name: purchase.supplier_name || '',
+        notes: purchase.notes || ''
+      };
+    }
+  }
+
+  return {
+    purchase_date: getTodayYMD(),
+    purchase_type: 'manual',
+    quantity: '',
+    unit_price: '',
+    total_price: '',
+    supplier_name: '',
+    notes: ''
+  };
+}
+
+function renderProductPurchaseInlineForm() {
+  if (!currentProductPurchaseFormMode) return '';
+
+  var formData = getCurrentProductPurchaseFormData();
+  return '<div class="product-purchase-inline-form">' +
+    '<div class="product-purchase-inline-title">' + (currentProductPurchaseFormMode === 'edit' ? 'עריכת רכישה' : 'הוספת רכישה') + '</div>' +
+    '<div class="form-row">' +
+      '<div class="form-group"><label class="form-label">תאריך רכישה *</label><input class="form-input" id="product-purchase-date" type="date" value="' + escapeProductPurchaseFormValue(formData.purchase_date) + '"></div>' +
+      '<div class="form-group"><label class="form-label">סוג רכישה</label><select class="form-select" id="product-purchase-type"><option value="manual"' + (formData.purchase_type === 'manual' ? ' selected' : '') + '>ידני</option><option value="shopping"' + (formData.purchase_type === 'shopping' ? ' selected' : '') + '>Shopping</option><option value="import"' + (formData.purchase_type === 'import' ? ' selected' : '') + '>ייבוא</option></select></div>' +
+    '</div>' +
+    '<div class="form-row">' +
+      '<div class="form-group"><label class="form-label">כמות *</label><input class="form-input" id="product-purchase-quantity" type="number" step="0.01" min="0" placeholder="0" value="' + escapeProductPurchaseFormValue(formData.quantity) + '"></div>' +
+      '<div class="form-group"><label class="form-label">מחיר יחידה *</label><input class="form-input" id="product-purchase-unit-price" type="number" step="0.01" min="0" placeholder="0.00" value="' + escapeProductPurchaseFormValue(formData.unit_price) + '"></div>' +
+    '</div>' +
+    '<div class="form-row">' +
+      '<div class="form-group"><label class="form-label">סה"כ</label><input class="form-input" id="product-purchase-total-price" type="number" step="0.01" readonly value="' + escapeProductPurchaseFormValue(formData.total_price) + '"></div>' +
+      '<div class="form-group"><label class="form-label">ספק</label><input class="form-input" id="product-purchase-supplier-name" placeholder="שם הספק" value="' + escapeProductPurchaseFormValue(formData.supplier_name) + '"></div>' +
+    '</div>' +
+    '<div class="form-group"><label class="form-label">הערות</label><textarea class="form-textarea" id="product-purchase-notes" placeholder="הערות על הרכישה">' + escapeProductPurchaseFormValue(formData.notes) + '</textarea></div>' +
+    '<div class="product-purchase-inline-actions">' +
+      '<button class="btn btn-secondary" type="button" id="btn-cancel-product-purchase">ביטול</button>' +
+      '<button class="btn btn-primary" type="button" id="btn-save-product-purchase">' + (currentProductPurchaseFormMode === 'edit' ? 'שמור שינויים' : 'שמור רכישה') + '</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function startProductPurchaseCreate(productId) {
+  currentProductPurchaseFormMode = 'create';
+  currentProductPurchaseEditId = null;
+  renderProductPurchasesUI(productId);
+}
+
+function startProductPurchaseEdit(productId, purchaseId) {
+  var purchase = currentProductPurchases.find(function(item) { return Number(item.id) === Number(purchaseId); });
+  if (!purchase) {
+    toast('הרכישה לא נמצאה', 'error');
+    return;
+  }
+
+  currentProductPurchaseFormMode = 'edit';
+  currentProductPurchaseEditId = Number(purchaseId);
+  renderProductPurchasesUI(productId);
+}
+
+function cancelProductPurchaseInlineForm(productId) {
+  currentProductPurchaseFormMode = null;
+  currentProductPurchaseEditId = null;
+  currentProductPurchaseSaving = false;
+  renderProductPurchasesUI(productId);
+}
+
+function calculateInlineProductPurchaseTotal() {
+  var quantityEl = document.getElementById('product-purchase-quantity');
+  var unitPriceEl = document.getElementById('product-purchase-unit-price');
+  var totalEl = document.getElementById('product-purchase-total-price');
+  if (!quantityEl || !unitPriceEl || !totalEl) return;
+
+  var quantity = Number(quantityEl.value);
+  var unitPrice = Number(unitPriceEl.value);
+  if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice <= 0) {
+    totalEl.value = '';
+    return;
+  }
+
+  totalEl.value = (Math.round(quantity * unitPrice * 100) / 100).toFixed(2);
+}
+
+function collectProductPurchaseInlineForm() {
+  var quantity = Number(document.getElementById('product-purchase-quantity').value);
+  var unitPrice = Number(document.getElementById('product-purchase-unit-price').value);
+  var totalPrice = Math.round(quantity * unitPrice * 100) / 100;
+
+  return {
+    purchase_date: document.getElementById('product-purchase-date').value,
+    purchase_type: document.getElementById('product-purchase-type').value,
+    quantity: quantity,
+    unit_price: unitPrice,
+    total_price: totalPrice,
+    supplier_name: document.getElementById('product-purchase-supplier-name').value.trim(),
+    notes: document.getElementById('product-purchase-notes').value.trim()
+  };
+}
+
+function saveProductPurchaseInline(productId) {
+  if (currentProductPurchaseSaving) return;
+
+  var body = collectProductPurchaseInlineForm();
+  var isEdit = currentProductPurchaseFormMode === 'edit';
+  if (!body.purchase_date) { toast('תאריך רכישה חובה', 'error'); return; }
+  if (!['manual', 'shopping', 'import'].includes(body.purchase_type)) { toast('סוג רכישה לא תקין', 'error'); return; }
+  if (!Number.isFinite(body.quantity) || body.quantity <= 0) { toast('כמות חייבת להיות גדולה מ-0', 'error'); return; }
+  if (!Number.isFinite(body.unit_price) || body.unit_price <= 0) { toast('מחיר יחידה חייב להיות גדול מ-0', 'error'); return; }
+  if (!Number.isFinite(body.total_price) || body.total_price <= 0) { toast('סה"כ חייב להיות גדול מ-0', 'error'); return; }
+
+  currentProductPurchaseSaving = true;
+  var addBtn = document.getElementById('btn-add-product-purchase');
+  var cancelBtn = document.getElementById('btn-cancel-product-purchase');
+  var saveBtn = document.getElementById('btn-save-product-purchase');
+  if (addBtn) addBtn.disabled = true;
+  if (cancelBtn) cancelBtn.disabled = true;
+  if (saveBtn) saveBtn.disabled = true;
+
+  apiCall(isEdit ? 'PUT' : 'POST', isEdit ? '/api/product-purchases/' + currentProductPurchaseEditId : '/api/products/' + productId + '/purchases', body).then(function() {
+    currentProductPurchaseSaving = false;
+    currentProductPurchaseFormMode = null;
+    currentProductPurchaseEditId = null;
+    toast(isEdit ? 'הרכישה עודכנה' : 'הרכישה נוספה', 'success');
+    loadProductPurchases(productId);
+  }).catch(function(e) {
+    currentProductPurchaseSaving = false;
+    if (addBtn) addBtn.disabled = false;
+    if (cancelBtn) cancelBtn.disabled = false;
+    if (saveBtn) saveBtn.disabled = false;
     toast(e.message, 'error');
   });
 }
@@ -2742,6 +2948,9 @@ function renderProductPurchasesSection(productId, purchases) {
           '<span>סה"כ: ' + formatProductPurchaseMoney(purchase.total_price) + '</span>' +
         '</div>' +
         (purchase.notes ? '<div class="product-purchase-row-notes">' + purchase.notes + '</div>' : '') +
+      '</div>' +
+      '<div class="product-purchase-row-actions">' +
+        '<button class="btn btn-secondary btn-sm product-purchase-edit-btn" type="button" data-id="' + purchase.id + '">עריכה</button>' +
       '</div>' +
     '</div>';
   }).join('') + '</div>';
@@ -2851,8 +3060,10 @@ function openProductModal(id) {
         (id ? '<div class="product-purchases-section" id="product-purchases-section">' +
           '<div class="product-purchases-header">' +
             '<div class="product-purchases-title">היסטוריית רכישות</div>' +
+            '<button class="btn btn-primary btn-sm" type="button" id="btn-add-product-purchase">הוסף רכישה</button>' +
           '</div>' +
           '<div class="product-purchases-summary" id="product-purchases-summary"><div class="dash-empty">טוען...</div></div>' +
+          '<div id="product-purchase-inline-form"></div>' +
           '<div id="product-purchases-list"></div>' +
         '</div>' : '') +
       '</div>' +
@@ -2864,7 +3075,7 @@ function openProductModal(id) {
 
   document.body.appendChild(overlay);
 
-  function close() { overlay.remove(); currentProductId = null; }
+  function close() { overlay.remove(); currentProductId = null; currentProductPurchaseEditId = null; currentProductPurchaseFormMode = null; currentProductPurchaseSaving = false; }
   document.getElementById('product-modal-close').onclick = close;
   document.getElementById('product-modal-cancel').onclick = close;
 
