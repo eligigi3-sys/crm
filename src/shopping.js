@@ -1,3 +1,126 @@
+function parseOptionalProductId(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const productId = Number(value);
+  if (!Number.isInteger(productId) || productId <= 0) {
+    throw new Error('מוצר מקושר לא תקין');
+  }
+  return productId;
+}
+
+async function getProductById(productId, env) {
+  return env.DB.prepare(`
+    SELECT id, is_active
+    FROM products
+    WHERE id = ?
+  `).bind(productId).first();
+}
+
+async function assertValidShoppingProductLink(productId, env) {
+  if (productId === null) return null;
+  const product = await getProductById(productId, env);
+  if (!product) {
+    throw new Error('המוצר המקושר לא נמצא');
+  }
+  return product;
+}
+
+function normalizeShoppingPurchaseQuantity(value) {
+  if (value === null || value === undefined || value === '') return 1;
+  const quantity = Number(String(value).trim());
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    throw new Error('כמות לא תקינה עבור מוצר מקושר');
+  }
+  return Math.round(quantity * 100) / 100;
+}
+
+function normalizeShoppingPurchaseLineTotal(value) {
+  const totalPrice = Number(value);
+  if (!Number.isFinite(totalPrice) || totalPrice < 0) {
+    throw new Error('מחיר לא תקין עבור מוצר מקושר');
+  }
+  return Math.round(totalPrice * 100) / 100;
+}
+
+function calculateShoppingUnitPrice(totalPrice, quantity) {
+  return Math.round((totalPrice / quantity) * 100) / 100;
+}
+
+async function normalizeShoppingLedgerItem(rawItem, env) {
+  const productId = parseOptionalProductId(rawItem ? rawItem.product_id : null);
+  await assertValidShoppingProductLink(productId, env);
+
+  if (productId === null) {
+    return {
+      productId: null,
+      quantity: null,
+      totalPrice: null,
+      unitPrice: null
+    };
+  }
+
+  const quantity = normalizeShoppingPurchaseQuantity(rawItem.quantity);
+  const totalPrice = normalizeShoppingPurchaseLineTotal(rawItem.price);
+  const unitPrice = calculateShoppingUnitPrice(totalPrice, quantity);
+
+  return {
+    productId,
+    quantity,
+    totalPrice,
+    unitPrice
+  };
+}
+
+async function getProductPurchaseByShoppingPurchaseItemId(shoppingPurchaseItemId, env) {
+  return env.DB.prepare(`
+    SELECT id
+    FROM product_purchases
+    WHERE shopping_purchase_item_id = ?
+    LIMIT 1
+  `).bind(shoppingPurchaseItemId).first();
+}
+
+async function insertProductPurchaseFromShoppingItem(params, env) {
+  const existing = await getProductPurchaseByShoppingPurchaseItemId(params.shoppingPurchaseItemId, env);
+  if (existing) {
+    throw new Error('כפילות בהיסטוריית רכישות עבור פריט קנייה זה');
+  }
+
+  try {
+    await env.DB.prepare(`
+      INSERT INTO product_purchases (
+        product_id,
+        purchase_type,
+        purchase_date,
+        quantity,
+        unit_price,
+        total_price,
+        shopping_list_id,
+        shopping_purchase_id,
+        shopping_purchase_item_id,
+        supplier_name,
+        notes
+      )
+      VALUES (?, 'shopping', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      params.productId,
+      params.purchaseDate,
+      params.quantity,
+      params.unitPrice,
+      params.totalPrice,
+      params.shoppingListId,
+      params.shoppingPurchaseId,
+      params.shoppingPurchaseItemId,
+      null,
+      params.notes || null
+    ).run();
+  } catch (error) {
+    if (String((error && error.message) || error).includes('idx_product_purchases_shopping_purchase_item_unique')) {
+      throw new Error('כפילות בהיסטוריית רכישות עבור פריט קנייה זה');
+    }
+    throw error;
+  }
+}
+
 export async function handleShopping(request, env, path) {
   const method = request.method;
 
@@ -141,18 +264,21 @@ export async function handleShopping(request, env, path) {
     const b = await request.json();
 
     if (!b.item_name) throw new Error('שם פריט חובה');
+    const productId = parseOptionalProductId(b.product_id);
+    await assertValidShoppingProductLink(productId, env);
 
     const result = await env.DB.prepare(`
       INSERT INTO shopping_items
-        (list_id, item_name, quantity, status, notes, price)
-      VALUES (?, ?, ?, ?, ?, ?)
+        (list_id, item_name, quantity, status, notes, price, product_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `).bind(
       listId,
       b.item_name,
       b.quantity || null,
       b.status || 'pending',
       b.notes || null,
-      Number(b.price || 0)
+      Number(b.price || 0),
+      productId
     ).run();
 
     return { success: true, id: result.meta.last_row_id };
@@ -165,6 +291,8 @@ export async function handleShopping(request, env, path) {
     const b = await request.json();
 
     if (!b.item_name) throw new Error('שם פריט חובה');
+    const productId = parseOptionalProductId(b.product_id);
+    await assertValidShoppingProductLink(productId, env);
 
     await env.DB.prepare(`
       UPDATE shopping_items
@@ -173,7 +301,8 @@ export async function handleShopping(request, env, path) {
         quantity = ?,
         status = ?,
         notes = ?,
-        price = ?
+        price = ?,
+        product_id = ?
       WHERE id = ?
     `).bind(
       b.item_name,
@@ -181,6 +310,7 @@ export async function handleShopping(request, env, path) {
       b.status || 'pending',
       b.notes || null,
       Number(b.price || 0),
+      productId,
       id
     ).run();
 
@@ -203,36 +333,84 @@ export async function handleShopping(request, env, path) {
 
     const items = Array.isArray(b.items) ? b.items : [];
     const total = items.reduce((sum, item) => sum + Number(item.price || 0), 0);
-
-    const purchase = await env.DB.prepare(`
-      INSERT INTO shopping_purchases (list_id, purchase_date, total_amount, notes)
-      VALUES (?, ?, ?, ?)
-    `).bind(
-      listId,
-      b.purchase_date || new Date().toISOString().slice(0, 10),
-      Number(b.total_amount || total || 0),
-      b.notes || null
-    ).run();
-
-    const purchaseId = purchase.meta.last_row_id;
+    const normalizedItems = [];
 
     for (const item of items) {
-      await env.DB.prepare(`
-        INSERT INTO shopping_purchase_items
-          (purchase_id, item_name, quantity, price, notes)
-        VALUES (?, ?, ?, ?, ?)
-      `).bind(
-        purchaseId,
-        item.item_name,
-        item.quantity || null,
-        Number(item.price || 0),
-        item.notes || null
-      ).run();
+      normalizedItems.push({
+        raw: item,
+        ledger: await normalizeShoppingLedgerItem(item, env)
+      });
     }
 
-    await env.DB.prepare('DELETE FROM shopping_items WHERE list_id = ?').bind(listId).run();
+    const purchaseDate = b.purchase_date || new Date().toISOString().slice(0, 10);
+    const totalAmount = Number(b.total_amount || total || 0);
+    let transactionStarted = false;
 
-    return { success: true, id: purchaseId };
+    try {
+      await env.DB.prepare('BEGIN').run();
+      transactionStarted = true;
+
+      const purchase = await env.DB.prepare(`
+        INSERT INTO shopping_purchases (list_id, purchase_date, total_amount, notes)
+        VALUES (?, ?, ?, ?)
+      `).bind(
+        listId,
+        purchaseDate,
+        totalAmount,
+        b.notes || null
+      ).run();
+
+      const purchaseId = purchase.meta.last_row_id;
+
+      for (const itemData of normalizedItems) {
+        const item = itemData.raw;
+        const ledger = itemData.ledger;
+
+        const purchaseItem = await env.DB.prepare(`
+          INSERT INTO shopping_purchase_items
+            (purchase_id, item_name, quantity, price, notes, product_id)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).bind(
+          purchaseId,
+          item.item_name,
+          item.quantity || null,
+          Number(item.price || 0),
+          item.notes || null,
+          ledger.productId
+        ).run();
+
+        const shoppingPurchaseItemId = purchaseItem.meta.last_row_id;
+
+        if (ledger.productId !== null) {
+          await insertProductPurchaseFromShoppingItem({
+            productId: ledger.productId,
+            purchaseDate,
+            quantity: ledger.quantity,
+            unitPrice: ledger.unitPrice,
+            totalPrice: ledger.totalPrice,
+            shoppingListId: Number(listId),
+            shoppingPurchaseId: purchaseId,
+            shoppingPurchaseItemId,
+            notes: item.notes || null
+          }, env);
+        }
+      }
+
+      await env.DB.prepare('DELETE FROM shopping_items WHERE list_id = ?').bind(listId).run();
+      await env.DB.prepare('COMMIT').run();
+      transactionStarted = false;
+
+      return { success: true, id: purchaseId };
+    } catch (error) {
+      if (transactionStarted) {
+        try {
+          await env.DB.prepare('ROLLBACK').run();
+        } catch (rollbackError) {
+          console.error('Shopping finalize rollback failed', rollbackError);
+        }
+      }
+      throw error;
+    }
   }
 
 
