@@ -70,57 +70,6 @@ async function normalizeShoppingLedgerItem(rawItem, env) {
   };
 }
 
-async function getProductPurchaseByShoppingPurchaseItemId(shoppingPurchaseItemId, env) {
-  return env.DB.prepare(`
-    SELECT id
-    FROM product_purchases
-    WHERE shopping_purchase_item_id = ?
-    LIMIT 1
-  `).bind(shoppingPurchaseItemId).first();
-}
-
-async function insertProductPurchaseFromShoppingItem(params, env) {
-  const existing = await getProductPurchaseByShoppingPurchaseItemId(params.shoppingPurchaseItemId, env);
-  if (existing) {
-    throw new Error('כפילות בהיסטוריית רכישות עבור פריט קנייה זה');
-  }
-
-  try {
-    await env.DB.prepare(`
-      INSERT INTO product_purchases (
-        product_id,
-        purchase_type,
-        purchase_date,
-        quantity,
-        unit_price,
-        total_price,
-        shopping_list_id,
-        shopping_purchase_id,
-        shopping_purchase_item_id,
-        supplier_name,
-        notes
-      )
-      VALUES (?, 'shopping', ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      params.productId,
-      params.purchaseDate,
-      params.quantity,
-      params.unitPrice,
-      params.totalPrice,
-      params.shoppingListId,
-      params.shoppingPurchaseId,
-      params.shoppingPurchaseItemId,
-      null,
-      params.notes || null
-    ).run();
-  } catch (error) {
-    if (String((error && error.message) || error).includes('idx_product_purchases_shopping_purchase_item_unique')) {
-      throw new Error('כפילות בהיסטוריית רכישות עבור פריט קנייה זה');
-    }
-    throw error;
-  }
-}
-
 export async function handleShopping(request, env, path) {
   const method = request.method;
 
@@ -342,75 +291,39 @@ export async function handleShopping(request, env, path) {
       });
     }
 
-    const purchaseDate = b.purchase_date || new Date().toISOString().slice(0, 10);
-    const totalAmount = Number(b.total_amount || total || 0);
-    let transactionStarted = false;
+    const purchase = await env.DB.prepare(`
+      INSERT INTO shopping_purchases (list_id, purchase_date, total_amount, notes)
+      VALUES (?, ?, ?, ?)
+    `).bind(
+      listId,
+      b.purchase_date || new Date().toISOString().slice(0, 10),
+      Number(b.total_amount || total || 0),
+      b.notes || null
+    ).run();
 
-    try {
-      await env.DB.prepare('BEGIN').run();
-      transactionStarted = true;
+    const purchaseId = purchase.meta.last_row_id;
 
-      const purchase = await env.DB.prepare(`
-        INSERT INTO shopping_purchases (list_id, purchase_date, total_amount, notes)
-        VALUES (?, ?, ?, ?)
+    for (const itemData of normalizedItems) {
+      const item = itemData.raw;
+      const ledger = itemData.ledger;
+
+      await env.DB.prepare(`
+        INSERT INTO shopping_purchase_items
+          (purchase_id, item_name, quantity, price, notes, product_id)
+        VALUES (?, ?, ?, ?, ?, ?)
       `).bind(
-        listId,
-        purchaseDate,
-        totalAmount,
-        b.notes || null
+        purchaseId,
+        item.item_name,
+        item.quantity || null,
+        Number(item.price || 0),
+        item.notes || null,
+        ledger.productId
       ).run();
-
-      const purchaseId = purchase.meta.last_row_id;
-
-      for (const itemData of normalizedItems) {
-        const item = itemData.raw;
-        const ledger = itemData.ledger;
-
-        const purchaseItem = await env.DB.prepare(`
-          INSERT INTO shopping_purchase_items
-            (purchase_id, item_name, quantity, price, notes, product_id)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `).bind(
-          purchaseId,
-          item.item_name,
-          item.quantity || null,
-          Number(item.price || 0),
-          item.notes || null,
-          ledger.productId
-        ).run();
-
-        const shoppingPurchaseItemId = purchaseItem.meta.last_row_id;
-
-        if (ledger.productId !== null) {
-          await insertProductPurchaseFromShoppingItem({
-            productId: ledger.productId,
-            purchaseDate,
-            quantity: ledger.quantity,
-            unitPrice: ledger.unitPrice,
-            totalPrice: ledger.totalPrice,
-            shoppingListId: Number(listId),
-            shoppingPurchaseId: purchaseId,
-            shoppingPurchaseItemId,
-            notes: item.notes || null
-          }, env);
-        }
-      }
-
-      await env.DB.prepare('DELETE FROM shopping_items WHERE list_id = ?').bind(listId).run();
-      await env.DB.prepare('COMMIT').run();
-      transactionStarted = false;
-
-      return { success: true, id: purchaseId };
-    } catch (error) {
-      if (transactionStarted) {
-        try {
-          await env.DB.prepare('ROLLBACK').run();
-        } catch (rollbackError) {
-          console.error('Shopping finalize rollback failed', rollbackError);
-        }
-      }
-      throw error;
     }
+
+    await env.DB.prepare('DELETE FROM shopping_items WHERE list_id = ?').bind(listId).run();
+
+    return { success: true, id: purchaseId };
   }
 
 
