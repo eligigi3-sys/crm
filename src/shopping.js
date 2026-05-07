@@ -70,6 +70,69 @@ async function normalizeShoppingLedgerItem(rawItem, env) {
   };
 }
 
+async function getShoppingPurchaseById(purchaseId, env) {
+  return env.DB.prepare(`
+    SELECT *
+    FROM shopping_purchases
+    WHERE id = ?
+  `).bind(purchaseId).first();
+}
+
+async function getShoppingPurchaseItems(purchaseId, env) {
+  const result = await env.DB.prepare(`
+    SELECT *
+    FROM shopping_purchase_items
+    WHERE purchase_id = ?
+    ORDER BY created_at ASC, id ASC
+  `).bind(purchaseId).all();
+  return result.results || [];
+}
+
+async function getProductPurchaseByShoppingPurchaseItemId(shoppingPurchaseItemId, env) {
+  return env.DB.prepare(`
+    SELECT id
+    FROM product_purchases
+    WHERE shopping_purchase_item_id = ?
+    LIMIT 1
+  `).bind(shoppingPurchaseItemId).first();
+}
+
+async function insertProductPurchaseFromShoppingPurchaseItem(purchase, item, env) {
+  const productId = parseOptionalProductId(item.product_id);
+  await assertValidShoppingProductLink(productId, env);
+  const quantity = normalizeShoppingPurchaseQuantity(item.quantity);
+  const totalPrice = normalizeShoppingPurchaseLineTotal(item.price);
+  const unitPrice = calculateShoppingUnitPrice(totalPrice, quantity);
+
+  await env.DB.prepare(`
+    INSERT INTO product_purchases (
+      product_id,
+      purchase_type,
+      purchase_date,
+      quantity,
+      unit_price,
+      total_price,
+      shopping_list_id,
+      shopping_purchase_id,
+      shopping_purchase_item_id,
+      supplier_name,
+      notes
+    )
+    VALUES (?, 'shopping', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    productId,
+    purchase.purchase_date,
+    quantity,
+    unitPrice,
+    totalPrice,
+    purchase.list_id,
+    purchase.id,
+    item.id,
+    null,
+    item.notes || null
+  ).run();
+}
+
 export async function handleShopping(request, env, path) {
   const method = request.method;
 
@@ -326,6 +389,59 @@ export async function handleShopping(request, env, path) {
     return { success: true, id: purchaseId };
   }
 
+
+  const purchaseSyncProductsMatch = path.match(/^\/api\/shopping-purchases\/(\d+)\/sync-products$/);
+
+  if (purchaseSyncProductsMatch && method === 'POST') {
+    const purchaseId = Number(purchaseSyncProductsMatch[1]);
+    const purchase = await getShoppingPurchaseById(purchaseId, env);
+    if (!purchase) throw new Error('רכישת קניות לא נמצאה');
+
+    const items = await getShoppingPurchaseItems(purchaseId, env);
+    const summary = {
+      purchase_id: purchaseId,
+      eligible_count: 0,
+      created_count: 0,
+      skipped_unlinked: 0,
+      skipped_existing: 0,
+      failed_count: 0,
+      failures: []
+    };
+
+    for (const item of items) {
+      const productId = parseOptionalProductId(item.product_id);
+      if (productId === null) {
+        summary.skipped_unlinked++;
+        continue;
+      }
+
+      summary.eligible_count++;
+
+      const existing = await getProductPurchaseByShoppingPurchaseItemId(item.id, env);
+      if (existing) {
+        summary.skipped_existing++;
+        continue;
+      }
+
+      try {
+        await insertProductPurchaseFromShoppingPurchaseItem(purchase, item, env);
+        summary.created_count++;
+      } catch (error) {
+        var errorMessage = error && error.message ? error.message : 'שגיאת סנכרון לא ידועה';
+        if (String(errorMessage).includes('idx_product_purchases_shopping_purchase_item_unique') || String(errorMessage).includes('UNIQUE constraint failed')) {
+          summary.skipped_existing++;
+          continue;
+        }
+        summary.failed_count++;
+        summary.failures.push({
+          item_id: item.id,
+          error: errorMessage
+        });
+      }
+    }
+
+    return summary;
+  }
 
   const purchaseDetailsMatch = path.match(/^\/api\/shopping-purchases\/(\d+)$/);
 
