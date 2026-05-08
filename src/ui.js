@@ -1131,14 +1131,19 @@ id="customers-search">
     <div id="page-products" class="page">
       <div class="page-header">
         <div class="page-title">מוצרים / מלאי</div>
-        <button class="btn btn-primary" id="btn-new-product">+ מוצר חדש</button>
-      </div>
-      <div class="table-card">
-        <div class="table-toolbar">
-          <input class="search-input" type="text" placeholder="חיפוש לפי שם / קטגוריה / SKU..." id="products-search">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-secondary" id="btn-product-reports">דוחות רכישות</button>
+          <button class="btn btn-primary" id="btn-new-product">+ מוצר חדש</button>
         </div>
-        <div id="products-grid" style="padding:16px">
-          <div class="dash-empty">טוען...</div>
+      </div>
+      <div id="products-page-content">
+        <div class="table-card">
+          <div class="table-toolbar">
+            <input class="search-input" type="text" placeholder="חיפוש לפי שם / קטגוריה / SKU..." id="products-search">
+          </div>
+          <div id="products-grid" style="padding:16px">
+            <div class="dash-empty">טוען...</div>
+          </div>
         </div>
       </div>
     </div>
@@ -3069,7 +3074,218 @@ function renderProductPurchasesSection(productId, purchases) {
   }).join('') + '</div>';
 }
 
+var currentProductsView = 'list';
+
+function renderProductsListView() {
+  return '<div class="table-card">' +
+    '<div class="table-toolbar">' +
+      '<input class="search-input" type="text" placeholder="חיפוש לפי שם / קטגוריה / SKU..." id="products-search">' +
+    '</div>' +
+    '<div id="products-grid" style="padding:16px">' +
+      '<div class="dash-empty">טוען...</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function formatProductReportDate(dateStr) {
+  return dateStr ? formatDate(dateStr) : '—';
+}
+
+function getProductReportLast30Start() {
+  var today = getTodayYMD();
+  var base = new Date(today + 'T00:00:00');
+  base.setDate(base.getDate() - 29);
+  return base.toISOString().slice(0, 10);
+}
+
+function getProductReportSourceLabel(purchase, shoppingListsMap) {
+  if (purchase.supplier_name) return purchase.supplier_name;
+  if (purchase.shopping_list_id && shoppingListsMap[purchase.shopping_list_id]) return shoppingListsMap[purchase.shopping_list_id];
+  if (purchase.purchase_type === 'shopping') return 'קניית Shopping';
+  return '—';
+}
+
+function renderProductReportsTable(title, emptyText, rowsHtml, columnsHtml) {
+  return '<div class="table-card" style="margin-bottom:16px">' +
+    '<div class="table-toolbar"><strong>' + title + '</strong></div>' +
+    (rowsHtml ? '<div style="padding:16px"><table><thead><tr>' + columnsHtml + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>' : '<div class="dash-empty" style="padding:16px">' + emptyText + '</div>') +
+  '</div>';
+}
+
+function loadProductPurchaseReports() {
+  currentProductsView = 'reports';
+  var content = document.getElementById('products-page-content');
+  if (!content) return;
+
+  content.innerHTML = '<div class="table-card"><div class="dash-empty" style="padding:24px">טוען דוחות רכישות...</div></div>';
+
+  Promise.all([
+    apiCall('GET', '/api/products?includeInactive=1'),
+    apiCall('GET', '/api/shopping-lists')
+  ]).then(function(results) {
+    var products = results[0].products || [];
+    var shoppingLists = results[1].lists || [];
+    var shoppingListsMap = {};
+    shoppingLists.forEach(function(list) { shoppingListsMap[list.id] = list.name || ('חנות #' + list.id); });
+
+    return Promise.all(products.map(function(product) {
+      return apiCall('GET', '/api/products/' + product.id + '/purchases?limit=200&offset=0').then(function(data) {
+        return {
+          product: product,
+          purchases: data.purchases || []
+        };
+      });
+    })).then(function(productEntries) {
+      var allPurchases = [];
+      productEntries.forEach(function(entry) {
+        entry.purchases.forEach(function(purchase) {
+          allPurchases.push({
+            product: entry.product,
+            purchase: purchase
+          });
+        });
+      });
+
+      var currentMonth = getTodayYMD().slice(0, 7);
+      var last30Start = getProductReportLast30Start();
+      var totalThisMonth = 0;
+      var totalLast30 = 0;
+      var topProductsMap = {};
+      var sourceMap = {};
+      var priceIncreases = [];
+
+      allPurchases.forEach(function(entry) {
+        var purchase = entry.purchase;
+        var product = entry.product;
+        var date = String(purchase.purchase_date || '').slice(0, 10);
+        var total = Number(purchase.total_price || 0);
+
+        if (date.slice(0, 7) === currentMonth) totalThisMonth += total;
+        if (date && date >= last30Start) totalLast30 += total;
+
+        if (!topProductsMap[product.id]) {
+          topProductsMap[product.id] = { product: product, spend: 0, count: 0 };
+        }
+        topProductsMap[product.id].spend += total;
+        topProductsMap[product.id].count += 1;
+
+        var sourceLabel = getProductReportSourceLabel(purchase, shoppingListsMap);
+        if (sourceLabel && sourceLabel !== '—') {
+          if (!sourceMap[sourceLabel]) sourceMap[sourceLabel] = { name: sourceLabel, count: 0, total: 0 };
+          sourceMap[sourceLabel].count += 1;
+          sourceMap[sourceLabel].total += total;
+        }
+      });
+
+      productEntries.forEach(function(entry) {
+        var sorted = (entry.purchases || []).slice().sort(function(a, b) {
+          return String(b.purchase_date || '').localeCompare(String(a.purchase_date || '')) || Number(b.id || 0) - Number(a.id || 0);
+        });
+        if (sorted.length < 2) return;
+        var latest = sorted[0];
+        var previous = sorted[1];
+        var latestPrice = Number(latest.unit_price || 0);
+        var previousPrice = Number(previous.unit_price || 0);
+        if (latestPrice > previousPrice) {
+          priceIncreases.push({
+            product: entry.product,
+            latest: latest,
+            previous: previous,
+            delta: latestPrice - previousPrice
+          });
+        }
+      });
+
+      var recentRows = allPurchases.slice().sort(function(a, b) {
+        return String(b.purchase.purchase_date || '').localeCompare(String(a.purchase.purchase_date || '')) || Number(b.purchase.id || 0) - Number(a.purchase.id || 0);
+      }).slice(0, 12).map(function(entry) {
+        return '<tr>' +
+          '<td>' + formatProductReportDate(entry.purchase.purchase_date) + '</td>' +
+          '<td>' + (entry.product.name || 'מוצר') + '</td>' +
+          '<td>' + formatProductMoney(entry.purchase.total_price) + '</td>' +
+          '<td>' + getProductReportSourceLabel(entry.purchase, shoppingListsMap) + '</td>' +
+          '<td>' + (entry.purchase.notes || '—') + '</td>' +
+        '</tr>';
+      }).join('');
+
+      var topRows = Object.keys(topProductsMap).map(function(key) { return topProductsMap[key]; }).sort(function(a, b) {
+        return b.spend - a.spend;
+      }).slice(0, 10).map(function(entry) {
+        return '<tr>' +
+          '<td>' + (entry.product.name || 'מוצר') + '</td>' +
+          '<td>' + entry.count + '</td>' +
+          '<td>' + formatProductMoney(entry.spend) + '</td>' +
+        '</tr>';
+      }).join('');
+
+      var increaseRows = priceIncreases.sort(function(a, b) { return b.delta - a.delta; }).slice(0, 10).map(function(entry) {
+        return '<tr>' +
+          '<td>' + (entry.product.name || 'מוצר') + '</td>' +
+          '<td>' + formatProductMoney(entry.previous.unit_price) + '</td>' +
+          '<td>' + formatProductMoney(entry.latest.unit_price) + '</td>' +
+          '<td>' + formatProductMoney(entry.delta) + '</td>' +
+          '<td>' + formatProductReportDate(entry.latest.purchase_date) + '</td>' +
+        '</tr>';
+      }).join('');
+
+      var sourceRows = Object.keys(sourceMap).map(function(key) { return sourceMap[key]; }).sort(function(a, b) {
+        return b.total - a.total;
+      }).slice(0, 20).map(function(entry) {
+        return '<tr>' +
+          '<td>' + entry.name + '</td>' +
+          '<td>' + entry.count + '</td>' +
+          '<td>' + formatProductMoney(entry.total) + '</td>' +
+        '</tr>';
+      }).join('');
+
+      content.innerHTML = '' +
+        '<div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">' +
+          '<div class="page-title" style="font-size:22px">דוחות רכישות</div>' +
+          '<button class="btn btn-secondary" id="btn-back-to-products-list">חזרה למוצרים</button>' +
+        '</div>' +
+        '<div class="stats-grid" style="margin-bottom:16px">' +
+          '<div class="stat-card"><div class="stat-label">סה"כ החודש</div><div class="stat-value">₪' + fmtMoney(totalThisMonth) + '</div></div>' +
+          '<div class="stat-card"><div class="stat-label">סה"כ 30 יום</div><div class="stat-value">₪' + fmtMoney(totalLast30) + '</div></div>' +
+          '<div class="stat-card"><div class="stat-label">מספר רכישות</div><div class="stat-value">' + allPurchases.length + '</div></div>' +
+          '<div class="stat-card"><div class="stat-label">מקורות/ספקים</div><div class="stat-value">' + Object.keys(sourceMap).length + '</div></div>' +
+        '</div>' +
+        renderProductReportsTable('רכישות אחרונות', 'אין רכישות להצגה', recentRows, '<th>תאריך</th><th>מוצר</th><th>סה"כ</th><th>ספק / חנות</th><th>הערות</th>') +
+        renderProductReportsTable('מוצרים עם ההוצאה הגבוהה ביותר', 'אין נתונים להצגה', topRows, '<th>מוצר</th><th>מספר רכישות</th><th>סה"כ הוצאה</th>') +
+        renderProductReportsTable('מוצרים שהתייקרו', 'אין כרגע מוצרים עם עלייה במחיר', increaseRows, '<th>מוצר</th><th>מחיר קודם</th><th>מחיר אחרון</th><th>פער</th><th>תאריך אחרון</th>') +
+        renderProductReportsTable('ספקים / חנויות שמופיעים בהיסטוריה', 'אין מקורות רכישה להצגה', sourceRows, '<th>ספק / חנות</th><th>מספר רכישות</th><th>סה"כ הוצאה</th>');
+
+      var backBtn = document.getElementById('btn-back-to-products-list');
+      if (backBtn) {
+        backBtn.onclick = function() {
+          currentProductsView = 'list';
+          var pageContent = document.getElementById('products-page-content');
+          if (!pageContent) return;
+          pageContent.innerHTML = renderProductsListView();
+          loadProducts();
+        };
+      }
+    });
+  }).catch(function(e) {
+    content.innerHTML = '<div class="table-card"><div class="dash-empty" style="padding:24px">שגיאה בטעינת דוחות רכישות</div></div>';
+    toast(e.message, 'error');
+  });
+}
+
 function loadProducts() {
+  currentProductsView = 'list';
+  var content = document.getElementById('products-page-content');
+  if (content && !document.getElementById('products-grid')) {
+    content.innerHTML = renderProductsListView();
+  }
+
+  var reportsBtn = document.getElementById('btn-product-reports');
+  if (reportsBtn && !reportsBtn.dataset.bound) {
+    reportsBtn.dataset.bound = '1';
+    reportsBtn.onclick = function() {
+      loadProductPurchaseReports();
+    };
+  }
+
   var grid = document.getElementById('products-grid');
   if (!grid) return;
 
