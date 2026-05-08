@@ -232,6 +232,27 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .product-card-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .product-status-active{background:var(--green-light);color:var(--green)}
 .product-status-inactive{background:var(--bg);color:var(--text3);border:1px solid var(--border)}
+.product-stock-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.product-stock-value{font-size:13px;font-weight:700;color:var(--text)}
+.product-stock-helper{font-size:11px;color:var(--text3)}
+.product-low-stock-banner{margin-bottom:16px;padding:14px 16px;border:1px solid #fdba74;background:#fff7ed;border-radius:12px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.product-low-stock-title{font-size:14px;font-weight:800;color:#9a3412}
+.product-low-stock-text{font-size:12px;color:#9a3412;line-height:1.6}
+.product-low-stock-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.product-low-stock-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#fff;border:1px solid #fdba74;font-size:12px;color:#9a3412;font-weight:700}
+.product-low-stock-chip-muted{color:var(--text3);border-color:var(--border);background:#fafbfc}
+.product-inventory-section{margin-top:18px;padding-top:18px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:14px}
+.product-inventory-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.product-inventory-card{background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.product-inventory-label{font-size:12px;color:var(--text3)}
+.product-inventory-value{font-size:16px;font-weight:800;color:var(--text)}
+.product-inventory-list{display:flex;flex-direction:column;gap:10px}
+.product-inventory-row{background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.product-inventory-row-main{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0}
+.product-inventory-row-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.product-inventory-row-stats{display:flex;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--text2)}
+.product-inventory-date{font-weight:700;color:var(--text)}
+.product-inventory-note{font-size:13px;color:var(--text2);line-height:1.6;white-space:pre-wrap}
 .product-purchases-section{margin-top:18px;padding-top:18px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:14px}
 .product-purchases-header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .product-purchases-title{font-size:16px;font-weight:800;color:var(--text)}
@@ -1245,7 +1266,8 @@ id="customers-search">
 <script>
 var token = localStorage.getItem('crm_token');
 var currentUser = JSON.parse(localStorage.getItem('crm_user') || 'null');
-var searchTimer, currentLeadId, dupLeadId, selectedContactId = null, currentEmployeeId = null, currentProductId = null, currentProductPurchases = [], currentProductPurchaseEditId = null, currentProductPurchaseFormMode = null, currentProductPurchaseSaving = false;
+var searchTimer, currentLeadId, dupLeadId, selectedContactId = null, currentEmployeeId = null, currentProductId = null, currentProductPurchases = [], currentProductPurchaseEditId = null, currentProductPurchaseFormMode = null, currentProductPurchaseSaving = false, currentProductStock = null, currentProductStockMovements = [];
+var currentLowStockProducts = [];
 var allLeadsCache = [];
 var calYear, calMonth;
 var predefinedCustomerTags = [
@@ -3076,15 +3098,93 @@ function renderProductPurchasesSection(productId, purchases) {
 
 var currentProductsView = 'list';
 
-function renderProductsListView() {
-  return '<div class="table-card">' +
-    '<div class="table-toolbar">' +
-      '<input class="search-input" type="text" placeholder="חיפוש לפי שם / קטגוריה / SKU..." id="products-search">' +
+function formatProductStockValue(value) {
+  var num = Number(value);
+  if (!Number.isFinite(num)) return '—';
+  if (Math.abs(num - Math.round(num)) < 0.001) return String(Math.round(num));
+  return num.toFixed(2);
+}
+
+function getProductInventoryStatusBadge(stockInfo) {
+  if (!stockInfo) return '<span class="badge badge-gray">מלאי לא זמין</span>';
+  return stockInfo.is_low_stock ? '<span class="badge badge-orange">מלאי נמוך</span>' : '<span class="badge badge-green">מלאי תקין</span>';
+}
+
+function renderProductLowStockSummary(products) {
+  if (!products || !products.length) {
+    return '<div class="product-low-stock-banner">' +
+      '<div>' +
+        '<div class="product-low-stock-title">מוצרים במלאי נמוך</div>' +
+        '<div class="product-low-stock-text">כרגע אין מוצרים פעילים שנמצאים מתחת לסף ההתראה.</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  return '<div class="product-low-stock-banner">' +
+    '<div style="flex:1;min-width:220px">' +
+      '<div class="product-low-stock-title">מוצרים במלאי נמוך</div>' +
+      '<div class="product-low-stock-text">' + products.length + ' מוצרים פעילים דורשים תשומת לב. הרשימה מוצגת מקריאת ה-API של low-stock בלבד.</div>' +
+      '<div class="product-low-stock-list">' + products.slice(0, 8).map(function(entry) {
+        var product = entry.product || {};
+        return '<span class="product-low-stock-chip">' +
+          '<span>' + (product.name || ('מוצר #' + product.id)) + '</span>' +
+          '<span class="product-low-stock-chip-muted">' + formatProductStockValue(entry.current_stock) + ' / מינימום ' + formatProductStockValue(entry.min_stock_alert) + '</span>' +
+        '</span>';
+      }).join('') + (products.length > 8 ? '<span class="product-low-stock-chip product-low-stock-chip-muted">ועוד ' + (products.length - 8) + '</span>' : '') + '</div>' +
     '</div>' +
-    '<div id="products-grid" style="padding:16px">' +
-      '<div class="dash-empty">טוען...</div>' +
+    '<button class="btn btn-secondary btn-sm" type="button" id="btn-refresh-low-stock">רענן מלאי</button>' +
+  '</div>';
+}
+
+function renderProductInventorySection(stockInfo, movements) {
+  if (!stockInfo) {
+    return '<div class="product-inventory-section" id="product-inventory-section">' +
+      '<div class="product-purchases-header"><div class="product-purchases-title">תמונת מלאי</div></div>' +
+      '<div class="dash-empty">לא הצלחנו לטעון כרגע את נתוני המלאי למוצר הזה.</div>' +
+    '</div>';
+  }
+
+  var recentMovements = (movements || []).slice(0, 5);
+  return '<div class="product-inventory-section" id="product-inventory-section">' +
+    '<div class="product-purchases-header"><div class="product-purchases-title">תמונת מלאי</div></div>' +
+    '<div class="product-inventory-grid">' +
+      '<div class="product-inventory-card"><div class="product-inventory-label">מלאי נוכחי</div><div class="product-inventory-value">' + formatProductStockValue(stockInfo.current_stock) + '</div></div>' +
+      '<div class="product-inventory-card"><div class="product-inventory-label">מינימום התראה</div><div class="product-inventory-value">' + (stockInfo.min_stock_alert !== null && stockInfo.min_stock_alert !== undefined && stockInfo.min_stock_alert !== '' ? formatProductStockValue(stockInfo.min_stock_alert) : 'לא הוגדר') + '</div></div>' +
+      '<div class="product-inventory-card"><div class="product-inventory-label">סטטוס</div><div class="product-inventory-value">' + (stockInfo.is_low_stock ? 'מלאי נמוך' : 'מלאי תקין') + '</div></div>' +
+    '</div>' +
+    '<div>' +
+      '<div class="product-purchase-summary-subtext" style="margin-bottom:8px">תנועות המלאי מוצגות מהחדשה לישנה, על בסיס ledger בלבד.</div>' +
+      (recentMovements.length ? '<div class="product-inventory-list">' + recentMovements.map(function(movement) {
+        return '<div class="product-inventory-row">' +
+          '<div class="product-inventory-row-main">' +
+            '<div class="product-inventory-row-top">' +
+              '<span class="product-inventory-date">' + formatDate(movement.created_at) + '</span>' +
+              '<span class="badge ' + (Number(movement.quantity_change) < 0 ? 'badge-red' : 'badge-blue') + '">' + (movement.movement_type || 'movement') + '</span>' +
+              (movement.reference_type ? '<span class="badge badge-gray">' + movement.reference_type + '</span>' : '') +
+            '</div>' +
+            '<div class="product-inventory-row-stats">' +
+              '<span>שינוי: ' + (Number(movement.quantity_change) > 0 ? '+' : '') + formatProductStockValue(movement.quantity_change) + '</span>' +
+              (movement.reason ? '<span>סיבה: ' + movement.reason + '</span>' : '') +
+              (movement.reference_id ? '<span>מזהה מקור: ' + movement.reference_id + '</span>' : '') +
+            '</div>' +
+            (movement.note ? '<div class="product-inventory-note">' + movement.note + '</div>' : '') +
+          '</div>' +
+        '</div>';
+      }).join('') + '</div>' : '<div class="dash-empty">אין עדיין תנועות מלאי למוצר הזה.</div>') +
     '</div>' +
   '</div>';
+}
+
+function renderProductsListView() {
+  return '<div id="products-low-stock-summary"></div>' +
+    '<div class="table-card">' +
+      '<div class="table-toolbar">' +
+        '<input class="search-input" type="text" placeholder="חיפוש לפי שם / קטגוריה / SKU..." id="products-search">' +
+      '</div>' +
+      '<div id="products-grid" style="padding:16px">' +
+        '<div class="dash-empty">טוען...</div>' +
+      '</div>' +
+    '</div>';
 }
 
 function formatProductReportDate(dateStr) {
@@ -3333,59 +3433,104 @@ function loadProducts() {
   }
 
   var grid = document.getElementById('products-grid');
+  var lowStockSummary = document.getElementById('products-low-stock-summary');
   if (!grid) return;
 
   var search = document.getElementById('products-search') ? document.getElementById('products-search').value.trim() : '';
   var path = '/api/products?search=' + encodeURIComponent(search) + '&includeInactive=1';
 
   grid.innerHTML = '<div class="dash-empty">טוען...</div>';
+  if (lowStockSummary) lowStockSummary.innerHTML = renderProductLowStockSummary([]);
 
-  apiCall('GET', path).then(function(data) {
+  Promise.all([
+    apiCall('GET', path),
+    apiCall('GET', '/api/inventory/low-stock').catch(function() { return { products: [] }; })
+  ]).then(function(results) {
+    var data = results[0] || {};
+    var lowStockData = results[1] || {};
     var products = data.products || [];
+    currentLowStockProducts = lowStockData.products || [];
+
+    if (lowStockSummary) {
+      lowStockSummary.innerHTML = renderProductLowStockSummary(currentLowStockProducts);
+      var refreshBtn = document.getElementById('btn-refresh-low-stock');
+      if (refreshBtn) refreshBtn.onclick = function() { loadProducts(); };
+    }
 
     if (!products.length) {
       grid.innerHTML = '<div class="dash-empty">אין מוצרים להצגה</div>';
       return;
     }
 
-    grid.innerHTML = '<div class="product-grid">' + products.map(function(product) {
-      return '<div class="product-card">' +
-        '<div class="product-card-header">' +
-          '<div style="flex:1">' +
-            '<div class="product-card-name">' + (product.name || 'מוצר ללא שם') + '</div>' +
-            '<div class="product-card-meta" style="margin-top:4px">' + (product.category || 'ללא קטגוריה') + '</div>' +
-          '</div>' +
-          productStatusBadge(product.is_active) +
-        '</div>' +
-        '<div class="product-card-meta">SKU: ' + (product.sku || '—') + '</div>' +
-        '<div class="product-card-meta">יחידה: ' + (product.unit || '—') + '</div>' +
-        '<div class="product-stats">' +
-          '<div class="product-stat"><div class="product-stat-label">עלות</div><div class="product-stat-value">' + formatProductMoney(product.cost_price) + '</div></div>' +
-          '<div class="product-stat"><div class="product-stat-label">מחיר מכירה</div><div class="product-stat-value">' + formatProductMoney(product.sale_price) + '</div></div>' +
-          '<div class="product-stat"><div class="product-stat-label">מלאי</div><div class="product-stat-value">' + (product.stock_quantity !== null && product.stock_quantity !== undefined && product.stock_quantity !== '' ? product.stock_quantity : '—') + '</div></div>' +
-          '<div class="product-stat"><div class="product-stat-label">מינימום התראה</div><div class="product-stat-value">' + (product.min_stock_alert !== null && product.min_stock_alert !== undefined && product.min_stock_alert !== '' ? product.min_stock_alert : '—') + '</div></div>' +
-        '</div>' +
-        (product.notes ? '<div class="product-card-notes">' + product.notes + '</div>' : '') +
-        '<div class="product-card-actions">' +
-          '<button class="btn btn-secondary btn-sm product-edit-btn" data-id="' + product.id + '">עריכה</button>' +
-          (Number(product.is_active) === 0 ? '' : '<button class="btn btn-danger btn-sm product-deactivate-btn" data-id="' + product.id + '">השבת</button>') +
-        '</div>' +
-      '</div>';
-    }).join('') + '</div>';
-
-    grid.querySelectorAll('.product-edit-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        openProductModal(parseInt(this.getAttribute('data-id')));
+    return Promise.all(products.map(function(product) {
+      return apiCall('GET', '/api/products/' + product.id + '/stock').then(function(stock) {
+        return { product: product, stock: stock };
+      }).catch(function() {
+        return { product: product, stock: null };
       });
-    });
+    })).then(function(productEntries) {
+      var lowStockMap = {};
+      currentLowStockProducts.forEach(function(entry) {
+        if (entry && entry.product && entry.product.id !== undefined) lowStockMap[entry.product.id] = true;
+      });
 
-    grid.querySelectorAll('.product-deactivate-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        deactivateProduct(parseInt(this.getAttribute('data-id')));
+      grid.innerHTML = '<div class="product-grid">' + productEntries.map(function(entry) {
+        var product = entry.product;
+        var stockInfo = entry.stock;
+        var cardStockValue = stockInfo ? formatProductStockValue(stockInfo.current_stock) : 'לא זמין';
+        var minAlertValue = stockInfo && stockInfo.min_stock_alert !== null && stockInfo.min_stock_alert !== undefined && stockInfo.min_stock_alert !== ''
+          ? formatProductStockValue(stockInfo.min_stock_alert)
+          : '—';
+        var showLowStock = !!lowStockMap[product.id] || !!(stockInfo && stockInfo.is_low_stock);
+
+        return '<div class="product-card">' +
+          '<div class="product-card-header">' +
+            '<div style="flex:1">' +
+              '<div class="product-card-name">' + (product.name || 'מוצר ללא שם') + '</div>' +
+              '<div class="product-card-meta" style="margin-top:4px">' + (product.category || 'ללא קטגוריה') + '</div>' +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
+              (showLowStock ? '<span class="badge badge-orange">מלאי נמוך</span>' : '') +
+              productStatusBadge(product.is_active) +
+            '</div>' +
+          '</div>' +
+          '<div class="product-card-meta">SKU: ' + (product.sku || '—') + '</div>' +
+          '<div class="product-card-meta">יחידה: ' + (product.unit || '—') + '</div>' +
+          '<div class="product-stock-row">' +
+            '<div><div class="product-stock-helper">מלאי נוכחי (ledger)</div><div class="product-stock-value">' + cardStockValue + '</div></div>' +
+            getProductInventoryStatusBadge(stockInfo) +
+          '</div>' +
+          '<div class="product-stats">' +
+            '<div class="product-stat"><div class="product-stat-label">עלות</div><div class="product-stat-value">' + formatProductMoney(product.cost_price) + '</div></div>' +
+            '<div class="product-stat"><div class="product-stat-label">מחיר מכירה</div><div class="product-stat-value">' + formatProductMoney(product.sale_price) + '</div></div>' +
+            '<div class="product-stat"><div class="product-stat-label">מלאי שמור במוצר</div><div class="product-stat-value">' + (product.stock_quantity !== null && product.stock_quantity !== undefined && product.stock_quantity !== '' ? product.stock_quantity : '—') + '</div></div>' +
+            '<div class="product-stat"><div class="product-stat-label">מינימום התראה</div><div class="product-stat-value">' + minAlertValue + '</div></div>' +
+          '</div>' +
+          (product.notes ? '<div class="product-card-notes">' + product.notes + '</div>' : '') +
+          '<div class="product-card-actions">' +
+            '<button class="btn btn-secondary btn-sm product-edit-btn" data-id="' + product.id + '">עריכה</button>' +
+            (Number(product.is_active) === 0 ? '' : '<button class="btn btn-danger btn-sm product-deactivate-btn" data-id="' + product.id + '">השבת</button>') +
+          '</div>' +
+        '</div>';
+      }).join('') + '</div>';
+
+      grid.querySelectorAll('.product-edit-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          openProductModal(parseInt(this.getAttribute('data-id')));
+        });
+      });
+
+      grid.querySelectorAll('.product-deactivate-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          deactivateProduct(parseInt(this.getAttribute('data-id')));
+        });
       });
     });
   }).catch(function(e) {
     grid.innerHTML = '<div class="dash-empty">שגיאה בטעינת מוצרים</div>';
+    if (lowStockSummary) {
+      lowStockSummary.innerHTML = '<div class="product-low-stock-banner"><div><div class="product-low-stock-title">מוצרים במלאי נמוך</div><div class="product-low-stock-text">לא הצלחנו לטעון כרגע את רשימת המלאי הנמוך.</div></div></div>';
+    }
     toast(e.message, 'error');
   });
 }
@@ -3400,6 +3545,8 @@ function deactivateProduct(id) {
 
 function openProductModal(id) {
   currentProductId = id || null;
+  currentProductStock = null;
+  currentProductStockMovements = [];
   var old = document.getElementById('product-modal');
   if (old) old.remove();
 
@@ -3432,6 +3579,7 @@ function openProductModal(id) {
         '</div>' +
         '<div class="form-group"><label class="form-label">הערות</label><textarea class="form-textarea" id="product-notes" placeholder="הערות על המוצר"></textarea></div>' +
         '<div class="form-group"><label class="check-item" style="display:inline-flex;width:auto"><input type="checkbox" id="product-is-active" checked> מוצר פעיל</label></div>' +
+        (id ? '<div id="product-inventory-root">' + renderProductInventorySection(null, []) + '</div>' : '') +
         (id ? '<div class="product-purchases-section" id="product-purchases-section">' +
           '<div class="product-purchases-header">' +
             '<div class="product-purchases-title">היסטוריית רכישות</div>' +
@@ -3450,13 +3598,19 @@ function openProductModal(id) {
 
   document.body.appendChild(overlay);
 
-  function close() { overlay.remove(); currentProductId = null; currentProductPurchaseEditId = null; currentProductPurchaseFormMode = null; currentProductPurchaseSaving = false; }
+  function close() { overlay.remove(); currentProductId = null; currentProductPurchaseEditId = null; currentProductPurchaseFormMode = null; currentProductPurchaseSaving = false; currentProductStock = null; currentProductStockMovements = []; }
   document.getElementById('product-modal-close').onclick = close;
   document.getElementById('product-modal-cancel').onclick = close;
 
   if (id) {
-    apiCall('GET', '/api/products/' + id).then(function(data) {
-      var product = (data || {}).product || {};
+    Promise.all([
+      apiCall('GET', '/api/products/' + id),
+      apiCall('GET', '/api/products/' + id + '/stock').catch(function() { return null; }),
+      apiCall('GET', '/api/products/' + id + '/stock-movements?limit=5&offset=0').catch(function() { return { movements: [] }; })
+    ]).then(function(results) {
+      var product = ((results[0] || {}).product) || {};
+      currentProductStock = results[1];
+      currentProductStockMovements = (results[2] && results[2].movements) || [];
       document.getElementById('product-name').value = product.name || '';
       document.getElementById('product-category').value = product.category || '';
       document.getElementById('product-sku').value = product.sku || '';
@@ -3467,6 +3621,8 @@ function openProductModal(id) {
       document.getElementById('product-min-stock-alert').value = (product.min_stock_alert !== null && product.min_stock_alert !== undefined) ? product.min_stock_alert : '';
       document.getElementById('product-notes').value = product.notes || '';
       document.getElementById('product-is-active').checked = Number(product.is_active) !== 0;
+      var inventoryRoot = document.getElementById('product-inventory-root');
+      if (inventoryRoot) inventoryRoot.innerHTML = renderProductInventorySection(currentProductStock, currentProductStockMovements);
       loadProductPurchases(id);
     }).catch(function(e) { toast(e.message, 'error'); close(); });
   }
