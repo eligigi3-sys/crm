@@ -94,10 +94,21 @@ async function getProductPurchaseById(purchaseId, env) {
   return purchase;
 }
 
+async function getCurrentStockForProduct(productId, env) {
+  const row = await env.DB.prepare(
+    `SELECT COALESCE(SUM(quantity_change), 0) AS current_stock
+     FROM product_stock_movements
+     WHERE product_id = ?`
+  ).bind(productId).first();
+  return Number(row && row.current_stock !== undefined && row.current_stock !== null ? row.current_stock : 0);
+}
+
 export async function handleProducts(request, env, path) {
   const method = request.method;
   const url = new URL(request.url);
   const idMatch = path.match(/^\/api\/products\/(\d+)$/);
+  const productStockMatch = path.match(/^\/api\/products\/(\d+)\/stock$/);
+  const productStockMovementsMatch = path.match(/^\/api\/products\/(\d+)\/stock-movements$/);
   const productPurchasesMatch = path.match(/^\/api\/products\/(\d+)\/purchases$/);
   const productPurchaseMatch = path.match(/^\/api\/product-purchases\/(\d+)$/);
 
@@ -133,6 +144,90 @@ export async function handleProducts(request, env, path) {
 
     const { results } = await env.DB.prepare(query).bind(...params).all();
     return { products: results };
+  }
+
+  if (path === '/api/inventory/low-stock' && method === 'GET') {
+    const rows = await env.DB.prepare(
+      `SELECT
+         p.*, 
+         COALESCE(sm.current_stock, 0) AS current_stock
+       FROM products p
+       LEFT JOIN (
+         SELECT product_id, SUM(quantity_change) AS current_stock
+         FROM product_stock_movements
+         GROUP BY product_id
+       ) sm ON sm.product_id = p.id
+       WHERE p.min_stock_alert IS NOT NULL
+         AND COALESCE(sm.current_stock, 0) <= p.min_stock_alert
+       ORDER BY COALESCE(sm.current_stock, 0) ASC, p.min_stock_alert ASC, p.name COLLATE NOCASE ASC, p.id ASC`
+    ).all();
+
+    return {
+      products: (rows.results || []).map(function(product) {
+        var currentStock = Number(product.current_stock || 0);
+        return {
+          product: product,
+          current_stock: currentStock,
+          min_stock_alert: product.min_stock_alert,
+          is_low_stock: true
+        };
+      })
+    };
+  }
+
+  if (productStockMatch && method === 'GET') {
+    const productId = Number(productStockMatch[1]);
+    const product = await getProductById(productId, env);
+    const currentStock = await getCurrentStockForProduct(productId, env);
+    const minStockAlert = product.min_stock_alert;
+    const isLowStock = minStockAlert !== null && minStockAlert !== undefined && minStockAlert !== ''
+      ? currentStock <= Number(minStockAlert)
+      : false;
+
+    return {
+      product,
+      current_stock: currentStock,
+      min_stock_alert: minStockAlert,
+      is_low_stock: isLowStock
+    };
+  }
+
+  if (productStockMovementsMatch && method === 'GET') {
+    const productId = Number(productStockMovementsMatch[1]);
+    await getProductById(productId, env);
+
+    let limit = Number(url.searchParams.get('limit') || 100);
+    if (!Number.isFinite(limit)) limit = 100;
+    limit = Math.min(Math.max(limit, 1), 200);
+
+    let offset = Number(url.searchParams.get('offset') || 0);
+    if (!Number.isFinite(offset) || offset < 0) offset = 0;
+    offset = Math.floor(offset);
+
+    const movementsResult = await env.DB.prepare(
+      `SELECT *
+       FROM product_stock_movements
+       WHERE product_id = ?
+       ORDER BY created_at DESC, id DESC
+       LIMIT ? OFFSET ?`
+    ).bind(productId, limit, offset).all();
+
+    const hasMoreRow = await env.DB.prepare(
+      `SELECT 1
+       FROM product_stock_movements
+       WHERE product_id = ?
+       ORDER BY created_at DESC, id DESC
+       LIMIT 1 OFFSET ?`
+    ).bind(productId, offset + limit).first();
+
+    return {
+      movements: movementsResult.results || [],
+      pagination: {
+        limit,
+        offset,
+        has_more: !!hasMoreRow
+      }
+    };
   }
 
   if (productPurchasesMatch && method === 'GET') {
