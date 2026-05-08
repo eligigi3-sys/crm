@@ -3420,7 +3420,7 @@ function loadProductPurchaseReports() {
 function loadProducts() {
   currentProductsView = 'list';
   var content = document.getElementById('products-page-content');
-  if (content && !document.getElementById('products-grid')) {
+  if (content && (!document.getElementById('products-grid') || !document.getElementById('products-low-stock-summary'))) {
     content.innerHTML = renderProductsListView();
   }
 
