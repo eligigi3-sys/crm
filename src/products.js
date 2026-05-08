@@ -147,8 +147,9 @@ export async function handleProducts(request, env, path) {
   }
 
   if (path === '/api/inventory/low-stock' && method === 'GET') {
-    const rows = await env.DB.prepare(
-      `SELECT
+    const includeInactive = url.searchParams.get('includeInactive') === '1';
+    const params = [];
+    let query = `SELECT
          p.*, 
          COALESCE(sm.current_stock, 0) AS current_stock
        FROM products p
@@ -158,9 +159,17 @@ export async function handleProducts(request, env, path) {
          GROUP BY product_id
        ) sm ON sm.product_id = p.id
        WHERE p.min_stock_alert IS NOT NULL
-         AND COALESCE(sm.current_stock, 0) <= p.min_stock_alert
-       ORDER BY COALESCE(sm.current_stock, 0) ASC, p.min_stock_alert ASC, p.name COLLATE NOCASE ASC, p.id ASC`
-    ).all();
+         AND COALESCE(sm.current_stock, 0) <= p.min_stock_alert`;
+
+    if (!includeInactive) {
+      query += `
+         AND p.is_active = 1`;
+    }
+
+    query += `
+       ORDER BY COALESCE(sm.current_stock, 0) ASC, p.min_stock_alert ASC, p.name COLLATE NOCASE ASC, p.id ASC`;
+
+    const rows = await env.DB.prepare(query).bind(...params).all();
 
     return {
       products: (rows.results || []).map(function(product) {
