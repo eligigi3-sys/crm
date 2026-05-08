@@ -5030,6 +5030,23 @@ window.openShoppingPurchaseDetailsModal = function(purchaseId, currentListId) {
 
 
 // force-purchase-click-final
+function getShoppingProductSyncSummaryText(summary) {
+  if (!summary) return 'הסנכרון הושלם';
+  return [
+    'נוצרו: ' + Number(summary.created_count || 0),
+    'כבר סונכרנו: ' + Number(summary.skipped_existing || 0),
+    'ללא קישור: ' + Number(summary.skipped_unlinked || 0),
+    'נכשלו: ' + Number(summary.failed_count || 0)
+  ].join(' | ');
+}
+
+function getShoppingProductSyncFailureText(summary) {
+  if (!summary || !Array.isArray(summary.failures) || !summary.failures.length) return '';
+  return summary.failures.map(function(failure) {
+    return 'שורה ' + failure.item_id + ': ' + (failure.error || 'שגיאה לא ידועה');
+  }).join('\n');
+}
+
 window.openShoppingPurchaseDetailsModal = function(purchaseId, currentListId) {
   apiCall('GET', '/api/shopping-purchases/' + purchaseId).then(function(data) {
     var p = data.purchase || {};
@@ -5065,10 +5082,12 @@ window.openShoppingPurchaseDetailsModal = function(purchaseId, currentListId) {
             '<div style="display:grid;grid-template-columns:1.4fr .7fr .7fr;gap:8px;margin-bottom:6px;font-size:12px;color:var(--text3);font-weight:700"><div>מוצר</div><div>כמות</div><div>מחיר</div></div>' +
             (itemsHtml || '<div class="dash-empty">אין פריטים בעסקה</div>') +
           '</div>' +
+          '<div id="purchase-sync-summary" class="info-section" style="display:none"></div>' +
           (p.receipt_image ? '<div class="info-section"><div class="info-section-title">חשבונית</div><img src="' + p.receipt_image + '" style="max-width:100%;border-radius:12px;border:1px solid var(--border)"></div>' : '') +
         '</div>' +
         '<div class="modal-footer">' +
           '<button class="btn btn-danger" id="purchase-delete">מחק עסקה</button>' +
+          '<button class="btn btn-secondary" id="purchase-sync-products">סנכרן להיסטוריית מוצרים</button>' +
           '<button class="btn btn-secondary" id="purchase-details-cancel">ביטול</button>' +
           '<button class="btn btn-primary" id="purchase-details-save">שמור</button>' +
         '</div>' +
@@ -5078,9 +5097,36 @@ window.openShoppingPurchaseDetailsModal = function(purchaseId, currentListId) {
     document.getElementById('purchase-store-id').value = p.list_id;
 
     function close() { overlay.remove(); }
+    function setSyncSummary(summary) {
+      var box = document.getElementById('purchase-sync-summary');
+      if (!box) return;
+      var failureText = getShoppingProductSyncFailureText(summary);
+      box.style.display = 'block';
+      box.innerHTML = '<div class="info-section-title">סיכום סנכרון</div><div>' + getShoppingProductSyncSummaryText(summary) + '</div>' + (failureText ? '<pre style="margin-top:8px;white-space:pre-wrap;font-family:inherit;background:#fafbfc;padding:10px;border-radius:8px">' + failureText + '</pre>' : '');
+    }
 
     document.getElementById('purchase-details-close').onclick = close;
     document.getElementById('purchase-details-cancel').onclick = close;
+
+    document.getElementById('purchase-sync-products').onclick = function() {
+      var btn = this;
+      btn.disabled = true;
+      btn.textContent = 'מסנכרן...';
+      apiCall('POST', '/api/shopping-purchases/' + purchaseId + '/sync-products').then(function(summary) {
+        setSyncSummary(summary);
+        var summaryText = getShoppingProductSyncSummaryText(summary);
+        if (summary.failed_count > 0) {
+          toast(summaryText, 'error');
+        } else {
+          toast(summaryText, 'success');
+        }
+      }).catch(function(e) {
+        toast(e.message, 'error');
+      }).finally(function() {
+        btn.disabled = false;
+        btn.textContent = 'סנכרן להיסטוריית מוצרים';
+      });
+    };
 
     document.getElementById('purchase-details-save').onclick = function() {
       var updatedItems = items.map(function(it, idx) {
