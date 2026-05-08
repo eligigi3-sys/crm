@@ -3105,10 +3105,26 @@ function getProductReportSourceLabel(purchase, shoppingListsMap) {
   return '—';
 }
 
-function renderProductReportsTable(title, emptyText, rowsHtml, columnsHtml) {
+function formatProductReportPercent(value) {
+  return Number(value || 0).toFixed(1) + '%';
+}
+
+function getProductReportTrendBadge(kind, text) {
+  var styles = {
+    up: 'background:#fee2e2;color:#b91c1c',
+    down: 'background:#dcfce7;color:#166534',
+    shopping: 'background:#dbeafe;color:#1d4ed8',
+    inactive: 'background:#f3f4f6;color:#4b5563'
+  };
+  return '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700;' + (styles[kind] || styles.shopping) + '">' + text + '</span>';
+}
+
+function renderProductReportsTable(title, emptyText, rowsHtml, columnsHtml, subtitle) {
   return '<div class="table-card" style="margin-bottom:16px">' +
-    '<div class="table-toolbar"><strong>' + title + '</strong></div>' +
-    (rowsHtml ? '<div style="padding:16px"><table><thead><tr>' + columnsHtml + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>' : '<div class="dash-empty" style="padding:16px">' + emptyText + '</div>') +
+    '<div class="table-toolbar" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">' +
+      '<div><strong>' + title + '</strong>' + (subtitle ? '<div style="font-size:12px;color:var(--text3);margin-top:4px">' + subtitle + '</div>' : '') + '</div>' +
+    '</div>' +
+    (rowsHtml ? '<div style="padding:16px;overflow:auto"><table><thead><tr>' + columnsHtml + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>' : '<div class="dash-empty" style="padding:16px">' + emptyText + '</div>') +
   '</div>';
 }
 
@@ -3137,15 +3153,6 @@ function loadProductPurchaseReports() {
       });
     })).then(function(productEntries) {
       var allPurchases = [];
-      productEntries.forEach(function(entry) {
-        entry.purchases.forEach(function(purchase) {
-          allPurchases.push({
-            product: entry.product,
-            purchase: purchase
-          });
-        });
-      });
-
       var currentMonth = getTodayYMD().slice(0, 7);
       var last30Start = getProductReportLast30Start();
       var totalThisMonth = 0;
@@ -3153,28 +3160,41 @@ function loadProductPurchaseReports() {
       var topProductsMap = {};
       var sourceMap = {};
       var priceIncreases = [];
+      var recentShoppingLinked = [];
 
-      allPurchases.forEach(function(entry) {
-        var purchase = entry.purchase;
-        var product = entry.product;
-        var date = String(purchase.purchase_date || '').slice(0, 10);
-        var total = Number(purchase.total_price || 0);
+      productEntries.forEach(function(entry) {
+        entry.purchases.forEach(function(purchase) {
+          var normalized = {
+            product: entry.product,
+            purchase: purchase,
+            date: String(purchase.purchase_date || '').slice(0, 10),
+            total: Number(purchase.total_price || 0),
+            unitPrice: Number(purchase.unit_price || 0),
+            sourceLabel: getProductReportSourceLabel(purchase, shoppingListsMap),
+            isShopping: purchase.purchase_type === 'shopping' || !!purchase.shopping_purchase_id || !!purchase.shopping_list_id || !!purchase.shopping_purchase_item_id,
+            isInactive: Number(entry.product.is_active) === 0
+          };
+          allPurchases.push(normalized);
 
-        if (date.slice(0, 7) === currentMonth) totalThisMonth += total;
-        if (date && date >= last30Start) totalLast30 += total;
+          if (normalized.date.slice(0, 7) === currentMonth) totalThisMonth += normalized.total;
+          if (normalized.date && normalized.date >= last30Start) totalLast30 += normalized.total;
 
-        if (!topProductsMap[product.id]) {
-          topProductsMap[product.id] = { product: product, spend: 0, count: 0 };
-        }
-        topProductsMap[product.id].spend += total;
-        topProductsMap[product.id].count += 1;
+          if (!topProductsMap[entry.product.id]) {
+            topProductsMap[entry.product.id] = { product: entry.product, spend: 0, count: 0, shoppingCount: 0 };
+          }
+          topProductsMap[entry.product.id].spend += normalized.total;
+          topProductsMap[entry.product.id].count += 1;
+          if (normalized.isShopping) topProductsMap[entry.product.id].shoppingCount += 1;
 
-        var sourceLabel = getProductReportSourceLabel(purchase, shoppingListsMap);
-        if (sourceLabel && sourceLabel !== '—') {
-          if (!sourceMap[sourceLabel]) sourceMap[sourceLabel] = { name: sourceLabel, count: 0, total: 0 };
-          sourceMap[sourceLabel].count += 1;
-          sourceMap[sourceLabel].total += total;
-        }
+          if (normalized.sourceLabel && normalized.sourceLabel !== '—') {
+            if (!sourceMap[normalized.sourceLabel]) sourceMap[normalized.sourceLabel] = { name: normalized.sourceLabel, count: 0, total: 0, shoppingCount: 0 };
+            sourceMap[normalized.sourceLabel].count += 1;
+            sourceMap[normalized.sourceLabel].total += normalized.total;
+            if (normalized.isShopping) sourceMap[normalized.sourceLabel].shoppingCount += 1;
+          }
+
+          if (normalized.isShopping) recentShoppingLinked.push(normalized);
+        });
       });
 
       productEntries.forEach(function(entry) {
@@ -3191,7 +3211,9 @@ function loadProductPurchaseReports() {
             product: entry.product,
             latest: latest,
             previous: previous,
-            delta: latestPrice - previousPrice
+            delta: latestPrice - previousPrice,
+            percent: previousPrice > 0 ? ((latestPrice - previousPrice) / previousPrice) * 100 : null,
+            isInactive: Number(entry.product.is_active) === 0
           });
         }
       });
@@ -3199,11 +3221,14 @@ function loadProductPurchaseReports() {
       var recentRows = allPurchases.slice().sort(function(a, b) {
         return String(b.purchase.purchase_date || '').localeCompare(String(a.purchase.purchase_date || '')) || Number(b.purchase.id || 0) - Number(a.purchase.id || 0);
       }).slice(0, 12).map(function(entry) {
+        var badges = [];
+        if (entry.isShopping) badges.push(getProductReportTrendBadge('shopping', 'Shopping'));
+        if (entry.isInactive) badges.push(getProductReportTrendBadge('inactive', 'מוצר מושבת'));
         return '<tr>' +
           '<td>' + formatProductReportDate(entry.purchase.purchase_date) + '</td>' +
-          '<td>' + (entry.product.name || 'מוצר') + '</td>' +
+          '<td><div style="display:flex;flex-direction:column;gap:4px"><div>' + (entry.product.name || 'מוצר') + '</div>' + (badges.length ? '<div style="display:flex;gap:6px;flex-wrap:wrap">' + badges.join('') + '</div>' : '') + '</div></td>' +
           '<td>' + formatProductMoney(entry.purchase.total_price) + '</td>' +
-          '<td>' + getProductReportSourceLabel(entry.purchase, shoppingListsMap) + '</td>' +
+          '<td>' + entry.sourceLabel + '</td>' +
           '<td>' + (entry.purchase.notes || '—') + '</td>' +
         '</tr>';
       }).join('');
@@ -3211,28 +3236,48 @@ function loadProductPurchaseReports() {
       var topRows = Object.keys(topProductsMap).map(function(key) { return topProductsMap[key]; }).sort(function(a, b) {
         return b.spend - a.spend;
       }).slice(0, 10).map(function(entry) {
+        var badges = [];
+        if (Number(entry.product.is_active) === 0) badges.push(getProductReportTrendBadge('inactive', 'מוצר מושבת'));
+        if (entry.shoppingCount > 0) badges.push(getProductReportTrendBadge('shopping', entry.shoppingCount + ' משופינג'));
         return '<tr>' +
-          '<td>' + (entry.product.name || 'מוצר') + '</td>' +
+          '<td><div style="display:flex;flex-direction:column;gap:4px"><div>' + (entry.product.name || 'מוצר') + '</div>' + (badges.length ? '<div style="display:flex;gap:6px;flex-wrap:wrap">' + badges.join('') + '</div>' : '') + '</div></td>' +
           '<td>' + entry.count + '</td>' +
           '<td>' + formatProductMoney(entry.spend) + '</td>' +
         '</tr>';
       }).join('');
 
       var increaseRows = priceIncreases.sort(function(a, b) { return b.delta - a.delta; }).slice(0, 10).map(function(entry) {
+        var extra = entry.percent === null ? 'ללא בסיס להשוואה' : 'עלייה של ' + formatProductReportPercent(entry.percent);
+        var badges = [getProductReportTrendBadge('up', 'מחיר גבוה יותר')];
+        if (entry.isInactive) badges.push(getProductReportTrendBadge('inactive', 'מוצר מושבת'));
         return '<tr>' +
-          '<td>' + (entry.product.name || 'מוצר') + '</td>' +
+          '<td><div style="display:flex;flex-direction:column;gap:4px"><div>' + (entry.product.name || 'מוצר') + '</div><div style="display:flex;gap:6px;flex-wrap:wrap">' + badges.join('') + '</div></div></td>' +
           '<td>' + formatProductMoney(entry.previous.unit_price) + '</td>' +
           '<td>' + formatProductMoney(entry.latest.unit_price) + '</td>' +
-          '<td>' + formatProductMoney(entry.delta) + '</td>' +
+          '<td><div>' + formatProductMoney(entry.delta) + '</div><div style="font-size:12px;color:var(--text3)">' + extra + '</div></td>' +
           '<td>' + formatProductReportDate(entry.latest.purchase_date) + '</td>' +
         '</tr>';
       }).join('');
 
-      var sourceRows = Object.keys(sourceMap).map(function(key) { return sourceMap[key]; }).sort(function(a, b) {
-        return b.total - a.total;
-      }).slice(0, 20).map(function(entry) {
+      var recentShoppingRows = recentShoppingLinked.slice().sort(function(a, b) {
+        return String(b.purchase.purchase_date || '').localeCompare(String(a.purchase.purchase_date || '')) || Number(b.purchase.id || 0) - Number(a.purchase.id || 0);
+      }).slice(0, 10).map(function(entry) {
+        var badges = [getProductReportTrendBadge('shopping', 'משופינג')];
+        if (entry.isInactive) badges.push(getProductReportTrendBadge('inactive', 'מוצר מושבת'));
         return '<tr>' +
-          '<td>' + entry.name + '</td>' +
+          '<td>' + formatProductReportDate(entry.purchase.purchase_date) + '</td>' +
+          '<td><div style="display:flex;flex-direction:column;gap:4px"><div>' + (entry.product.name || 'מוצר') + '</div><div style="display:flex;gap:6px;flex-wrap:wrap">' + badges.join('') + '</div></div></td>' +
+          '<td>' + formatProductMoney(entry.purchase.total_price) + '</td>' +
+          '<td>' + entry.sourceLabel + '</td>' +
+        '</tr>';
+      }).join('');
+
+      var sourceRows = Object.keys(sourceMap).map(function(key) { return sourceMap[key]; }).sort(function(a, b) {
+        return b.count - a.count || b.total - a.total;
+      }).slice(0, 20).map(function(entry) {
+        var shoppingBadge = entry.shoppingCount > 0 ? getProductReportTrendBadge('shopping', entry.shoppingCount + ' משופינג') : '';
+        return '<tr>' +
+          '<td><div style="display:flex;flex-direction:column;gap:4px"><div>' + entry.name + '</div>' + (shoppingBadge ? '<div>' + shoppingBadge + '</div>' : '') + '</div></td>' +
           '<td>' + entry.count + '</td>' +
           '<td>' + formatProductMoney(entry.total) + '</td>' +
         '</tr>';
@@ -3240,7 +3285,7 @@ function loadProductPurchaseReports() {
 
       content.innerHTML = '' +
         '<div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">' +
-          '<div class="page-title" style="font-size:22px">דוחות רכישות</div>' +
+          '<div><div class="page-title" style="font-size:22px">דוחות רכישות</div><div style="font-size:12px;color:var(--text3);margin-top:4px">מבט מהיר על התייקרויות, רכישות משופינג, ספקים והוצאות חריגות.</div></div>' +
           '<button class="btn btn-secondary" id="btn-back-to-products-list">חזרה למוצרים</button>' +
         '</div>' +
         '<div class="stats-grid" style="margin-bottom:16px">' +
@@ -3249,10 +3294,11 @@ function loadProductPurchaseReports() {
           '<div class="stat-card"><div class="stat-label">מספר רכישות</div><div class="stat-value">' + allPurchases.length + '</div></div>' +
           '<div class="stat-card"><div class="stat-label">מקורות/ספקים</div><div class="stat-value">' + Object.keys(sourceMap).length + '</div></div>' +
         '</div>' +
-        renderProductReportsTable('רכישות אחרונות', 'אין רכישות להצגה', recentRows, '<th>תאריך</th><th>מוצר</th><th>סה"כ</th><th>ספק / חנות</th><th>הערות</th>') +
-        renderProductReportsTable('מוצרים עם ההוצאה הגבוהה ביותר', 'אין נתונים להצגה', topRows, '<th>מוצר</th><th>מספר רכישות</th><th>סה"כ הוצאה</th>') +
-        renderProductReportsTable('מוצרים שהתייקרו', 'אין כרגע מוצרים עם עלייה במחיר', increaseRows, '<th>מוצר</th><th>מחיר קודם</th><th>מחיר אחרון</th><th>פער</th><th>תאריך אחרון</th>') +
-        renderProductReportsTable('ספקים / חנויות שמופיעים בהיסטוריה', 'אין מקורות רכישה להצגה', sourceRows, '<th>ספק / חנות</th><th>מספר רכישות</th><th>סה"כ הוצאה</th>');
+        renderProductReportsTable('רכישות אחרונות', 'אין רכישות להצגה עדיין. ברגע שתתווסף היסטוריית רכישות, היא תופיע כאן.', recentRows, '<th>תאריך</th><th>מוצר</th><th>סה"כ</th><th>ספק / חנות</th><th>הערות</th>', 'כולל איתור מהיר של רכישות משופינג ומוצרים מושבתים.') +
+        renderProductReportsTable('מוצרים עם ההוצאה הגבוהה ביותר', 'אין עדיין מוצרים עם היסטוריית רכישות.', topRows, '<th>מוצר</th><th>מספר רכישות</th><th>סה"כ הוצאה</th>', 'עוזר לזהות איפה רוב תקציב הרכש מצטבר.') +
+        renderProductReportsTable('מוצרים שהתייקרו', 'אין כרגע מוצרים עם עלייה בין הרכישה האחרונה לזו שלפניה.', increaseRows, '<th>מוצר</th><th>מחיר קודם</th><th>מחיר אחרון</th><th>פער</th><th>תאריך אחרון</th>', 'השוואה בין שתי הרכישות האחרונות לכל מוצר, כולל אחוז שינוי כשאפשר.') +
+        renderProductReportsTable('רכישות אחרונות שהגיעו משופינג', 'עדיין אין רכישות שמקורן בסנכרון משופינג.', recentShoppingRows, '<th>תאריך</th><th>מוצר</th><th>סה"כ</th><th>מקור</th>', 'מראה רק רכישות שנוצרו מסנכרון Shopping → Products.') +
+        renderProductReportsTable('ספקים / חנויות שמופיעים בהיסטוריה', 'אין עדיין ספקים או חנויות להצגה.', sourceRows, '<th>ספק / חנות</th><th>מספר רכישות</th><th>סה"כ הוצאה</th>', 'ממויין קודם לפי תדירות, ואז לפי סך הוצאה כדי להבליט מקורות מרכזיים.');
 
       var backBtn = document.getElementById('btn-back-to-products-list');
       if (backBtn) {
