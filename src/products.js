@@ -96,7 +96,17 @@ async function getShoppingPurchaseById(purchaseId, env) {
 }
 
 async function getProductPurchaseById(purchaseId, env) {
-  const purchase = await env.DB.prepare('SELECT * FROM product_purchases WHERE id = ?').bind(purchaseId).first();
+  const purchase = await env.DB.prepare(
+    `SELECT pp.*, 
+        EXISTS(
+          SELECT 1
+          FROM product_stock_movements psm
+          WHERE psm.movement_type = 'purchase_intake'
+            AND psm.product_purchase_id = pp.id
+        ) AS stock_received
+     FROM product_purchases pp
+     WHERE pp.id = ?`
+  ).bind(purchaseId).first();
   if (!purchase) throw new Error('רשומת רכישה לא נמצאה');
   return purchase;
 }
@@ -116,6 +126,29 @@ async function getStockMovementById(movementId, env) {
   return movement;
 }
 
+async function getPurchaseIntakeMovementByPurchaseId(purchaseId, env) {
+  return await env.DB.prepare(
+    `SELECT *
+     FROM product_stock_movements
+     WHERE movement_type = 'purchase_intake'
+       AND product_purchase_id = ?
+     ORDER BY id DESC
+     LIMIT 1`
+  ).bind(purchaseId).first();
+}
+
+function buildPurchaseIntakeNote(purchase) {
+  var parts = [];
+  if (purchase.purchase_date) parts.push('תאריך: ' + purchase.purchase_date);
+  if (purchase.supplier_name) parts.push('ספק: ' + purchase.supplier_name);
+  return parts.join(' | ') || null;
+}
+
+function isUniqueConstraintError(err) {
+  var text = String((err && err.message) || err || '');
+  return text.indexOf('UNIQUE constraint failed') !== -1;
+}
+
 export async function handleProducts(request, env, path) {
   const method = request.method;
   const url = new URL(request.url);
@@ -125,6 +158,7 @@ export async function handleProducts(request, env, path) {
   const productStockAdjustmentsMatch = path.match(/^\/api\/products\/(\d+)\/stock-adjustments$/);
   const productPurchasesMatch = path.match(/^\/api\/products\/(\d+)\/purchases$/);
   const productPurchaseMatch = path.match(/^\/api\/product-purchases\/(\d+)$/);
+  const productPurchaseReceiveStockMatch = path.match(/^\/api\/product-purchases\/(\d+)\/receive-stock$/);
 
   if (path === '/api/products' && method === 'GET') {
     const search = (url.searchParams.get('search') || '').trim();
@@ -318,10 +352,16 @@ export async function handleProducts(request, env, path) {
     offset = Math.floor(offset);
 
     const purchasesResult = await env.DB.prepare(
-      `SELECT *
-       FROM product_purchases
-       WHERE product_id = ?
-       ORDER BY purchase_date DESC, id DESC
+      `SELECT pp.*, 
+          EXISTS(
+            SELECT 1
+            FROM product_stock_movements psm
+            WHERE psm.movement_type = 'purchase_intake'
+              AND psm.product_purchase_id = pp.id
+          ) AS stock_received
+       FROM product_purchases pp
+       WHERE pp.product_id = ?
+       ORDER BY pp.purchase_date DESC, pp.id DESC
        LIMIT ? OFFSET ?`
     ).bind(productId, limit, offset).all();
 
@@ -347,6 +387,84 @@ export async function handleProducts(request, env, path) {
     const purchaseId = Number(productPurchaseMatch[1]);
     const purchase = await getProductPurchaseById(purchaseId, env);
     return { purchase };
+  }
+
+  if (productPurchaseReceiveStockMatch && method === 'POST') {
+    const purchaseId = Number(productPurchaseReceiveStockMatch[1]);
+    const purchase = await getProductPurchaseById(purchaseId, env);
+    const product = await getProductById(purchase.product_id, env);
+
+    const existingMovement = await getPurchaseIntakeMovementByPurchaseId(purchaseId, env);
+    if (existingMovement) {
+      const currentStock = await getCurrentStockForProduct(purchase.product_id, env);
+      const minStockAlert = product.min_stock_alert;
+      const isLowStock = minStockAlert !== null && minStockAlert !== undefined && minStockAlert !== ''
+        ? currentStock <= Number(minStockAlert)
+        : false;
+      return {
+        success: true,
+        already_received: true,
+        movement: existingMovement,
+        current_stock: currentStock,
+        is_low_stock: isLowStock
+      };
+    }
+
+    let movement;
+    try {
+      const result = await env.DB.prepare(
+        `INSERT INTO product_stock_movements (
+          product_id,
+          movement_type,
+          quantity_change,
+          reference_type,
+          reference_id,
+          product_purchase_id,
+          reason,
+          note,
+          created_at,
+          updated_at
+        ) VALUES (?, 'purchase_intake', ?, 'product_purchase', ?, ?, 'קליטת מלאי מרכישה', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+      ).bind(
+        purchase.product_id,
+        purchase.quantity,
+        purchase.id,
+        purchase.id,
+        buildPurchaseIntakeNote(purchase)
+      ).run();
+
+      movement = await getStockMovementById(result.meta.last_row_id, env);
+    } catch (err) {
+      if (!isUniqueConstraintError(err)) throw err;
+      const racedMovement = await getPurchaseIntakeMovementByPurchaseId(purchaseId, env);
+      if (!racedMovement) throw err;
+      const currentStock = await getCurrentStockForProduct(purchase.product_id, env);
+      const minStockAlert = product.min_stock_alert;
+      const isLowStock = minStockAlert !== null && minStockAlert !== undefined && minStockAlert !== ''
+        ? currentStock <= Number(minStockAlert)
+        : false;
+      return {
+        success: true,
+        already_received: true,
+        movement: racedMovement,
+        current_stock: currentStock,
+        is_low_stock: isLowStock
+      };
+    }
+
+    const currentStock = await getCurrentStockForProduct(purchase.product_id, env);
+    const minStockAlert = product.min_stock_alert;
+    const isLowStock = minStockAlert !== null && minStockAlert !== undefined && minStockAlert !== ''
+      ? currentStock <= Number(minStockAlert)
+      : false;
+
+    return {
+      success: true,
+      already_received: false,
+      movement,
+      current_stock: currentStock,
+      is_low_stock: isLowStock
+    };
   }
 
   if (idMatch && method === 'GET') {

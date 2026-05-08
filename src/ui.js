@@ -1271,7 +1271,7 @@ id="customers-search">
 <script>
 var token = localStorage.getItem('crm_token');
 var currentUser = JSON.parse(localStorage.getItem('crm_user') || 'null');
-var searchTimer, currentLeadId, dupLeadId, selectedContactId = null, currentEmployeeId = null, currentProductId = null, currentProductPurchases = [], currentProductPurchaseEditId = null, currentProductPurchaseFormMode = null, currentProductPurchaseSaving = false, currentProductStock = null, currentProductStockMovements = [], currentProductAdjustmentMode = null, currentProductAdjustmentSaving = false;
+var searchTimer, currentLeadId, dupLeadId, selectedContactId = null, currentEmployeeId = null, currentProductId = null, currentProductPurchases = [], currentProductPurchaseEditId = null, currentProductPurchaseFormMode = null, currentProductPurchaseSaving = false, currentProductStock = null, currentProductStockMovements = [], currentProductAdjustmentMode = null, currentProductAdjustmentSaving = false, currentProductReceiveStockPurchaseId = null;
 var currentLowStockProducts = [];
 var allLeadsCache = [];
 var calYear, calMonth;
@@ -2778,7 +2778,7 @@ function renderProductPurchasesUI(productId) {
   listEl.innerHTML = renderProductPurchasesSection(productId, currentProductPurchases);
 
   if (addBtn) {
-    addBtn.disabled = currentProductPurchaseSaving;
+    addBtn.disabled = currentProductPurchaseSaving || currentProductReceiveStockPurchaseId !== null;
     addBtn.onclick = function() {
       startProductPurchaseCreate(productId);
     };
@@ -2810,6 +2810,12 @@ function renderProductPurchasesUI(productId) {
       startProductPurchaseEdit(productId, parseInt(this.getAttribute('data-id')));
     });
   });
+
+  listEl.querySelectorAll('.product-purchase-receive-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      receiveProductPurchaseStock(productId, parseInt(this.getAttribute('data-id')));
+    });
+  });
 }
 
 function loadProductPurchases(productId) {
@@ -2830,6 +2836,7 @@ function loadProductPurchases(productId) {
     currentProductPurchaseFormMode = null;
     currentProductPurchaseEditId = null;
     currentProductPurchaseSaving = false;
+    currentProductReceiveStockPurchaseId = null;
     summaryEl.innerHTML = '<div class="dash-empty">שגיאה בטעינת סיכום רכישות</div>';
     formEl.innerHTML = '';
     listEl.innerHTML = '<div class="product-purchases-empty">לא ניתן לטעון את היסטוריית הרכישות</div>';
@@ -3079,6 +3086,8 @@ function renderProductPurchasesSection(productId, purchases) {
   return '<div class="product-purchases-list">' + purchases.map(function(purchase, index) {
     var change = getProductPurchaseChangeText(purchases, index);
     var purchaseTypeMap = { manual: 'ידני', shopping: 'Shopping', import: 'ייבוא' };
+    var isReceived = Number(purchase.stock_received) === 1;
+    var isReceiving = Number(currentProductReceiveStockPurchaseId) === Number(purchase.id);
     return '<div class="product-purchase-row">' +
       '<div class="product-purchase-row-main">' +
         '<div class="product-purchase-row-top">' +
@@ -3086,6 +3095,7 @@ function renderProductPurchasesSection(productId, purchases) {
           '<span class="product-purchase-type">' + (purchaseTypeMap[purchase.purchase_type] || purchase.purchase_type || '—') + '</span>' +
           (purchase.supplier_name ? '<span class="product-purchase-supplier">' + purchase.supplier_name + '</span>' : '') +
           '<span class="product-purchase-change ' + change.className + '">' + change.text + '</span>' +
+          (isReceived ? '<span class="badge badge-green">כבר נקלט למלאי</span>' : '') +
         '</div>' +
         '<div class="product-purchase-row-stats">' +
           '<span>כמות: ' + (purchase.quantity !== null && purchase.quantity !== undefined && purchase.quantity !== '' ? purchase.quantity : '—') + '</span>' +
@@ -3095,10 +3105,40 @@ function renderProductPurchasesSection(productId, purchases) {
         (purchase.notes ? '<div class="product-purchase-row-notes">' + purchase.notes + '</div>' : '') +
       '</div>' +
       '<div class="product-purchase-row-actions">' +
-        '<button class="btn btn-secondary btn-sm product-purchase-edit-btn" type="button" data-id="' + purchase.id + '">עריכה</button>' +
+        (!isReceived ? '<button class="btn btn-primary btn-sm product-purchase-receive-btn" type="button" data-id="' + purchase.id + '"' + (isReceiving ? ' disabled' : '') + '>' + (isReceiving ? 'קולט...' : 'הכנס למלאי') + '</button>' : '') +
+        '<button class="btn btn-secondary btn-sm product-purchase-edit-btn" type="button" data-id="' + purchase.id + '"' + (isReceiving ? ' disabled' : '') + '>עריכה</button>' +
       '</div>' +
     '</div>';
   }).join('') + '</div>';
+}
+
+function receiveProductPurchaseStock(productId, purchaseId) {
+  if (currentProductReceiveStockPurchaseId !== null) return;
+  currentProductReceiveStockPurchaseId = Number(purchaseId);
+  renderProductPurchasesUI(productId);
+
+  apiCall('POST', '/api/product-purchases/' + purchaseId + '/receive-stock').then(function(data) {
+    currentProductReceiveStockPurchaseId = null;
+    return Promise.all([
+      loadProductInventory(productId),
+      new Promise(function(resolve) {
+        apiCall('GET', '/api/products/' + productId + '/purchases').then(function(resp) {
+          currentProductPurchases = (resp && resp.purchases) || [];
+          renderProductPurchasesUI(productId);
+          resolve();
+        }).catch(function(err) {
+          resolve(err);
+        });
+      })
+    ]).then(function() {
+      loadProducts();
+      toast(data && data.already_received ? 'הרכישה כבר נקלטה למלאי' : 'המלאי נקלט מהרכישה', 'success');
+    });
+  }).catch(function(e) {
+    currentProductReceiveStockPurchaseId = null;
+    renderProductPurchasesUI(productId);
+    toast(e.message, 'error');
+  });
 }
 
 var currentProductsView = 'list';
