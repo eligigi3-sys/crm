@@ -5260,7 +5260,7 @@ function getShoppingProductSyncFailureText(summary) {
   if (!summary || !Array.isArray(summary.failures) || !summary.failures.length) return '';
   return summary.failures.map(function(failure) {
     return 'שורה ' + failure.item_id + ': ' + (failure.error || 'שגיאה לא ידועה');
-  }).join('\n');
+  }).join('\\n');
 }
 
 window.openShoppingPurchaseDetailsModal = function(purchaseId, currentListId) {
