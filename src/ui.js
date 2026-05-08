@@ -242,10 +242,15 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .product-low-stock-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#fff;border:1px solid #fdba74;font-size:12px;color:#9a3412;font-weight:700}
 .product-low-stock-chip-muted{color:var(--text3);border-color:var(--border);background:#fafbfc}
 .product-inventory-section{margin-top:18px;padding-top:18px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:14px}
+.product-inventory-actions{display:flex;gap:8px;flex-wrap:wrap}
 .product-inventory-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
 .product-inventory-card{background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px}
 .product-inventory-label{font-size:12px;color:var(--text3)}
 .product-inventory-value{font-size:16px;font-weight:800;color:var(--text)}
+.product-adjustment-form{border:1px solid var(--border);border-radius:12px;background:#f8fafc;padding:14px;display:flex;flex-direction:column;gap:12px}
+.product-adjustment-title{font-size:14px;font-weight:800;color:var(--text)}
+.product-adjustment-helper{font-size:12px;color:var(--text3);line-height:1.5}
+.product-adjustment-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 .product-inventory-list{display:flex;flex-direction:column;gap:10px}
 .product-inventory-row{background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
 .product-inventory-row-main{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0}
@@ -1266,7 +1271,7 @@ id="customers-search">
 <script>
 var token = localStorage.getItem('crm_token');
 var currentUser = JSON.parse(localStorage.getItem('crm_user') || 'null');
-var searchTimer, currentLeadId, dupLeadId, selectedContactId = null, currentEmployeeId = null, currentProductId = null, currentProductPurchases = [], currentProductPurchaseEditId = null, currentProductPurchaseFormMode = null, currentProductPurchaseSaving = false, currentProductStock = null, currentProductStockMovements = [];
+var searchTimer, currentLeadId, dupLeadId, selectedContactId = null, currentEmployeeId = null, currentProductId = null, currentProductPurchases = [], currentProductPurchaseEditId = null, currentProductPurchaseFormMode = null, currentProductPurchaseSaving = false, currentProductStock = null, currentProductStockMovements = [], currentProductAdjustmentMode = null, currentProductAdjustmentSaving = false;
 var currentLowStockProducts = [];
 var allLeadsCache = [];
 var calYear, calMonth;
@@ -3136,6 +3141,43 @@ function renderProductLowStockSummary(products) {
   '</div>';
 }
 
+function renderProductAdjustmentForm() {
+  if (!currentProductAdjustmentMode) return '';
+  var isDecrease = currentProductAdjustmentMode === 'decrease';
+  return '<div class="product-adjustment-form" id="product-adjustment-form">' +
+    '<div class="product-adjustment-title">' + (isDecrease ? 'הפחתת מלאי' : 'הוספת מלאי') + '</div>' +
+    '<div class="product-adjustment-helper">' + (isDecrease ? 'הזן כמות חיובית שתופחת מהמלאי. המערכת תשמור תנועה שלילית ב-ledger.' : 'הזן כמות חיובית שתתווסף למלאי. המערכת תשמור תנועה חיובית ב-ledger.') + '</div>' +
+    '<div class="form-row">' +
+      '<div class="form-group"><label class="form-label">כמות *</label><input class="form-input" id="product-adjustment-quantity" type="number" step="0.01" min="0.01" placeholder="0"></div>' +
+      '<div class="form-group"><label class="form-label">סיבה *</label><input class="form-input" id="product-adjustment-reason" placeholder="למשל: ספירת מלאי / תיקון"></div>' +
+    '</div>' +
+    '<div class="form-group"><label class="form-label">הערה</label><textarea class="form-textarea" id="product-adjustment-note" placeholder="הערה פנימית אופציונלית"></textarea></div>' +
+    '<div class="product-adjustment-actions">' +
+      '<button class="btn btn-secondary" type="button" id="btn-cancel-product-adjustment">ביטול</button>' +
+      '<button class="btn btn-primary" type="button" id="btn-save-product-adjustment">' + (currentProductAdjustmentSaving ? 'שומר...' : (isDecrease ? 'שמור הפחתה' : 'שמור הוספה')) + '</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function bindProductAdjustmentForm(productId) {
+  var cancelBtn = document.getElementById('btn-cancel-product-adjustment');
+  if (cancelBtn) {
+    cancelBtn.onclick = function() {
+      currentProductAdjustmentMode = null;
+      currentProductAdjustmentSaving = false;
+      renderProductInventoryUI(productId);
+    };
+  }
+
+  var saveBtn = document.getElementById('btn-save-product-adjustment');
+  if (saveBtn) {
+    saveBtn.disabled = currentProductAdjustmentSaving;
+    saveBtn.onclick = function() {
+      saveProductStockAdjustment(productId);
+    };
+  }
+}
+
 function renderProductInventorySection(stockInfo, movements) {
   if (!stockInfo) {
     return '<div class="product-inventory-section" id="product-inventory-section">' +
@@ -3146,12 +3188,19 @@ function renderProductInventorySection(stockInfo, movements) {
 
   var recentMovements = (movements || []).slice(0, 5);
   return '<div class="product-inventory-section" id="product-inventory-section">' +
-    '<div class="product-purchases-header"><div class="product-purchases-title">תמונת מלאי</div></div>' +
+    '<div class="product-purchases-header">' +
+      '<div class="product-purchases-title">תמונת מלאי</div>' +
+      '<div class="product-inventory-actions">' +
+        '<button class="btn btn-secondary btn-sm" type="button" id="btn-product-stock-increase">הוסף מלאי</button>' +
+        '<button class="btn btn-secondary btn-sm" type="button" id="btn-product-stock-decrease">הפחת מלאי</button>' +
+      '</div>' +
+    '</div>' +
     '<div class="product-inventory-grid">' +
       '<div class="product-inventory-card"><div class="product-inventory-label">מלאי נוכחי</div><div class="product-inventory-value">' + formatProductStockValue(stockInfo.current_stock) + '</div></div>' +
       '<div class="product-inventory-card"><div class="product-inventory-label">מינימום התראה</div><div class="product-inventory-value">' + (stockInfo.min_stock_alert !== null && stockInfo.min_stock_alert !== undefined && stockInfo.min_stock_alert !== '' ? formatProductStockValue(stockInfo.min_stock_alert) : 'לא הוגדר') + '</div></div>' +
       '<div class="product-inventory-card"><div class="product-inventory-label">סטטוס</div><div class="product-inventory-value">' + (stockInfo.is_low_stock ? 'מלאי נמוך' : 'מלאי תקין') + '</div></div>' +
     '</div>' +
+    renderProductAdjustmentForm() +
     '<div>' +
       '<div class="product-purchase-summary-subtext" style="margin-bottom:8px">תנועות המלאי מוצגות מהחדשה לישנה, על בסיס ledger בלבד.</div>' +
       (recentMovements.length ? '<div class="product-inventory-list">' + recentMovements.map(function(movement) {
@@ -3173,6 +3222,89 @@ function renderProductInventorySection(stockInfo, movements) {
       }).join('') + '</div>' : '<div class="dash-empty">אין עדיין תנועות מלאי למוצר הזה.</div>') +
     '</div>' +
   '</div>';
+}
+
+function renderProductInventoryUI(productId) {
+  var inventoryRoot = document.getElementById('product-inventory-root');
+  if (!inventoryRoot) return;
+  inventoryRoot.innerHTML = renderProductInventorySection(currentProductStock, currentProductStockMovements);
+
+  if (!currentProductStock) return;
+
+  var increaseBtn = document.getElementById('btn-product-stock-increase');
+  if (increaseBtn) {
+    increaseBtn.disabled = currentProductAdjustmentSaving;
+    increaseBtn.onclick = function() {
+      currentProductAdjustmentMode = 'increase';
+      currentProductAdjustmentSaving = false;
+      renderProductInventoryUI(productId);
+    };
+  }
+
+  var decreaseBtn = document.getElementById('btn-product-stock-decrease');
+  if (decreaseBtn) {
+    decreaseBtn.disabled = currentProductAdjustmentSaving;
+    decreaseBtn.onclick = function() {
+      currentProductAdjustmentMode = 'decrease';
+      currentProductAdjustmentSaving = false;
+      renderProductInventoryUI(productId);
+    };
+  }
+
+  bindProductAdjustmentForm(productId);
+}
+
+function loadProductInventory(productId) {
+  return Promise.all([
+    apiCall('GET', '/api/products/' + productId + '/stock').catch(function() { return null; }),
+    apiCall('GET', '/api/products/' + productId + '/stock-movements?limit=5&offset=0').catch(function() { return { movements: [] }; })
+  ]).then(function(results) {
+    currentProductStock = results[0];
+    currentProductStockMovements = (results[1] && results[1].movements) || [];
+    renderProductInventoryUI(productId);
+    return currentProductStock;
+  });
+}
+
+function saveProductStockAdjustment(productId) {
+  if (currentProductAdjustmentSaving) return;
+  var quantityInput = document.getElementById('product-adjustment-quantity');
+  var reasonInput = document.getElementById('product-adjustment-reason');
+  var noteInput = document.getElementById('product-adjustment-note');
+  if (!quantityInput || !reasonInput) return;
+
+  var rawQuantity = Number(quantityInput.value);
+  if (!Number.isFinite(rawQuantity) || rawQuantity <= 0) {
+    toast('כמות חובה וצריכה להיות גדולה מ-0', 'error');
+    return;
+  }
+
+  var reason = reasonInput.value.trim();
+  if (!reason) {
+    toast('סיבת התאמה חובה', 'error');
+    return;
+  }
+
+  var signedQuantity = currentProductAdjustmentMode === 'decrease' ? -rawQuantity : rawQuantity;
+  currentProductAdjustmentSaving = true;
+  renderProductInventoryUI(productId);
+
+  apiCall('POST', '/api/products/' + productId + '/stock-adjustments', {
+    quantity_change: signedQuantity,
+    reason: reason,
+    note: noteInput ? noteInput.value.trim() : ''
+  }).then(function() {
+    currentProductAdjustmentMode = null;
+    currentProductAdjustmentSaving = false;
+    return loadProductInventory(productId);
+  }).then(function() {
+    toast('התאמת המלאי נשמרה', 'success');
+    loadProducts();
+  }).catch(function(e) {
+    currentProductAdjustmentSaving = false;
+    renderProductInventoryUI(productId);
+    toast(e.message, 'error');
+  });
 }
 
 function renderProductsListView() {
@@ -3547,6 +3679,8 @@ function openProductModal(id) {
   currentProductId = id || null;
   currentProductStock = null;
   currentProductStockMovements = [];
+  currentProductAdjustmentMode = null;
+  currentProductAdjustmentSaving = false;
   var old = document.getElementById('product-modal');
   if (old) old.remove();
 
@@ -3598,19 +3732,21 @@ function openProductModal(id) {
 
   document.body.appendChild(overlay);
 
-  function close() { overlay.remove(); currentProductId = null; currentProductPurchaseEditId = null; currentProductPurchaseFormMode = null; currentProductPurchaseSaving = false; currentProductStock = null; currentProductStockMovements = []; }
+  function close() { overlay.remove(); currentProductId = null; currentProductPurchaseEditId = null; currentProductPurchaseFormMode = null; currentProductPurchaseSaving = false; currentProductStock = null; currentProductStockMovements = []; currentProductAdjustmentMode = null; currentProductAdjustmentSaving = false; }
   document.getElementById('product-modal-close').onclick = close;
   document.getElementById('product-modal-cancel').onclick = close;
 
   if (id) {
     Promise.all([
       apiCall('GET', '/api/products/' + id),
-      apiCall('GET', '/api/products/' + id + '/stock').catch(function() { return null; }),
-      apiCall('GET', '/api/products/' + id + '/stock-movements?limit=5&offset=0').catch(function() { return { movements: [] }; })
+      loadProductInventory(id).catch(function() {
+        currentProductStock = null;
+        currentProductStockMovements = [];
+        renderProductInventoryUI(id);
+        return null;
+      })
     ]).then(function(results) {
       var product = ((results[0] || {}).product) || {};
-      currentProductStock = results[1];
-      currentProductStockMovements = (results[2] && results[2].movements) || [];
       document.getElementById('product-name').value = product.name || '';
       document.getElementById('product-category').value = product.category || '';
       document.getElementById('product-sku').value = product.sku || '';
@@ -3621,8 +3757,7 @@ function openProductModal(id) {
       document.getElementById('product-min-stock-alert').value = (product.min_stock_alert !== null && product.min_stock_alert !== undefined) ? product.min_stock_alert : '';
       document.getElementById('product-notes').value = product.notes || '';
       document.getElementById('product-is-active').checked = Number(product.is_active) !== 0;
-      var inventoryRoot = document.getElementById('product-inventory-root');
-      if (inventoryRoot) inventoryRoot.innerHTML = renderProductInventorySection(currentProductStock, currentProductStockMovements);
+      renderProductInventoryUI(id);
       loadProductPurchases(id);
     }).catch(function(e) { toast(e.message, 'error'); close(); });
   }

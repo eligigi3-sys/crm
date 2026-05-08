@@ -54,6 +54,13 @@ function normalizeOptionalId(value, fieldLabel) {
   return num;
 }
 
+function normalizeStockAdjustmentQuantity(value) {
+  var num = Number(value);
+  if (!Number.isFinite(num)) throw new Error('כמות שינוי לא תקינה');
+  if (num === 0) throw new Error('כמות שינוי לא יכולה להיות 0');
+  return num;
+}
+
 function calculatePurchaseTotal(quantity, unitPrice) {
   return Math.round(quantity * unitPrice * 100) / 100;
 }
@@ -103,12 +110,19 @@ async function getCurrentStockForProduct(productId, env) {
   return Number(row && row.current_stock !== undefined && row.current_stock !== null ? row.current_stock : 0);
 }
 
+async function getStockMovementById(movementId, env) {
+  const movement = await env.DB.prepare('SELECT * FROM product_stock_movements WHERE id = ?').bind(movementId).first();
+  if (!movement) throw new Error('תנועת מלאי לא נמצאה');
+  return movement;
+}
+
 export async function handleProducts(request, env, path) {
   const method = request.method;
   const url = new URL(request.url);
   const idMatch = path.match(/^\/api\/products\/(\d+)$/);
   const productStockMatch = path.match(/^\/api\/products\/(\d+)\/stock$/);
   const productStockMovementsMatch = path.match(/^\/api\/products\/(\d+)\/stock-movements$/);
+  const productStockAdjustmentsMatch = path.match(/^\/api\/products\/(\d+)\/stock-adjustments$/);
   const productPurchasesMatch = path.match(/^\/api\/products\/(\d+)\/purchases$/);
   const productPurchaseMatch = path.match(/^\/api\/product-purchases\/(\d+)$/);
 
@@ -236,6 +250,58 @@ export async function handleProducts(request, env, path) {
         offset,
         has_more: !!hasMoreRow
       }
+    };
+  }
+
+  if (productStockAdjustmentsMatch && method === 'POST') {
+    const productId = Number(productStockAdjustmentsMatch[1]);
+    await getProductById(productId, env);
+
+    let b;
+    try {
+      b = await request.json();
+    } catch {
+      throw new Error('בקשה לא תקינה');
+    }
+
+    const quantityChange = normalizeStockAdjustmentQuantity(b.quantity_change);
+    const reason = normalizeText(b.reason);
+    const note = normalizeText(b.note);
+
+    if (!reason) throw new Error('סיבת התאמה חובה');
+
+    const result = await env.DB.prepare(
+      `INSERT INTO product_stock_movements (
+        product_id,
+        movement_type,
+        quantity_change,
+        reference_type,
+        reason,
+        note,
+        created_at,
+        updated_at
+      ) VALUES (?, 'adjustment', ?, 'manual', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    ).bind(
+      productId,
+      quantityChange,
+      reason,
+      note
+    ).run();
+
+    const movement = await getStockMovementById(result.meta.last_row_id, env);
+    const currentStock = await getCurrentStockForProduct(productId, env);
+    const product = await getProductById(productId, env);
+    const minStockAlert = product.min_stock_alert;
+    const isLowStock = minStockAlert !== null && minStockAlert !== undefined && minStockAlert !== ''
+      ? currentStock <= Number(minStockAlert)
+      : false;
+
+    return {
+      success: true,
+      movement,
+      current_stock: currentStock,
+      min_stock_alert: minStockAlert,
+      is_low_stock: isLowStock
     };
   }
 
