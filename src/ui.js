@@ -3550,6 +3550,8 @@ function loadProductPurchaseReports() {
       var sourceMap = {};
       var priceIncreases = [];
       var recentShoppingLinked = [];
+      var supplierVariationProducts = [];
+      var supplierPriceIncreases = [];
 
       productEntries.forEach(function(entry) {
         entry.purchases.forEach(function(purchase) {
@@ -3569,11 +3571,14 @@ function loadProductPurchaseReports() {
           if (normalized.date && normalized.date >= last30Start) totalLast30 += normalized.total;
 
           if (!topProductsMap[entry.product.id]) {
-            topProductsMap[entry.product.id] = { product: entry.product, spend: 0, count: 0, shoppingCount: 0 };
+            topProductsMap[entry.product.id] = { product: entry.product, spend: 0, count: 0, shoppingCount: 0, lastPurchaseDate: '' };
           }
           topProductsMap[entry.product.id].spend += normalized.total;
           topProductsMap[entry.product.id].count += 1;
           if (normalized.isShopping) topProductsMap[entry.product.id].shoppingCount += 1;
+          if (normalized.date && normalized.date > topProductsMap[entry.product.id].lastPurchaseDate) {
+            topProductsMap[entry.product.id].lastPurchaseDate = normalized.date;
+          }
 
           if (normalized.sourceLabel && normalized.sourceLabel !== '—') {
             if (!sourceMap[normalized.sourceLabel]) sourceMap[normalized.sourceLabel] = { name: normalized.sourceLabel, count: 0, total: 0, shoppingCount: 0 };
@@ -3590,20 +3595,89 @@ function loadProductPurchaseReports() {
         var sorted = (entry.purchases || []).slice().sort(function(a, b) {
           return String(b.purchase_date || '').localeCompare(String(a.purchase_date || '')) || Number(b.id || 0) - Number(a.id || 0);
         });
-        if (sorted.length < 2) return;
-        var latest = sorted[0];
-        var previous = sorted[1];
-        var latestPrice = Number(latest.unit_price || 0);
-        var previousPrice = Number(previous.unit_price || 0);
-        if (latestPrice > previousPrice) {
-          priceIncreases.push({
-            product: entry.product,
-            latest: latest,
-            previous: previous,
-            delta: latestPrice - previousPrice,
-            percent: previousPrice > 0 ? ((latestPrice - previousPrice) / previousPrice) * 100 : null,
-            isInactive: Number(entry.product.is_active) === 0
+        if (sorted.length >= 2) {
+          var latest = sorted[0];
+          var previous = sorted[1];
+          var latestPrice = Number(latest.unit_price || 0);
+          var previousPrice = Number(previous.unit_price || 0);
+          if (latestPrice > previousPrice) {
+            priceIncreases.push({
+              product: entry.product,
+              latest: latest,
+              previous: previous,
+              delta: latestPrice - previousPrice,
+              percent: previousPrice > 0 ? ((latestPrice - previousPrice) / previousPrice) * 100 : null,
+              isInactive: Number(entry.product.is_active) === 0
+            });
+          }
+        }
+
+        var bySupplier = {};
+        (entry.purchases || []).forEach(function(purchase) {
+          var sourceLabel = getProductReportSourceLabel(purchase, shoppingListsMap);
+          if (!sourceLabel || sourceLabel === '—') return;
+          var unitPrice = Number(purchase.unit_price || 0);
+          if (!Number.isFinite(unitPrice) || unitPrice <= 0) return;
+          if (!bySupplier[sourceLabel]) bySupplier[sourceLabel] = [];
+          bySupplier[sourceLabel].push(purchase);
+        });
+
+        var supplierNames = Object.keys(bySupplier);
+        if (supplierNames.length >= 2) {
+          var supplierStats = supplierNames.map(function(name) {
+            var purchases = bySupplier[name];
+            var prices = purchases.map(function(p) { return Number(p.unit_price || 0); }).filter(function(v) { return Number.isFinite(v) && v > 0; });
+            var latestPurchase = purchases.slice().sort(function(a, b) {
+              return String(b.purchase_date || '').localeCompare(String(a.purchase_date || '')) || Number(b.id || 0) - Number(a.id || 0);
+            })[0];
+            return {
+              name: name,
+              minPrice: Math.min.apply(null, prices),
+              maxPrice: Math.max.apply(null, prices),
+              latestPrice: Number(latestPurchase && latestPurchase.unit_price || 0),
+              latestDate: String(latestPurchase && latestPurchase.purchase_date || ''),
+              count: purchases.length
+            };
+          }).filter(function(stat) {
+            return Number.isFinite(stat.minPrice) && Number.isFinite(stat.maxPrice) && Number.isFinite(stat.latestPrice) && stat.latestPrice > 0;
           });
+
+          if (supplierStats.length >= 2) {
+            var lowestSupplier = supplierStats.slice().sort(function(a, b) {
+              return a.minPrice - b.minPrice || a.name.localeCompare(b.name);
+            })[0];
+            var highestSupplier = supplierStats.slice().sort(function(a, b) {
+              return b.maxPrice - a.maxPrice || a.name.localeCompare(b.name);
+            })[0];
+            if (highestSupplier && lowestSupplier && highestSupplier.maxPrice > lowestSupplier.minPrice) {
+              supplierVariationProducts.push({
+                product: entry.product,
+                lowestSupplier: lowestSupplier,
+                highestSupplier: highestSupplier,
+                delta: highestSupplier.maxPrice - lowestSupplier.minPrice,
+                supplierCount: supplierStats.length,
+                isInactive: Number(entry.product.is_active) === 0
+              });
+            }
+
+            var latestBySupplier = supplierStats.slice().sort(function(a, b) {
+              return b.latestPrice - a.latestPrice || b.latestDate.localeCompare(a.latestDate);
+            });
+            var cheapestCurrentSupplier = supplierStats.slice().sort(function(a, b) {
+              return a.latestPrice - b.latestPrice || b.latestDate.localeCompare(a.latestDate);
+            })[0];
+            var expensiveCurrentSupplier = latestBySupplier[0];
+            if (expensiveCurrentSupplier && cheapestCurrentSupplier && expensiveCurrentSupplier.name !== cheapestCurrentSupplier.name && expensiveCurrentSupplier.latestPrice > cheapestCurrentSupplier.latestPrice) {
+              supplierPriceIncreases.push({
+                product: entry.product,
+                expensiveSupplier: expensiveCurrentSupplier,
+                cheaperSupplier: cheapestCurrentSupplier,
+                delta: expensiveCurrentSupplier.latestPrice - cheapestCurrentSupplier.latestPrice,
+                percent: cheapestCurrentSupplier.latestPrice > 0 ? ((expensiveCurrentSupplier.latestPrice - cheapestCurrentSupplier.latestPrice) / cheapestCurrentSupplier.latestPrice) * 100 : null,
+                isInactive: Number(entry.product.is_active) === 0
+              });
+            }
+          }
         }
       });
 
@@ -3623,7 +3697,7 @@ function loadProductPurchaseReports() {
       }).join('');
 
       var topRows = Object.keys(topProductsMap).map(function(key) { return topProductsMap[key]; }).sort(function(a, b) {
-        return b.spend - a.spend;
+        return b.count - a.count || b.spend - a.spend;
       }).slice(0, 10).map(function(entry) {
         var badges = [];
         if (Number(entry.product.is_active) === 0) badges.push(getProductReportTrendBadge('inactive', 'מוצר מושבת'));
@@ -3632,6 +3706,7 @@ function loadProductPurchaseReports() {
           '<td><div style="display:flex;flex-direction:column;gap:4px"><div>' + (entry.product.name || 'מוצר') + '</div>' + (badges.length ? '<div style="display:flex;gap:6px;flex-wrap:wrap">' + badges.join('') + '</div>' : '') + '</div></td>' +
           '<td>' + entry.count + '</td>' +
           '<td>' + formatProductMoney(entry.spend) + '</td>' +
+          '<td>' + formatProductReportDate(entry.lastPurchaseDate) + '</td>' +
         '</tr>';
       }).join('');
 
@@ -3662,13 +3737,42 @@ function loadProductPurchaseReports() {
       }).join('');
 
       var sourceRows = Object.keys(sourceMap).map(function(key) { return sourceMap[key]; }).sort(function(a, b) {
-        return b.count - a.count || b.total - a.total;
+        return b.total - a.total || b.count - a.count;
       }).slice(0, 20).map(function(entry) {
         var shoppingBadge = entry.shoppingCount > 0 ? getProductReportTrendBadge('shopping', entry.shoppingCount + ' משופינג') : '';
+        var avgPurchase = entry.count > 0 ? entry.total / entry.count : 0;
         return '<tr>' +
           '<td><div style="display:flex;flex-direction:column;gap:4px"><div>' + entry.name + '</div>' + (shoppingBadge ? '<div>' + shoppingBadge + '</div>' : '') + '</div></td>' +
           '<td>' + entry.count + '</td>' +
           '<td>' + formatProductMoney(entry.total) + '</td>' +
+          '<td>' + formatProductMoney(avgPurchase) + '</td>' +
+        '</tr>';
+      }).join('');
+
+      var supplierVariationRows = supplierVariationProducts.sort(function(a, b) {
+        return b.delta - a.delta;
+      }).slice(0, 10).map(function(entry) {
+        var badges = [];
+        if (entry.isInactive) badges.push(getProductReportTrendBadge('inactive', 'מוצר מושבת'));
+        badges.push(getProductReportTrendBadge('shopping', entry.supplierCount + ' ספקים'));
+        return '<tr>' +
+          '<td><div style="display:flex;flex-direction:column;gap:4px"><div>' + (entry.product.name || 'מוצר') + '</div><div style="display:flex;gap:6px;flex-wrap:wrap">' + badges.join('') + '</div></div></td>' +
+          '<td><div>' + entry.lowestSupplier.name + '</div><div style="font-size:12px;color:var(--text3)">' + formatProductMoney(entry.lowestSupplier.minPrice) + '</div></td>' +
+          '<td><div>' + entry.highestSupplier.name + '</div><div style="font-size:12px;color:var(--text3)">' + formatProductMoney(entry.highestSupplier.maxPrice) + '</div></td>' +
+          '<td>' + formatProductMoney(entry.delta) + '</td>' +
+        '</tr>';
+      }).join('');
+
+      var supplierIncreaseRows = supplierPriceIncreases.sort(function(a, b) {
+        return b.delta - a.delta;
+      }).slice(0, 10).map(function(entry) {
+        var badges = [getProductReportTrendBadge('up', 'ספק יקר יותר')];
+        if (entry.isInactive) badges.push(getProductReportTrendBadge('inactive', 'מוצר מושבת'));
+        return '<tr>' +
+          '<td><div style="display:flex;flex-direction:column;gap:4px"><div>' + (entry.product.name || 'מוצר') + '</div><div style="display:flex;gap:6px;flex-wrap:wrap">' + badges.join('') + '</div></div></td>' +
+          '<td><div>' + entry.cheaperSupplier.name + '</div><div style="font-size:12px;color:var(--text3)">' + formatProductMoney(entry.cheaperSupplier.latestPrice) + '</div></td>' +
+          '<td><div>' + entry.expensiveSupplier.name + '</div><div style="font-size:12px;color:var(--text3)">' + formatProductMoney(entry.expensiveSupplier.latestPrice) + '</div></td>' +
+          '<td><div>' + formatProductMoney(entry.delta) + '</div><div style="font-size:12px;color:var(--text3)">' + (entry.percent === null ? '—' : formatProductReportPercent(entry.percent)) + '</div></td>' +
         '</tr>';
       }).join('');
 
@@ -3684,10 +3788,12 @@ function loadProductPurchaseReports() {
           '<div class="stat-card"><div class="stat-label">מקורות/ספקים</div><div class="stat-value">' + Object.keys(sourceMap).length + '</div></div>' +
         '</div>' +
         renderProductReportsTable('רכישות אחרונות', 'אין רכישות להצגה עדיין. ברגע שתתווסף היסטוריית רכישות, היא תופיע כאן.', recentRows, '<th>תאריך</th><th>מוצר</th><th>סה"כ</th><th>ספק / חנות</th><th>הערות</th>', 'כולל איתור מהיר של רכישות משופינג ומוצרים מושבתים.') +
-        renderProductReportsTable('מוצרים עם ההוצאה הגבוהה ביותר', 'אין עדיין מוצרים עם היסטוריית רכישות.', topRows, '<th>מוצר</th><th>מספר רכישות</th><th>סה"כ הוצאה</th>', 'עוזר לזהות איפה רוב תקציב הרכש מצטבר.') +
+        renderProductReportsTable('סיכום הוצאה לפי ספק / חנות', 'אין עדיין ספקים או חנויות להצגה.', sourceRows, '<th>ספק / חנות</th><th>מספר רכישות</th><th>סה"כ הוצאה</th><th>ממוצע לרכישה</th>', 'ממויין לפי סך הוצאה, עם ממוצע רכישה שיעזור להבין לאן הכסף הולך.') +
+        renderProductReportsTable('המוצרים שנרכשו הכי הרבה', 'אין עדיין מוצרים עם היסטוריית רכישות.', topRows, '<th>מוצר</th><th>מספר רכישות</th><th>סה"כ הוצאה</th><th>רכישה אחרונה</th>', 'ממויין קודם לפי תדירות רכישה, ואז לפי סך הוצאה.') +
+        renderProductReportsTable('מוצרים עם פערי מחיר בין ספקים', 'אין עדיין מספיק נתונים כדי להציג פערי מחיר בין ספקים לאותו מוצר.', supplierVariationRows, '<th>מוצר</th><th>ספק זול</th><th>ספק יקר</th><th>פער</th>', 'מוצג רק כאשר אותו מוצר נרכש מכמה ספקים או חנויות ובמחירים שונים.') +
         renderProductReportsTable('מוצרים שהתייקרו', 'אין כרגע מוצרים עם עלייה בין הרכישה האחרונה לזו שלפניה.', increaseRows, '<th>מוצר</th><th>מחיר קודם</th><th>מחיר אחרון</th><th>פער</th><th>תאריך אחרון</th>', 'השוואה בין שתי הרכישות האחרונות לכל מוצר, כולל אחוז שינוי כשאפשר.') +
-        renderProductReportsTable('רכישות אחרונות שהגיעו משופינג', 'עדיין אין רכישות שמקורן בסנכרון משופינג.', recentShoppingRows, '<th>תאריך</th><th>מוצר</th><th>סה"כ</th><th>מקור</th>', 'מראה רק רכישות שנוצרו מסנכרון Shopping → Products.') +
-        renderProductReportsTable('ספקים / חנויות שמופיעים בהיסטוריה', 'אין עדיין ספקים או חנויות להצגה.', sourceRows, '<th>ספק / חנות</th><th>מספר רכישות</th><th>סה"כ הוצאה</th>', 'ממויין קודם לפי תדירות, ואז לפי סך הוצאה כדי להבליט מקורות מרכזיים.');
+        renderProductReportsTable('מוצרים יקרים יותר לפי ספק', 'אין עדיין מספיק נתונים כדי להציג ספק יקר יותר מול ספק זול יותר לאותו מוצר.', supplierIncreaseRows, '<th>מוצר</th><th>ספק זול יותר</th><th>ספק יקר יותר</th><th>פער</th>', 'מבוסס על המחיר האחרון הידוע לכל ספק עבור אותו מוצר, רק כשיש לפחות שני ספקים להשוואה.') +
+        renderProductReportsTable('רכישות אחרונות שהגיעו משופינג', 'עדיין אין רכישות שמקורן בסנכרון משופינג.', recentShoppingRows, '<th>תאריך</th><th>מוצר</th><th>סה"כ</th><th>מקור</th>', 'מראה רק רכישות שנוצרו מסנכרון Shopping → Products.');
 
       var backBtn = document.getElementById('btn-back-to-products-list');
       if (backBtn) {
