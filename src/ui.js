@@ -5004,8 +5004,45 @@ function escapeHtml(value) {
 }
 
 function getAllocationStatusLabel(status) {
-  var labels = { draft: 'טיוטה', reserved: 'שמור', cancelled: 'בוטל' };
+  var labels = { draft: 'תכנון', reserved: 'שמור', cancelled: 'בוטל' };
   return labels[status] || status || '—';
+}
+
+function parseAllocationPreviewNumber(value) {
+  if (value === undefined || value === null || value === '') return 0;
+  var num = Number(value);
+  return Number.isFinite(num) ? num : 0;
+}
+
+function getAllocationFormPreview(formState, currentAllocation) {
+  var planned = parseAllocationPreviewNumber(formState && formState.planned_quantity);
+  var reserved = parseAllocationPreviewNumber(formState && formState.reserved_quantity);
+  var currentStock = currentAllocation ? Number(currentAllocation.current_stock || 0) : null;
+  var reservedElsewhere = currentAllocation ? Number(currentAllocation.reserved_elsewhere || 0) : null;
+  var availableStock = currentAllocation ? Number(currentAllocation.available_stock || 0) : null;
+  var warnings = [];
+
+  if (availableStock !== null && planned > availableStock) {
+    warnings.push({
+      tone: 'warning',
+      text: 'הכמות המתוכננת גבוהה מהמלאי הזמין כרגע. זה מותר לצורך תכנון בלבד, אבל לא מבצע שמירה אמיתית במלאי.'
+    });
+  }
+  if (availableStock !== null && reserved > availableStock) {
+    warnings.push({
+      tone: 'danger',
+      text: 'הכמות השמורה גבוהה מהמלאי הזמין כרגע. השרת יחסום שמירה כזו.'
+    });
+  }
+
+  return {
+    planned: planned,
+    reserved: reserved,
+    currentStock: currentStock,
+    reservedElsewhere: reservedElsewhere,
+    availableStock: availableStock,
+    warnings: warnings
+  };
 }
 
 function renderEventInventoryPlanningSection(inventoryData, productOptions, formState) {
@@ -5024,6 +5061,14 @@ function renderEventInventoryPlanningSection(inventoryData, productOptions, form
       if (isEdit && currentAllocation && Number(product.id) === Number(currentAllocation.product_id)) return true;
       return Number(product.is_active) === 1;
     });
+    var preview = getAllocationFormPreview(formState, currentAllocation);
+    var contextCards = [
+      { label: 'מלאי נוכחי', value: preview.currentStock === null ? '—' : formatProductStockValue(preview.currentStock) },
+      { label: 'שמור באירועים אחרים', value: preview.reservedElsewhere === null ? '—' : formatProductStockValue(preview.reservedElsewhere) },
+      { label: 'זמין כרגע', value: preview.availableStock === null ? '—' : formatProductStockValue(preview.availableStock) },
+      { label: 'מתוכנן', value: formatProductStockValue(preview.planned) },
+      { label: 'שמור', value: formatProductStockValue(preview.reserved) }
+    ];
 
     var productOptionsHtml = ['<option value="">בחר מוצר</option>'].concat(selectableProducts.map(function(product) {
       var selected = Number(formState.product_id) === Number(product.id) ? ' selected' : '';
@@ -5031,22 +5076,34 @@ function renderEventInventoryPlanningSection(inventoryData, productOptions, form
       return '<option value="' + product.id + '"' + selected + '>' + escapeHtml(product.name || ('מוצר #' + product.id)) + activeLabel + '</option>';
     })).join('');
 
+    var warningsHtml = preview.warnings.map(function(warning) {
+      var colors = warning.tone === 'danger'
+        ? 'background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;'
+        : 'background:#fff7ed;color:#c2410c;border:1px solid #fdba74;';
+      return '<div style="margin-bottom:8px;padding:8px 10px;border-radius:8px;font-size:12px;' + colors + '">' + escapeHtml(warning.text) + '</div>';
+    }).join('');
+
     formHtml =
       '<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px;background:#f8fafc">' +
         '<div style="font-weight:700;margin-bottom:10px">' + (isEdit ? 'עריכת הקצאה' : 'הוספת מוצר לתכנון') + '</div>' +
         (formState.error ? '<div style="margin-bottom:10px;padding:8px 10px;border-radius:8px;background:#fef2f2;color:#b91c1c;font-size:12px">' + escapeHtml(formState.error) + '</div>' : '') +
+        warningsHtml +
         '<div style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px">' +
           '<select class="form-input" id="event-allocation-product">' + productOptionsHtml + '</select>' +
           '<input class="form-input" id="event-allocation-planned" type="number" min="0" step="0.01" placeholder="כמות מתוכננת" value="' + escapeHtml(formState.planned_quantity) + '">' +
           '<input class="form-input" id="event-allocation-reserved" type="number" min="0" step="0.01" placeholder="כמות שמורה" value="' + escapeHtml(formState.reserved_quantity) + '">' +
           '<select class="form-input" id="event-allocation-status">' +
-            '<option value="draft"' + (formState.status === 'draft' ? ' selected' : '') + '>טיוטה</option>' +
+            '<option value="draft"' + (formState.status === 'draft' ? ' selected' : '') + '>תכנון</option>' +
             '<option value="reserved"' + (formState.status === 'reserved' ? ' selected' : '') + '>שמור</option>' +
             '<option value="cancelled"' + (formState.status === 'cancelled' ? ' selected' : '') + '>בוטל</option>' +
           '</select>' +
         '</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:8px">' + contextCards.map(function(card) {
+          return '<div style="border:1px solid var(--border);border-radius:10px;background:white;padding:8px 10px"><div style="font-size:11px;color:var(--text3);margin-bottom:4px">' + escapeHtml(card.label) + '</div><div style="font-weight:700;color:var(--text)">' + escapeHtml(card.value) + '</div></div>';
+        }).join('') + '</div>' +
         '<textarea class="form-input" id="event-allocation-note" rows="2" placeholder="הערה...">' + escapeHtml(formState.note) + '</textarea>' +
-        '<div style="margin-top:8px;font-size:12px;color:var(--text3)">אפשר לתכנן יותר מהמלאי הזמין, אבל אי אפשר לשמור כמות reserved שגדולה מהמלאי הזמין כרגע.</div>' +
+        '<div style="margin-top:8px;font-size:12px;color:var(--text3)">תכנון הקצאה לא משנה את המלאי האמיתי. השרת עדיין בודק כל שמירה בפועל.</div>' +
+        (preview.availableStock === null ? '<div style="margin-top:6px;font-size:12px;color:var(--text3)">במסך יצירה הנתונים המלאים על מלאי זמין יוצגו במדויק אחרי שמירה או בעריכת הקצאה קיימת.</div>' : '') +
         '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">' +
           '<button class="btn btn-secondary btn-sm" id="event-allocation-form-cancel">ביטול</button>' +
           '<button class="btn btn-primary btn-sm" id="event-allocation-form-save">שמור</button>' +
@@ -5083,7 +5140,7 @@ function renderEventInventoryPlanningSection(inventoryData, productOptions, form
     '</div>';
   }).join('');
 
-  return '<div class="info-section"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px"><div class="info-section-title">תכנון מלאי לאירוע</div><button class="btn btn-secondary btn-sm" id="event-allocation-add-btn">הוסף מוצר לתכנון</button></div><div style="font-size:12px;color:var(--text3);margin-bottom:10px">תכנון ושמירה ידניים בלבד, בלי לבצע שינוי במלאי האמיתי.</div>' + formHtml + (rows || '<div style="font-size:13px;color:var(--text3)">אין עדיין תכנון מלאי לאירוע הזה.</div>') + '</div>';
+  return '<div class="info-section"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px"><div class="info-section-title">תכנון מלאי לאירוע</div><button class="btn btn-secondary btn-sm" id="event-allocation-add-btn">הוסף מוצר לתכנון</button></div><div style="font-size:12px;color:var(--text3);margin-bottom:10px">תכנון ושמירה ידניים בלבד, בלי לבצע שינוי במלאי האמיתי או לכתוב תנועת מלאי.</div>' + formHtml + (rows || '<div style="font-size:13px;color:var(--text3);padding:10px 0">אין עדיין תכנון מלאי לאירוע הזה. אפשר להוסיף מוצר לתכנון בלי לשנות את המלאי בפועל.</div>') + '</div>';
 }
 
 function openEventDetailsModal(id) {
@@ -5178,6 +5235,35 @@ function openEventDetailsModal(id) {
           renderInventorySection(null);
         };
       }
+
+      function rerenderAllocationFormPreview() {
+        var formSaveEl = document.getElementById('event-allocation-form-save');
+        if (!formSaveEl) return;
+        var liveMode = formSaveEl.getAttribute('data-mode') || 'create';
+        var liveAllocationId = formSaveEl.getAttribute('data-allocation-id') || '';
+        var baseAllocation = liveMode === 'edit'
+          ? currentInventoryData.allocations.find(function(item) { return String(item.id) === String(liveAllocationId); })
+          : null;
+        renderInventorySection(buildAllocationFormState(baseAllocation, {
+          mode: liveMode,
+          allocationId: liveAllocationId,
+          product_id: document.getElementById('event-allocation-product') ? document.getElementById('event-allocation-product').value : '',
+          planned_quantity: document.getElementById('event-allocation-planned') ? document.getElementById('event-allocation-planned').value : '',
+          reserved_quantity: document.getElementById('event-allocation-reserved') ? document.getElementById('event-allocation-reserved').value : '',
+          status: document.getElementById('event-allocation-status') ? document.getElementById('event-allocation-status').value : 'draft',
+          note: document.getElementById('event-allocation-note') ? document.getElementById('event-allocation-note').value : ''
+        }));
+      }
+
+      ['event-allocation-product', 'event-allocation-planned', 'event-allocation-reserved', 'event-allocation-status'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.onchange = rerenderAllocationFormPreview;
+      });
+
+      ['event-allocation-planned', 'event-allocation-reserved'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.oninput = rerenderAllocationFormPreview;
+      });
 
       var formSaveBtn = document.getElementById('event-allocation-form-save');
       if (formSaveBtn) {
