@@ -80,11 +80,132 @@ async function getEmployeeById(employeeId, env) {
   return env.DB.prepare('SELECT * FROM employees WHERE id = ?').bind(employeeId).first();
 }
 
+async function getCurrentStockForProduct(productId, env) {
+  const row = await env.DB.prepare(
+    `SELECT COALESCE(SUM(quantity_change), 0) AS current_stock
+     FROM product_stock_movements
+     WHERE product_id = ?`
+  ).bind(productId).first();
+  return Number(row && row.current_stock !== undefined && row.current_stock !== null ? row.current_stock : 0);
+}
+
+async function getReservedElsewhereForProduct(productId, eventId, env) {
+  const row = await env.DB.prepare(
+    `SELECT COALESCE(SUM(reserved_quantity), 0) AS reserved_elsewhere
+     FROM event_product_allocations
+     WHERE product_id = ?
+       AND event_id != ?
+       AND status IN ('reserved', 'partial')`
+  ).bind(productId, eventId).first();
+  return Number(row && row.reserved_elsewhere !== undefined && row.reserved_elsewhere !== null ? row.reserved_elsewhere : 0);
+}
+
 export async function handleLeads(request, env, path) {
   const method = request.method;
   const url = new URL(request.url);
   const assignmentIdMatch = path.match(/^\/api\/lead-employees\/(\d+)$/);
   const leadEmployeesMatch = path.match(/^\/api\/leads\/(\d+)\/employees$/);
+  const leadInventoryMatch = path.match(/^\/api\/leads\/(\d+)\/inventory$/);
+
+  if (leadInventoryMatch && method === 'GET') {
+    const leadId = leadInventoryMatch[1];
+    const event = await env.DB.prepare(`
+      SELECT
+        leads.*,
+        contacts.contact_num,
+        contacts.name AS contact_name
+      FROM leads
+      LEFT JOIN contacts ON leads.contact_id = contacts.id
+      WHERE leads.id = ?
+    `).bind(leadId).first();
+
+    if (!event) throw new Error('Lead not found');
+
+    const { results } = await env.DB.prepare(`
+      SELECT
+        epa.id,
+        epa.event_id,
+        epa.product_id,
+        epa.planned_quantity,
+        epa.reserved_quantity,
+        epa.status,
+        epa.note,
+        epa.created_at,
+        epa.updated_at,
+        p.name AS product_name,
+        p.category AS product_category,
+        p.sku AS product_sku,
+        p.unit AS product_unit,
+        p.is_active AS product_is_active,
+        (
+          SELECT pp.purchase_date
+          FROM product_purchases pp
+          WHERE pp.product_id = epa.product_id
+          ORDER BY pp.purchase_date DESC, pp.id DESC
+          LIMIT 1
+        ) AS latest_purchase_date,
+        (
+          SELECT psm.created_at
+          FROM product_stock_movements psm
+          WHERE psm.product_id = epa.product_id
+          ORDER BY psm.created_at DESC, psm.id DESC
+          LIMIT 1
+        ) AS latest_stock_movement_date,
+        EXISTS(
+          SELECT 1
+          FROM product_purchases pp
+          WHERE pp.product_id = epa.product_id
+            AND NOT EXISTS(
+              SELECT 1
+              FROM product_stock_movements psm
+              WHERE psm.movement_type = 'purchase_intake'
+                AND psm.product_purchase_id = pp.id
+            )
+        ) AS has_unreceived_purchases
+      FROM event_product_allocations epa
+      INNER JOIN products p ON p.id = epa.product_id
+      WHERE epa.event_id = ?
+      ORDER BY p.name COLLATE NOCASE ASC, epa.id ASC
+    `).bind(leadId).all();
+
+    const allocations = await Promise.all((results || []).map(async function(row) {
+      const currentStock = await getCurrentStockForProduct(row.product_id, env);
+      const reservedElsewhere = await getReservedElsewhereForProduct(row.product_id, leadId, env);
+      const availableStock = currentStock - reservedElsewhere;
+      const shortageAmount = Math.max(Number(row.reserved_quantity || 0) - availableStock, 0);
+
+      return {
+        id: row.id,
+        product_id: row.product_id,
+        product_name: row.product_name,
+        product_category: row.product_category,
+        product_sku: row.product_sku,
+        product_unit: row.product_unit,
+        product_is_active: row.product_is_active,
+        planned_quantity: Number(row.planned_quantity || 0),
+        reserved_quantity: Number(row.reserved_quantity || 0),
+        status: row.status,
+        note: row.note,
+        current_stock: currentStock,
+        reserved_elsewhere: reservedElsewhere,
+        available_stock: availableStock,
+        shortage_amount: shortageAmount,
+        is_short: shortageAmount > 0,
+        latest_purchase_date: row.latest_purchase_date || null,
+        latest_stock_movement_date: row.latest_stock_movement_date || null,
+        has_unreceived_purchases: Number(row.has_unreceived_purchases || 0) === 1
+      };
+    }));
+
+    return {
+      event,
+      summary: {
+        allocation_count: allocations.length,
+        shortage_count: allocations.filter(function(item) { return item.is_short; }).length
+      },
+      allocations
+    };
+  }
 
   if (leadEmployeesMatch && method === 'GET') {
     const leadId = leadEmployeesMatch[1];
