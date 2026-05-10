@@ -241,6 +241,20 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .product-low-stock-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .product-low-stock-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#fff;border:1px solid #fdba74;font-size:12px;color:#9a3412;font-weight:700}
 .product-low-stock-chip-muted{color:var(--text3);border-color:var(--border);background:#fafbfc}
+.product-ops-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:16px}
+.product-ops-card{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px;min-width:0}
+.product-ops-card-title{font-size:14px;font-weight:800;color:var(--text)}
+.product-ops-card-subtitle{font-size:12px;color:var(--text3);line-height:1.5}
+.product-ops-list{display:flex;flex-direction:column;gap:10px}
+.product-ops-item{border:1px solid var(--border);border-radius:10px;padding:10px;background:#fafbfc;display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.product-ops-item-main{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0}
+.product-ops-item-title{font-size:13px;font-weight:700;color:var(--text)}
+.product-ops-item-meta{font-size:12px;color:var(--text2);line-height:1.5;display:flex;gap:8px;flex-wrap:wrap}
+.product-ops-empty{padding:16px;border:1px dashed var(--border);border-radius:10px;background:#f8fafc;color:var(--text3);text-align:center;font-size:13px}
+.product-ops-action{flex-shrink:0;display:flex;align-items:flex-start;gap:8px}
+.badge-urgent{background:#fef2f2;color:#b91c1c}
+.badge-attention{background:#fff7ed;color:#c2410c}
+.badge-stable{background:#ecfdf3;color:#166534}
 .product-inventory-section{margin-top:18px;padding-top:18px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:14px}
 .product-inventory-actions{display:flex;gap:8px;flex-wrap:wrap}
 .product-inventory-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
@@ -1273,6 +1287,8 @@ var token = localStorage.getItem('crm_token');
 var currentUser = JSON.parse(localStorage.getItem('crm_user') || 'null');
 var searchTimer, currentLeadId, dupLeadId, selectedContactId = null, currentEmployeeId = null, currentProductId = null, currentProductPurchases = [], currentProductPurchaseEditId = null, currentProductPurchaseFormMode = null, currentProductPurchaseSaving = false, currentProductStock = null, currentProductStockMovements = [], currentProductAdjustmentMode = null, currentProductAdjustmentSaving = false, currentProductReceiveStockPurchaseId = null;
 var currentLowStockProducts = [];
+var currentOperationalUnreceivedPurchases = [];
+var currentOperationalRecentMovements = [];
 var allLeadsCache = [];
 var calYear, calMonth;
 var predefinedCustomerTags = [
@@ -3347,8 +3363,109 @@ function saveProductStockAdjustment(productId) {
   });
 }
 
+function getLowStockUrgencyBadge(entry) {
+  var current = Number(entry && entry.current_stock || 0);
+  var min = Number(entry && entry.min_stock_alert || 0);
+  if (current <= 0) return '<span class="badge badge-urgent">דחוף</span>';
+  if (current < min) return '<span class="badge badge-attention">לטיפול</span>';
+  return '<span class="badge badge-stable">במעקב</span>';
+}
+
+function getMovementTypeLabel(type) {
+  var map = {
+    adjustment: 'התאמה',
+    purchase_intake: 'קליטת מלאי',
+    event_usage: 'שימוש באירוע',
+    correction: 'תיקון'
+  };
+  return map[type] || type || 'תנועה';
+}
+
+function renderOperationalIntelligenceWidgets() {
+  var lowStockHtml = currentLowStockProducts.length ? '<div class="product-ops-list">' + currentLowStockProducts.slice(0, 6).map(function(entry) {
+    var product = entry.product || {};
+    return '<div class="product-ops-item">' +
+      '<div class="product-ops-item-main">' +
+        '<div class="product-ops-item-title">' + (product.name || ('מוצר #' + product.id)) + '</div>' +
+        '<div class="product-ops-item-meta"><span>מלאי: ' + formatProductStockValue(entry.current_stock) + '</span><span>מינימום: ' + formatProductStockValue(entry.min_stock_alert) + '</span></div>' +
+      '</div>' +
+      '<div class="product-ops-action">' + getLowStockUrgencyBadge(entry) + '</div>' +
+    '</div>';
+  }).join('') + '</div>' : '<div class="product-ops-empty">אין כרגע מוצרים פעילים במלאי נמוך.</div>';
+
+  var unreceivedHtml = currentOperationalUnreceivedPurchases.length ? '<div class="product-ops-list">' + currentOperationalUnreceivedPurchases.slice(0, 6).map(function(entry) {
+    var purchase = entry.purchase || {};
+    var product = entry.product || {};
+    var isReceiving = Number(currentProductReceiveStockPurchaseId) === Number(purchase.id);
+    return '<div class="product-ops-item">' +
+      '<div class="product-ops-item-main">' +
+        '<div class="product-ops-item-title">' + (product.name || ('מוצר #' + product.id)) + '</div>' +
+        '<div class="product-ops-item-meta"><span>ספק: ' + (purchase.supplier_name || '—') + '</span><span>כמות: ' + formatProductStockValue(purchase.quantity) + '</span><span>תאריך: ' + formatProductReportDate(purchase.purchase_date) + '</span></div>' +
+      '</div>' +
+      '<div class="product-ops-action"><button class="btn btn-primary btn-sm operational-receive-stock-btn" type="button" data-product-id="' + product.id + '" data-purchase-id="' + purchase.id + '"' + (isReceiving ? ' disabled' : '') + '>' + (isReceiving ? 'קולט...' : 'הכנס למלאי') + '</button></div>' +
+    '</div>';
+  }).join('') + '</div>' : '<div class="product-ops-empty">אין כרגע רכישות שממתינות לקליטת מלאי.</div>';
+
+  var movementsHtml = currentOperationalRecentMovements.length ? '<div class="product-ops-list">' + currentOperationalRecentMovements.slice(0, 6).map(function(entry) {
+    var movement = entry.movement || {};
+    var product = entry.product || {};
+    return '<div class="product-ops-item">' +
+      '<div class="product-ops-item-main">' +
+        '<div class="product-ops-item-title">' + (product.name || ('מוצר #' + product.id)) + '</div>' +
+        '<div class="product-ops-item-meta"><span>' + getMovementTypeLabel(movement.movement_type) + '</span><span>שינוי: ' + (Number(movement.quantity_change) > 0 ? '+' : '') + formatProductStockValue(movement.quantity_change) + '</span><span>' + formatDate(movement.created_at) + '</span></div>' +
+        '<div class="product-ops-item-meta"><span>' + (movement.reason || movement.reference_type || 'ללא סיבה') + '</span>' + (movement.reference_id ? '<span>מקור #' + movement.reference_id + '</span>' : '') + '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('') + '</div>' : '<div class="product-ops-empty">אין עדיין תנועות מלאי להצגה.</div>';
+
+  return '<div class="product-ops-grid">' +
+    '<div class="product-ops-card"><div class="product-ops-card-title">מוצרים במלאי נמוך</div><div class="product-ops-card-subtitle">פוקוס מהיר על מוצרים שדורשים תשומת לב עכשיו.</div>' + lowStockHtml + '</div>' +
+    '<div class="product-ops-card"><div class="product-ops-card-title">רכישות שעדיין לא נקלטו למלאי</div><div class="product-ops-card-subtitle">רכישות קיימות שאפשר לקלוט ידנית למלאי בלי לפתוח אוטומציה.</div>' + unreceivedHtml + '</div>' +
+    '<div class="product-ops-card"><div class="product-ops-card-title">תנועות מלאי אחרונות</div><div class="product-ops-card-subtitle">פיד תפעולי קצר של intake והתאמות אחרונות.</div>' + movementsHtml + '</div>' +
+  '</div>';
+}
+
+function bindOperationalIntelligenceWidgets() {
+  var root = document.getElementById('products-operational-widgets');
+  if (!root) return;
+  root.querySelectorAll('.operational-receive-stock-btn').forEach(function(btn) {
+    btn.onclick = function() {
+      receiveOperationalPurchaseStock(parseInt(this.getAttribute('data-product-id')), parseInt(this.getAttribute('data-purchase-id')));
+    };
+  });
+}
+
+function renderOperationalIntelligenceLoading() {
+  return '<div class="product-ops-grid">' +
+    '<div class="product-ops-card"><div class="product-ops-card-title">מוצרים במלאי נמוך</div><div class="product-ops-empty">טוען...</div></div>' +
+    '<div class="product-ops-card"><div class="product-ops-card-title">רכישות שעדיין לא נקלטו למלאי</div><div class="product-ops-empty">טוען...</div></div>' +
+    '<div class="product-ops-card"><div class="product-ops-card-title">תנועות מלאי אחרונות</div><div class="product-ops-empty">טוען...</div></div>' +
+  '</div>';
+}
+
+function renderOperationalIntelligenceError() {
+  return '<div class="product-ops-grid">' +
+    '<div class="product-ops-card"><div class="product-ops-card-title">מוצרים במלאי נמוך</div><div class="product-ops-empty">לא הצלחנו לטעון כרגע את הווידג׳טים התפעוליים.</div></div>' +
+    '<div class="product-ops-card"><div class="product-ops-card-title">רכישות שעדיין לא נקלטו למלאי</div><div class="product-ops-empty">נסה לרענן שוב בעוד רגע.</div></div>' +
+    '<div class="product-ops-card"><div class="product-ops-card-title">תנועות מלאי אחרונות</div><div class="product-ops-empty">העמוד הראשי של המוצרים עדיין אמור להישאר זמין.</div></div>' +
+  '</div>';
+}
+
+function renderOperationalIntelligenceWidgetsIntoPage() {
+  var root = document.getElementById('products-operational-widgets');
+  if (!root) return;
+  root.innerHTML = renderOperationalIntelligenceWidgets();
+  bindOperationalIntelligenceWidgets();
+}
+
+function receiveOperationalPurchaseStock(productId, purchaseId) {
+  receiveProductPurchaseStock(productId, purchaseId);
+  renderOperationalIntelligenceWidgetsIntoPage();
+}
+
 function renderProductsListView() {
-  return '<div id="products-low-stock-summary"></div>' +
+  return '<div id="products-operational-widgets"></div>' +
+    '<div id="products-low-stock-summary"></div>' +
     '<div class="table-card">' +
       '<div class="table-toolbar">' +
         '<input class="search-input" type="text" placeholder="חיפוש לפי שם / קטגוריה / SKU..." id="products-search">' +
@@ -3592,7 +3709,7 @@ function loadProductPurchaseReports() {
 function loadProducts() {
   currentProductsView = 'list';
   var content = document.getElementById('products-page-content');
-  if (content && (!document.getElementById('products-grid') || !document.getElementById('products-low-stock-summary'))) {
+  if (content && (!document.getElementById('products-grid') || !document.getElementById('products-low-stock-summary') || !document.getElementById('products-operational-widgets'))) {
     content.innerHTML = renderProductsListView();
   }
 
@@ -3606,6 +3723,7 @@ function loadProducts() {
 
   var grid = document.getElementById('products-grid');
   var lowStockSummary = document.getElementById('products-low-stock-summary');
+  var operationalWidgets = document.getElementById('products-operational-widgets');
   if (!grid) return;
 
   var search = document.getElementById('products-search') ? document.getElementById('products-search').value.trim() : '';
@@ -3613,6 +3731,7 @@ function loadProducts() {
 
   grid.innerHTML = '<div class="dash-empty">טוען...</div>';
   if (lowStockSummary) lowStockSummary.innerHTML = renderProductLowStockSummary([]);
+  if (operationalWidgets) operationalWidgets.innerHTML = renderOperationalIntelligenceLoading();
 
   Promise.all([
     apiCall('GET', path),
@@ -3630,21 +3749,58 @@ function loadProducts() {
     }
 
     if (!products.length) {
+      currentOperationalUnreceivedPurchases = [];
+      currentOperationalRecentMovements = [];
+      renderOperationalIntelligenceWidgetsIntoPage();
       grid.innerHTML = '<div class="dash-empty">אין מוצרים להצגה</div>';
       return;
     }
 
     return Promise.all(products.map(function(product) {
-      return apiCall('GET', '/api/products/' + product.id + '/stock').then(function(stock) {
-        return { product: product, stock: stock };
-      }).catch(function() {
-        return { product: product, stock: null };
+      return Promise.all([
+        apiCall('GET', '/api/products/' + product.id + '/stock').catch(function() { return null; }),
+        apiCall('GET', '/api/products/' + product.id + '/purchases?limit=20&offset=0').catch(function() { return { purchases: [] }; }),
+        apiCall('GET', '/api/products/' + product.id + '/stock-movements?limit=5&offset=0').catch(function() { return { movements: [] }; })
+      ]).then(function(results) {
+        return {
+          product: product,
+          stock: results[0],
+          purchases: (results[1] && results[1].purchases) || [],
+          movements: (results[2] && results[2].movements) || []
+        };
       });
     })).then(function(productEntries) {
       var lowStockMap = {};
       currentLowStockProducts.forEach(function(entry) {
         if (entry && entry.product && entry.product.id !== undefined) lowStockMap[entry.product.id] = true;
       });
+
+      currentOperationalUnreceivedPurchases = [];
+      currentOperationalRecentMovements = [];
+      productEntries.forEach(function(entry) {
+        (entry.purchases || []).forEach(function(purchase) {
+          if (Number(purchase.stock_received) === 1) return;
+          currentOperationalUnreceivedPurchases.push({
+            product: entry.product,
+            purchase: purchase
+          });
+        });
+
+        (entry.movements || []).forEach(function(movement) {
+          currentOperationalRecentMovements.push({
+            product: entry.product,
+            movement: movement
+          });
+        });
+      });
+
+      currentOperationalUnreceivedPurchases.sort(function(a, b) {
+        return String(b.purchase.purchase_date || '').localeCompare(String(a.purchase.purchase_date || '')) || Number(b.purchase.id || 0) - Number(a.purchase.id || 0);
+      });
+      currentOperationalRecentMovements.sort(function(a, b) {
+        return String(b.movement.created_at || '').localeCompare(String(a.movement.created_at || '')) || Number(b.movement.id || 0) - Number(a.movement.id || 0);
+      });
+      renderOperationalIntelligenceWidgetsIntoPage();
 
       grid.innerHTML = '<div class="product-grid">' + productEntries.map(function(entry) {
         var product = entry.product;
@@ -3703,6 +3859,7 @@ function loadProducts() {
     if (lowStockSummary) {
       lowStockSummary.innerHTML = '<div class="product-low-stock-banner"><div><div class="product-low-stock-title">מוצרים במלאי נמוך</div><div class="product-low-stock-text">לא הצלחנו לטעון כרגע את רשימת המלאי הנמוך.</div></div></div>';
     }
+    if (operationalWidgets) operationalWidgets.innerHTML = renderOperationalIntelligenceError();
     toast(e.message, 'error');
   });
 }
