@@ -5068,7 +5068,8 @@ function getEventReadinessStatus(summary) {
 }
 
 function buildEventReadinessSummary(inventoryData, actionsData) {
-  var allocations = (inventoryData && inventoryData.allocations) || [];
+  var allAllocations = (inventoryData && inventoryData.allocations) || [];
+  var allocations = allAllocations.filter(function(item) { return item.status !== 'cancelled'; });
   var actions = (actionsData && actionsData.actions) || [];
   var totalPlannedQuantity = allocations.reduce(function(sum, item) { return sum + Number(item.planned_quantity || 0); }, 0);
   var totalReservedQuantity = allocations.reduce(function(sum, item) { return sum + Number(item.reserved_quantity || 0); }, 0);
