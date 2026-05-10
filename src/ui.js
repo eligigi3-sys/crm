@@ -5060,6 +5060,74 @@ function getAllocationFormPreview(formState, currentAllocation) {
   };
 }
 
+function getEventReadinessStatus(summary) {
+  if (!summary || !summary.hasPlanning) return { label: 'ללא תכנון', badgeClass: 'badge-gray' };
+  if (summary.shortageCount > 0) return { label: 'חסר מלאי', badgeClass: 'badge-red' };
+  if (summary.reservedCount <= 0 && summary.usedQuantity <= 0) return { label: 'דורש טיפול', badgeClass: 'badge-orange' };
+  return { label: 'מוכן', badgeClass: 'badge-green' };
+}
+
+function buildEventReadinessSummary(inventoryData, actionsData) {
+  var allocations = (inventoryData && inventoryData.allocations) || [];
+  var actions = (actionsData && actionsData.actions) || [];
+  var totalPlannedQuantity = allocations.reduce(function(sum, item) { return sum + Number(item.planned_quantity || 0); }, 0);
+  var totalReservedQuantity = allocations.reduce(function(sum, item) { return sum + Number(item.reserved_quantity || 0); }, 0);
+  var totalUsedQuantity = actions.filter(function(action) { return action.action_type === 'usage'; }).reduce(function(sum, action) { return sum + Number(action.quantity || 0); }, 0);
+  var shortageItems = allocations.filter(function(item) { return Number(item.shortage_amount || 0) > 0; });
+
+  return {
+    allocationCount: allocations.length,
+    shortageCount: shortageItems.length,
+    totalPlannedQuantity: totalPlannedQuantity,
+    totalReservedQuantity: totalReservedQuantity,
+    totalUsedQuantity: totalUsedQuantity,
+    shortageItems: shortageItems,
+    usageActions: actions.filter(function(action) { return action.action_type === 'usage'; }),
+    hasPlanning: allocations.length > 0
+  };
+}
+
+function renderEventOperationalReadinessSection(inventoryData, actionsData) {
+  var summary = buildEventReadinessSummary(inventoryData, actionsData);
+  var readiness = getEventReadinessStatus(summary);
+  var cards = [
+    { label: 'מספר הקצאות', value: summary.allocationCount },
+    { label: 'חוסרים', value: summary.shortageCount },
+    { label: 'סה"כ מתוכנן', value: formatProductStockValue(summary.totalPlannedQuantity) },
+    { label: 'סה"כ שמור', value: formatProductStockValue(summary.totalReservedQuantity) },
+    { label: 'סה"כ בשימוש', value: formatProductStockValue(summary.totalUsedQuantity) }
+  ];
+
+  if (!summary.hasPlanning) {
+    return '<div class="info-section"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px"><div class="info-section-title">מוכנות תפעולית</div><span class="badge ' + readiness.badgeClass + '">' + readiness.label + '</span></div><div style="font-size:13px;color:var(--text3);padding:8px 0">אין עדיין תכנון מלאי לאירוע הזה, לכן עדיין אי אפשר להעריך מוכנות תפעולית על בסיס מלאי.</div></div>';
+  }
+
+  var shortageListHtml = summary.shortageItems.length
+    ? '<div style="margin-top:10px"><div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px">חוסרים פתוחים</div>' + summary.shortageItems.map(function(item) {
+        return '<div style="font-size:12px;color:var(--text2);padding:6px 0;border-top:1px solid var(--border)">' +
+          '<strong>' + escapeHtml(item.product_name || ('מוצר #' + item.product_id)) + '</strong>' +
+          ' · חוסר ' + escapeHtml(formatProductStockValue(item.shortage_amount)) +
+          ' · זמין ' + escapeHtml(formatProductStockValue(item.available_stock)) +
+          ' · שמור ' + escapeHtml(formatProductStockValue(item.reserved_quantity)) +
+        '</div>';
+      }).join('') + '</div>'
+    : '<div style="margin-top:10px;font-size:12px;color:var(--text3)">אין כרגע חוסרי מלאי פתוחים לפי התכנון הקיים.</div>';
+
+  var usageListHtml = summary.usageActions.length
+    ? '<div style="margin-top:10px"><div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px">שימושים שנרשמו בפועל</div>' + summary.usageActions.slice(0, 5).map(function(action) {
+        return '<div style="font-size:12px;color:var(--text2);padding:6px 0;border-top:1px solid var(--border)">' +
+          '<strong>' + escapeHtml(action.product_name || ('מוצר #' + action.product_id)) + '</strong>' +
+          ' · כמות ' + escapeHtml(formatProductStockValue(action.quantity)) +
+          ' · ' + escapeHtml(formatProductReportDate(action.performed_at)) +
+        '</div>';
+      }).join('') + '</div>'
+    : '<div style="margin-top:10px;font-size:12px;color:var(--text3)">אין עדיין שימושים שנרשמו בפועל לאירוע הזה.</div>';
+
+  return '<div class="info-section"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px"><div class="info-section-title">מוכנות תפעולית</div><span class="badge ' + readiness.badgeClass + '">' + readiness.label + '</span></div><div style="font-size:12px;color:var(--text3);margin-bottom:10px">סיכום קריאה בלבד על בסיס תכנון המלאי, החוסרים והשימושים שנרשמו בפועל.</div><div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px">' + cards.map(function(card) {
+    return '<div style="border:1px solid var(--border);border-radius:10px;background:#fafbfc;padding:8px 10px"><div style="font-size:11px;color:var(--text3);margin-bottom:4px">' + escapeHtml(card.label) + '</div><div style="font-weight:700;color:var(--text)">' + escapeHtml(String(card.value)) + '</div></div>';
+  }).join('') + '</div>' + shortageListHtml + usageListHtml + '</div>';
+}
+
 function renderEventInventoryActionsSection(actionsData, inventoryData, productOptions, formState) {
   var actions = (actionsData && actionsData.actions) || [];
   var allocations = (inventoryData && inventoryData.allocations) || [];
@@ -5287,6 +5355,7 @@ function openEventDetailsModal(id) {
           '<div class="info-section"><div class="info-section-title">הערות</div>' +
           '<div style="font-size:13px;color:var(--text2);line-height:1.7;white-space:pre-wrap">' + (l.details || l.notes || 'אין הערות') + '</div>' +
           '</div>' +
+          '<div id="event-readiness-section"></div>' +
           '<div id="event-inventory-section"></div>' +
           '<div id="event-inventory-actions-section"></div>' +
           '<div id="event-assignments-section"></div>' +
@@ -5301,6 +5370,7 @@ function openEventDetailsModal(id) {
     document.body.appendChild(overlay);
     renderEventAssignments(document.getElementById('event-assignments-section'), id, assignments, employees);
 
+    var readinessSectionEl = document.getElementById('event-readiness-section');
     var inventorySectionEl = document.getElementById('event-inventory-section');
     var inventoryActionsSectionEl = document.getElementById('event-inventory-actions-section');
 
@@ -5446,11 +5516,17 @@ function openEventDetailsModal(id) {
       }
     }
 
+    function renderReadinessSection() {
+      if (!readinessSectionEl) return;
+      readinessSectionEl.innerHTML = renderEventOperationalReadinessSection(currentInventoryData, currentInventoryActionsData);
+    }
+
     function renderInventorySection(formState) {
       inventorySectionEl.innerHTML = renderEventInventoryPlanningSection(currentInventoryData, inventoryProducts, formState);
       inventorySectionEl.setAttribute('data-form-mode', formState ? formState.mode : '');
       inventorySectionEl.setAttribute('data-form-allocation-id', formState && formState.allocationId ? formState.allocationId : '');
       bindInventorySectionActions();
+      renderReadinessSection();
     }
 
     function refreshInventorySection(formState) {
@@ -5542,6 +5618,7 @@ function openEventDetailsModal(id) {
       bindInventoryActionsSection(formState || null);
     }
 
+    renderReadinessSection();
     renderInventorySection(null);
     renderInventoryActionsSection(buildUsageActionFormState());
 
