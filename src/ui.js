@@ -4994,15 +4994,51 @@ function makeTinyEditButton(c, field, label, inputType) {
 }
 
 
+function renderEventInventoryPlanningSection(inventoryData) {
+  var allocations = (inventoryData && inventoryData.allocations) || [];
+  if (!allocations.length) {
+    return '<div class="info-section"><div class="info-section-title">תכנון מלאי לאירוע</div><div style="font-size:13px;color:var(--text3)">אין עדיין תכנון מלאי לאירוע הזה.</div></div>';
+  }
+
+  var rows = allocations.map(function(item) {
+    var stockBadge = item.is_short ? '<span class="badge badge-red">חסר מלאי</span>' : '<span class="badge badge-green">מספיק מלאי</span>';
+    return '<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;background:#fafbfc">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:8px">' +
+        '<div><div style="font-weight:700;color:var(--text)">' + (item.product_name || ('מוצר #' + item.product_id)) + '</div><div style="font-size:12px;color:var(--text3)">' + (item.product_category || 'ללא קטגוריה') + (item.product_sku ? ' | SKU: ' + item.product_sku : '') + (item.product_unit ? ' | יחידה: ' + item.product_unit : '') + '</div></div>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' + stockBadge + '<span class="badge badge-purple">' + (item.status || '—') + '</span></div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:8px">' +
+        '<div style="font-size:12px;color:var(--text2)"><strong>מתוכנן:</strong> ' + formatProductStockValue(item.planned_quantity) + '</div>' +
+        '<div style="font-size:12px;color:var(--text2)"><strong>שמור:</strong> ' + formatProductStockValue(item.reserved_quantity) + '</div>' +
+        '<div style="font-size:12px;color:var(--text2)"><strong>מלאי נוכחי:</strong> ' + formatProductStockValue(item.current_stock) + '</div>' +
+        '<div style="font-size:12px;color:var(--text2)"><strong>שמור באירועים אחרים:</strong> ' + formatProductStockValue(item.reserved_elsewhere) + '</div>' +
+        '<div style="font-size:12px;color:var(--text2)"><strong>מלאי זמין:</strong> ' + formatProductStockValue(item.available_stock) + '</div>' +
+        '<div style="font-size:12px;color:var(--text2)"><strong>חוסר:</strong> ' + formatProductStockValue(item.shortage_amount) + '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--text3)">' +
+        '<span>רכישה אחרונה: ' + formatProductReportDate(item.latest_purchase_date) + '</span>' +
+        '<span>תנועת מלאי אחרונה: ' + formatProductReportDate(item.latest_stock_movement_date) + '</span>' +
+        '<span>רכישות לא נקלטו: ' + (item.has_unreceived_purchases ? 'כן' : 'לא') + '</span>' +
+        '<span>מוצר ' + (Number(item.product_is_active) === 0 ? 'מושבת' : 'פעיל') + '</span>' +
+      '</div>' +
+      (item.note ? '<div style="margin-top:8px;font-size:12px;color:var(--text2);white-space:pre-wrap"><strong>הערה:</strong> ' + item.note + '</div>' : '') +
+    '</div>';
+  }).join('');
+
+  return '<div class="info-section"><div class="info-section-title">תכנון מלאי לאירוע</div><div style="font-size:12px;color:var(--text3);margin-bottom:10px">תצוגה לקריאה בלבד של הקצאות מלאי, בלי לבצע שמירה או צריכה בפועל.</div>' + rows + '</div>';
+}
+
 function openEventDetailsModal(id) {
   Promise.all([
     apiCall('GET', '/api/leads/' + id),
     apiCall('GET', '/api/leads/' + id + '/employees').catch(function() { return { assignments: [] }; }),
-    apiCall('GET', '/api/employees').catch(function() { return { employees: [] }; })
+    apiCall('GET', '/api/employees').catch(function() { return { employees: [] }; }),
+    apiCall('GET', '/api/leads/' + id + '/inventory').catch(function() { return { allocations: [] }; })
   ]).then(function(results) {
     var data = results[0] || {};
     var assignmentsData = results[1] || { assignments: [] };
     var employeesData = results[2] || { employees: [] };
+    var inventoryData = results[3] || { allocations: [] };
     var l = data.lead || {};
     var assignments = assignmentsData.assignments || [];
     var employees = employeesData.employees || [];
@@ -5037,6 +5073,7 @@ function openEventDetailsModal(id) {
           '<div class="info-section"><div class="info-section-title">הערות</div>' +
           '<div style="font-size:13px;color:var(--text2);line-height:1.7;white-space:pre-wrap">' + (l.details || l.notes || 'אין הערות') + '</div>' +
           '</div>' +
+          renderEventInventoryPlanningSection(inventoryData) +
           '<div id="event-assignments-section"></div>' +
         '</div>' +
         '<div class="modal-footer">' +
