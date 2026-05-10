@@ -3517,6 +3517,25 @@ function renderProductReportsTable(title, emptyText, rowsHtml, columnsHtml, subt
   '</div>';
 }
 
+function getOperationalAlertSeverityBadge(kind) {
+  var map = {
+    urgent: '<span class="badge badge-urgent">דחוף</span>',
+    attention: '<span class="badge badge-attention">לטיפול</span>',
+    info: '<span class="badge badge-stable">במעקב</span>'
+  };
+  return map[kind] || map.info;
+}
+
+function renderOperationalAlertsCard(title, count, subtitle, itemsHtml, emptyText, severity) {
+  return '<div class="product-ops-card">' +
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">' +
+      '<div><div class="product-ops-card-title">' + title + '</div><div class="product-ops-card-subtitle">' + subtitle + '</div></div>' +
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge badge-purple">' + count + '</span>' + getOperationalAlertSeverityBadge(severity) + '</div>' +
+    '</div>' +
+    (itemsHtml ? '<div class="product-ops-list" style="margin-top:12px">' + itemsHtml + '</div>' : '<div class="product-ops-empty" style="margin-top:12px">' + emptyText + '</div>') +
+  '</div>';
+}
+
 function loadProductPurchaseReports() {
   currentProductsView = 'reports';
   var content = document.getElementById('products-page-content');
@@ -3526,18 +3545,24 @@ function loadProductPurchaseReports() {
 
   Promise.all([
     apiCall('GET', '/api/products?includeInactive=1'),
-    apiCall('GET', '/api/shopping-lists')
+    apiCall('GET', '/api/shopping-lists'),
+    apiCall('GET', '/api/inventory/low-stock').catch(function() { return { products: [] }; })
   ]).then(function(results) {
     var products = results[0].products || [];
     var shoppingLists = results[1].lists || [];
+    var lowStockProducts = (results[2] && results[2].products) || [];
     var shoppingListsMap = {};
     shoppingLists.forEach(function(list) { shoppingListsMap[list.id] = list.name || ('חנות #' + list.id); });
 
     return Promise.all(products.map(function(product) {
-      return apiCall('GET', '/api/products/' + product.id + '/purchases?limit=200&offset=0').then(function(data) {
+      return Promise.all([
+        apiCall('GET', '/api/products/' + product.id + '/purchases?limit=200&offset=0').catch(function() { return { purchases: [] }; }),
+        apiCall('GET', '/api/products/' + product.id + '/stock-movements?limit=10&offset=0').catch(function() { return { movements: [] }; })
+      ]).then(function(productResults) {
         return {
           product: product,
-          purchases: data.purchases || []
+          purchases: (productResults[0] && productResults[0].purchases) || [],
+          movements: (productResults[1] && productResults[1].movements) || []
         };
       });
     })).then(function(productEntries) {
@@ -3552,6 +3577,8 @@ function loadProductPurchaseReports() {
       var recentShoppingLinked = [];
       var supplierVariationProducts = [];
       var supplierPriceIncreases = [];
+      var unreceivedPurchases = [];
+      var unusualMovements = [];
 
       productEntries.forEach(function(entry) {
         entry.purchases.forEach(function(purchase) {
@@ -3588,6 +3615,25 @@ function loadProductPurchaseReports() {
           }
 
           if (normalized.isShopping) recentShoppingLinked.push(normalized);
+          if (Number(purchase.stock_received) !== 1) {
+            unreceivedPurchases.push({
+              product: entry.product,
+              purchase: purchase
+            });
+          }
+        });
+
+        (entry.movements || []).forEach(function(movement) {
+          var quantityChange = Math.abs(Number(movement.quantity_change || 0));
+          var isManual = movement.movement_type === 'adjustment' || movement.movement_type === 'correction';
+          var isLarge = quantityChange >= 10;
+          if (!isManual && !isLarge) return;
+          unusualMovements.push({
+            product: entry.product,
+            movement: movement,
+            isManual: isManual,
+            isLarge: isLarge
+          });
         });
       });
 
@@ -3680,6 +3726,43 @@ function loadProductPurchaseReports() {
           }
         }
       });
+
+      var syncedShoppingPurchaseItemIds = {};
+      recentShoppingLinked.forEach(function(entry) {
+        var key = Number(entry.purchase.shopping_purchase_item_id || 0);
+        if (key > 0) syncedShoppingPurchaseItemIds[key] = true;
+      });
+
+      return Promise.all(shoppingLists.map(function(list) {
+        return apiCall('GET', '/api/shopping-lists/' + list.id).catch(function() { return { purchases: [] }; });
+      })).then(function(shoppingListEntries) {
+        var shoppingPurchaseIds = {};
+        shoppingListEntries.forEach(function(listEntry) {
+          (listEntry.purchases || []).forEach(function(purchase) {
+            if (purchase && purchase.id !== undefined && purchase.id !== null) shoppingPurchaseIds[purchase.id] = true;
+          });
+        });
+
+        return Promise.all(Object.keys(shoppingPurchaseIds).map(function(id) {
+          return apiCall('GET', '/api/shopping-purchases/' + id).catch(function() { return null; });
+        })).then(function(shoppingPurchaseEntries) {
+          var unsyncedShoppingItems = [];
+          shoppingPurchaseEntries.forEach(function(entry) {
+            if (!entry || !entry.purchase) return;
+            var purchase = entry.purchase || {};
+            var items = entry.items || [];
+            items.forEach(function(item) {
+              var linkedProductId = Number(item.product_id || 0);
+              var shoppingPurchaseItemId = Number(item.id || 0);
+              if (!linkedProductId || !shoppingPurchaseItemId) return;
+              if (syncedShoppingPurchaseItemIds[shoppingPurchaseItemId]) return;
+              unsyncedShoppingItems.push({
+                purchase: purchase,
+                item: item,
+                sourceLabel: shoppingListsMap[purchase.list_id] || 'חנות #' + purchase.list_id
+              });
+            });
+          });
 
       var recentRows = allPurchases.slice().sort(function(a, b) {
         return String(b.purchase.purchase_date || '').localeCompare(String(a.purchase.purchase_date || '')) || Number(b.purchase.id || 0) - Number(a.purchase.id || 0);
@@ -3776,6 +3859,78 @@ function loadProductPurchaseReports() {
         '</tr>';
       }).join('');
 
+      var lowStockAlertItems = lowStockProducts.slice(0, 5).map(function(entry) {
+        var product = entry.product || {};
+        return '<div class="product-ops-item">' +
+          '<div class="product-ops-item-main">' +
+            '<div class="product-ops-item-title">' + (product.name || ('מוצר #' + product.id)) + '</div>' +
+            '<div class="product-ops-item-meta"><span>מלאי: ' + formatProductStockValue(entry.current_stock) + '</span><span>מינימום: ' + formatProductStockValue(entry.min_stock_alert) + '</span></div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+      var unreceivedAlertItems = unreceivedPurchases.slice().sort(function(a, b) {
+        return String(b.purchase.purchase_date || '').localeCompare(String(a.purchase.purchase_date || '')) || Number(b.purchase.id || 0) - Number(a.purchase.id || 0);
+      }).slice(0, 5).map(function(entry) {
+        return '<div class="product-ops-item">' +
+          '<div class="product-ops-item-main">' +
+            '<div class="product-ops-item-title">' + (entry.product.name || ('מוצר #' + entry.product.id)) + '</div>' +
+            '<div class="product-ops-item-meta"><span>כמות: ' + formatProductStockValue(entry.purchase.quantity) + '</span><span>תאריך: ' + formatProductReportDate(entry.purchase.purchase_date) + '</span><span>ספק: ' + (entry.purchase.supplier_name || '—') + '</span></div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+      var priceIncreaseAlertItems = priceIncreases.slice().sort(function(a, b) {
+        return b.delta - a.delta;
+      }).slice(0, 5).map(function(entry) {
+        return '<div class="product-ops-item">' +
+          '<div class="product-ops-item-main">' +
+            '<div class="product-ops-item-title">' + (entry.product.name || ('מוצר #' + entry.product.id)) + '</div>' +
+            '<div class="product-ops-item-meta"><span>מחיר קודם: ' + formatProductMoney(entry.previous.unit_price) + '</span><span>מחיר אחרון: ' + formatProductMoney(entry.latest.unit_price) + '</span><span>פער: ' + formatProductMoney(entry.delta) + '</span></div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+      var unusualMovementItems = unusualMovements.slice().sort(function(a, b) {
+        return String(b.movement.created_at || '').localeCompare(String(a.movement.created_at || '')) || Number(b.movement.id || 0) - Number(a.movement.id || 0);
+      }).slice(0, 5).map(function(entry) {
+        var movement = entry.movement || {};
+        var tags = [];
+        if (entry.isManual) tags.push('תנועה ידנית');
+        if (entry.isLarge) tags.push('כמות גדולה');
+        return '<div class="product-ops-item">' +
+          '<div class="product-ops-item-main">' +
+            '<div class="product-ops-item-title">' + (entry.product.name || ('מוצר #' + entry.product.id)) + '</div>' +
+            '<div class="product-ops-item-meta"><span>' + getMovementTypeLabel(movement.movement_type) + '</span><span>שינוי: ' + (Number(movement.quantity_change) > 0 ? '+' : '') + formatProductStockValue(movement.quantity_change) + '</span><span>' + formatDate(movement.created_at) + '</span></div>' +
+            '<div class="product-ops-item-meta"><span>' + (tags.join(' | ') || 'חריג') + '</span><span>' + (movement.reason || movement.reference_type || 'ללא סיבה') + '</span></div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+      var unsyncedShoppingAlertItems = unsyncedShoppingItems.slice().sort(function(a, b) {
+        return String(b.purchase.purchase_date || '').localeCompare(String(a.purchase.purchase_date || '')) || Number(b.purchase.id || 0) - Number(a.purchase.id || 0);
+      }).slice(0, 5).map(function(entry) {
+        return '<div class="product-ops-item">' +
+          '<div class="product-ops-item-main">' +
+            '<div class="product-ops-item-title">' + (entry.item.item_name || ('פריט #' + entry.item.id)) + '</div>' +
+            '<div class="product-ops-item-meta"><span>חנות: ' + entry.sourceLabel + '</span><span>תאריך: ' + formatProductReportDate(entry.purchase.purchase_date) + '</span><span>כמות: ' + formatProductStockValue(entry.item.quantity) + '</span></div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+      var alertsHtml = '<div class="table-card" style="margin-bottom:16px">' +
+        '<div class="table-toolbar" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">' +
+          '<div><strong>מרכז התראות תפעולי</strong><div style="font-size:12px;color:var(--text3);margin-top:4px">ריכוז קצר של נושאים שדורשים תשומת לב, על בסיס הנתונים הקיימים בלבד.</div></div>' +
+        '</div>' +
+        '<div class="product-ops-grid" style="padding:16px;padding-top:0">' +
+          renderOperationalAlertsCard('מוצרים במלאי נמוך', lowStockProducts.length, 'מוצרים פעילים שמתקרבים או ירדו מתחת למינימום.', lowStockAlertItems, 'אין כרגע מוצרים פעילים במלאי נמוך.', lowStockProducts.length ? 'urgent' : 'info') +
+          renderOperationalAlertsCard('רכישות שלא נקלטו למלאי', unreceivedPurchases.length, 'רכישות קיימות שהיסטוריית המוצרים עדיין מסמנת כלא נקלטו.', unreceivedAlertItems, 'אין כרגע רכישות שממתינות לקליטת מלאי.', unreceivedPurchases.length ? 'attention' : 'info') +
+          renderOperationalAlertsCard('מוצרים שהתייקרו', priceIncreases.length, 'השוואה בין שתי הרכישות האחרונות של כל מוצר.', priceIncreaseAlertItems, 'אין כרגע מוצרים עם עליית מחיר אחרונה.', priceIncreases.length ? 'attention' : 'info') +
+          renderOperationalAlertsCard('תנועות מלאי חריגות', unusualMovements.length, 'מוצגות רק תנועות ידניות או תנועות גדולות במיוחד, כדי להישאר שמרניים.', unusualMovementItems, 'לא זוהו כרגע תנועות מלאי חריגות לפי הכללים השמרניים.', unusualMovements.length ? 'attention' : 'info') +
+          renderOperationalAlertsCard('רכישות שופינג שלא סונכרנו', unsyncedShoppingItems.length, 'פריטי Shopping עם מוצר מקושר שעדיין לא הופיעו בהיסטוריית המוצרים.', unsyncedShoppingAlertItems, 'לא זוהו כרגע רכישות Shopping מקושרות שממתינות לסנכרון.', unsyncedShoppingItems.length ? 'attention' : 'info') +
+        '</div>' +
+      '</div>';
+
       content.innerHTML = '' +
         '<div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">' +
           '<div><div class="page-title" style="font-size:22px">דוחות רכישות</div><div style="font-size:12px;color:var(--text3);margin-top:4px">מבט מהיר על התייקרויות, רכישות משופינג, ספקים והוצאות חריגות.</div></div>' +
@@ -3787,6 +3942,7 @@ function loadProductPurchaseReports() {
           '<div class="stat-card"><div class="stat-label">מספר רכישות</div><div class="stat-value">' + allPurchases.length + '</div></div>' +
           '<div class="stat-card"><div class="stat-label">מקורות/ספקים</div><div class="stat-value">' + Object.keys(sourceMap).length + '</div></div>' +
         '</div>' +
+        alertsHtml +
         renderProductReportsTable('רכישות אחרונות', 'אין רכישות להצגה עדיין. ברגע שתתווסף היסטוריית רכישות, היא תופיע כאן.', recentRows, '<th>תאריך</th><th>מוצר</th><th>סה"כ</th><th>ספק / חנות</th><th>הערות</th>', 'כולל איתור מהיר של רכישות משופינג ומוצרים מושבתים.') +
         renderProductReportsTable('סיכום הוצאה לפי ספק / חנות', 'אין עדיין ספקים או חנויות להצגה.', sourceRows, '<th>ספק / חנות</th><th>מספר רכישות</th><th>סה"כ הוצאה</th><th>ממוצע לרכישה</th>', 'ממויין לפי סך הוצאה, עם ממוצע רכישה שיעזור להבין לאן הכסף הולך.') +
         renderProductReportsTable('המוצרים שנרכשו הכי הרבה', 'אין עדיין מוצרים עם היסטוריית רכישות.', topRows, '<th>מוצר</th><th>מספר רכישות</th><th>סה"כ הוצאה</th><th>רכישה אחרונה</th>', 'ממויין קודם לפי תדירות רכישה, ואז לפי סך הוצאה.') +
@@ -3805,6 +3961,8 @@ function loadProductPurchaseReports() {
           loadProducts();
         };
       }
+        });
+      });
     });
   }).catch(function(e) {
     content.innerHTML = '<div class="table-card"><div class="dash-empty" style="padding:24px">שגיאה בטעינת דוחות רכישות</div></div>';
