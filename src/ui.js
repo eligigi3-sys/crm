@@ -3579,6 +3579,8 @@ function loadProductPurchaseReports() {
       var supplierPriceIncreases = [];
       var unreceivedPurchases = [];
       var unusualMovements = [];
+      var productUnreceivedMap = {};
+      var productPriceIncreaseMap = {};
 
       productEntries.forEach(function(entry) {
         entry.purchases.forEach(function(purchase) {
@@ -3620,6 +3622,7 @@ function loadProductPurchaseReports() {
               product: entry.product,
               purchase: purchase
             });
+            productUnreceivedMap[entry.product.id] = true;
           }
         });
 
@@ -3647,14 +3650,16 @@ function loadProductPurchaseReports() {
           var latestPrice = Number(latest.unit_price || 0);
           var previousPrice = Number(previous.unit_price || 0);
           if (latestPrice > previousPrice) {
-            priceIncreases.push({
+            var increaseEntry = {
               product: entry.product,
               latest: latest,
               previous: previous,
               delta: latestPrice - previousPrice,
               percent: previousPrice > 0 ? ((latestPrice - previousPrice) / previousPrice) * 100 : null,
               isInactive: Number(entry.product.is_active) === 0
-            });
+            };
+            priceIncreases.push(increaseEntry);
+            productPriceIncreaseMap[entry.product.id] = increaseEntry;
           }
         }
 
@@ -3931,6 +3936,64 @@ function loadProductPurchaseReports() {
         '</div>' +
       '</div>';
 
+      var shoppingSuggestions = lowStockProducts.map(function(entry) {
+        var product = entry.product || {};
+        var currentStock = Number(entry.current_stock || 0);
+        var minStock = Number(entry.min_stock_alert || 0);
+        var latestMovementDate = '';
+        var productEntry = productEntries.find(function(candidate) { return Number(candidate.product && candidate.product.id) === Number(product.id); });
+        if (productEntry && Array.isArray(productEntry.movements) && productEntry.movements.length) {
+          latestMovementDate = String(productEntry.movements.slice().sort(function(a, b) {
+            return String(b.created_at || '').localeCompare(String(a.created_at || '')) || Number(b.id || 0) - Number(a.id || 0);
+          })[0].created_at || '').slice(0, 10);
+        }
+        var isNearThreshold = minStock > 0 && currentStock <= (minStock + 1);
+        var noRecentMovement = !latestMovementDate || latestMovementDate < last30Start;
+        return {
+          product: product,
+          currentStock: currentStock,
+          minStock: minStock,
+          hasUnreceived: !!productUnreceivedMap[product.id],
+          priceIncrease: productPriceIncreaseMap[product.id] || null,
+          latestMovementDate: latestMovementDate,
+          noRecentMovement: noRecentMovement,
+          isNearThreshold: isNearThreshold,
+          priority: (currentStock <= 0 ? 100 : 0) + (currentStock < minStock ? 50 : 0) + (isNearThreshold ? 20 : 0) + (noRecentMovement ? 10 : 0)
+        };
+      }).sort(function(a, b) {
+        return b.priority - a.priority || a.currentStock - b.currentStock || a.product.name.localeCompare(b.product.name);
+      });
+
+      var shoppingSuggestionItems = shoppingSuggestions.slice(0, 6).map(function(entry) {
+        var notes = [];
+        var badge = getOperationalAlertSeverityBadge(entry.currentStock <= 0 ? 'urgent' : 'attention');
+        if (entry.hasUnreceived) {
+          notes.push('יש רכישה פתוחה שעדיין לא נקלטה, כדאי לבדוק לפני קנייה נוספת');
+        } else {
+          notes.push('מומלץ לבדוק אם צריך לחדש מלאי בקרוב');
+        }
+        if (entry.priceIncrease) {
+          notes.push('זהירות מחיר: עלייה אחרונה של ' + formatProductMoney(entry.priceIncrease.delta));
+        }
+        if (entry.noRecentMovement && entry.isNearThreshold) {
+          notes.push('לא זוהתה תנועת מלאי עדכנית לאחרונה, למרות שהמוצר קרוב לסף');
+        }
+        return '<div class="product-ops-item">' +
+          '<div class="product-ops-item-main">' +
+            '<div class="product-ops-item-title" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' + (entry.product.name || ('מוצר #' + entry.product.id)) + badge + '</div>' +
+            '<div class="product-ops-item-meta"><span>מלאי: ' + formatProductStockValue(entry.currentStock) + '</span><span>מינימום: ' + formatProductStockValue(entry.minStock) + '</span>' + (entry.latestMovementDate ? '<span>תנועה אחרונה: ' + formatProductReportDate(entry.latestMovementDate) + '</span>' : '<span>אין תנועה עדכנית</span>') + '</div>' +
+            '<div class="product-ops-item-meta"><span>' + notes.join(' | ') + '</span></div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+      var suggestionsHtml = '<div class="table-card" style="margin-bottom:16px">' +
+        '<div class="table-toolbar" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">' +
+          '<div><strong>המלצות לבדיקה לפני קנייה</strong><div style="font-size:12px;color:var(--text3);margin-top:4px">רשימת מוצרים שכדאי לשקול לבדוק, בלי לפתוח רשימת קניות ובלי לבצע פעולה אוטומטית.</div></div>' +
+        '</div>' +
+        (shoppingSuggestionItems ? '<div class="product-ops-list" style="padding:16px;padding-top:0">' + shoppingSuggestionItems + '</div>' : '<div class="dash-empty" style="padding:16px">אין כרגע מוצרים שדורשים בדיקת קנייה לפי הכללים השמרניים.</div>') +
+      '</div>';
+
       content.innerHTML = '' +
         '<div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">' +
           '<div><div class="page-title" style="font-size:22px">דוחות רכישות</div><div style="font-size:12px;color:var(--text3);margin-top:4px">מבט מהיר על התייקרויות, רכישות משופינג, ספקים והוצאות חריגות.</div></div>' +
@@ -3943,6 +4006,7 @@ function loadProductPurchaseReports() {
           '<div class="stat-card"><div class="stat-label">מקורות/ספקים</div><div class="stat-value">' + Object.keys(sourceMap).length + '</div></div>' +
         '</div>' +
         alertsHtml +
+        suggestionsHtml +
         renderProductReportsTable('רכישות אחרונות', 'אין רכישות להצגה עדיין. ברגע שתתווסף היסטוריית רכישות, היא תופיע כאן.', recentRows, '<th>תאריך</th><th>מוצר</th><th>סה"כ</th><th>ספק / חנות</th><th>הערות</th>', 'כולל איתור מהיר של רכישות משופינג ומוצרים מושבתים.') +
         renderProductReportsTable('סיכום הוצאה לפי ספק / חנות', 'אין עדיין ספקים או חנויות להצגה.', sourceRows, '<th>ספק / חנות</th><th>מספר רכישות</th><th>סה"כ הוצאה</th><th>ממוצע לרכישה</th>', 'ממויין לפי סך הוצאה, עם ממוצע רכישה שיעזור להבין לאן הכסף הולך.') +
         renderProductReportsTable('המוצרים שנרכשו הכי הרבה', 'אין עדיין מוצרים עם היסטוריית רכישות.', topRows, '<th>מוצר</th><th>מספר רכישות</th><th>סה"כ הוצאה</th><th>רכישה אחרונה</th>', 'ממויין קודם לפי תדירות רכישה, ואז לפי סך הוצאה.') +
