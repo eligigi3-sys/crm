@@ -181,6 +181,7 @@ export async function handleLeads(request, env, path) {
   const assignmentIdMatch = path.match(/^\/api\/lead-employees\/(\d+)$/);
   const leadEmployeesMatch = path.match(/^\/api\/leads\/(\d+)\/employees$/);
   const leadInventoryMatch = path.match(/^\/api\/leads\/(\d+)\/inventory$/);
+  const leadInventoryActionsMatch = path.match(/^\/api\/leads\/(\d+)\/inventory-actions$/);
   const leadInventoryAllocationMatch = path.match(/^\/api\/leads\/(\d+)\/inventory\/(\d+)$/);
   const leadInventoryAllocationCancelMatch = path.match(/^\/api\/leads\/(\d+)\/inventory\/(\d+)\/cancel$/);
 
@@ -281,6 +282,88 @@ export async function handleLeads(request, env, path) {
         shortage_count: allocations.filter(function(item) { return item.is_short; }).length
       },
       allocations
+    };
+  }
+
+  if (leadInventoryActionsMatch && method === 'GET') {
+    const leadId = Number(leadInventoryActionsMatch[1]);
+    const event = await env.DB.prepare(`
+      SELECT
+        leads.*,
+        contacts.contact_num,
+        contacts.name AS contact_name
+      FROM leads
+      LEFT JOIN contacts ON leads.contact_id = contacts.id
+      WHERE leads.id = ?
+    `).bind(leadId).first();
+
+    if (!event) throw new Error('Lead not found');
+
+    const { results } = await env.DB.prepare(`
+      SELECT
+        eia.id,
+        eia.event_id,
+        eia.allocation_id,
+        eia.product_id,
+        eia.action_type,
+        eia.quantity,
+        eia.note,
+        eia.performed_at,
+        eia.created_at,
+        eia.updated_at,
+        p.name AS product_name,
+        p.category AS product_category,
+        p.sku AS product_sku,
+        p.unit AS product_unit,
+        p.is_active AS product_is_active,
+        psm.id AS stock_movement_id,
+        psm.movement_type AS stock_movement_type,
+        psm.quantity_change AS stock_movement_quantity_change,
+        psm.created_at AS stock_movement_created_at
+      FROM event_inventory_actions eia
+      INNER JOIN products p ON p.id = eia.product_id
+      LEFT JOIN product_stock_movements psm ON psm.event_inventory_action_id = eia.id
+      WHERE eia.event_id = ?
+      ORDER BY eia.performed_at DESC, eia.id DESC
+    `).bind(leadId).all();
+
+    const actions = (results || []).map(function(row) {
+      return {
+        id: row.id,
+        action_type: row.action_type,
+        quantity: Number(row.quantity || 0),
+        note: row.note || null,
+        performed_at: row.performed_at || null,
+        created_at: row.created_at || null,
+        allocation_id: row.allocation_id || null,
+        product_id: row.product_id,
+        product_name: row.product_name,
+        product_category: row.product_category,
+        product_sku: row.product_sku,
+        product_unit: row.product_unit,
+        product_is_active: row.product_is_active,
+        stock_movement: row.stock_movement_id ? {
+          exists: true,
+          id: row.stock_movement_id,
+          movement_type: row.stock_movement_type,
+          quantity_change: Number(row.stock_movement_quantity_change || 0),
+          created_at: row.stock_movement_created_at || null
+        } : {
+          exists: false,
+          id: null,
+          movement_type: null,
+          quantity_change: null,
+          created_at: null
+        }
+      };
+    });
+
+    return {
+      event,
+      summary: {
+        action_count: actions.length
+      },
+      actions
     };
   }
 

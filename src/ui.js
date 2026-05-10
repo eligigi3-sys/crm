@@ -5008,6 +5008,21 @@ function getAllocationStatusLabel(status) {
   return labels[status] || status || '—';
 }
 
+function getInventoryActionTypeLabel(actionType) {
+  var labels = { usage: 'שימוש', return: 'החזרה', damage: 'נזק', loss: 'אובדן' };
+  return labels[actionType] || actionType || '—';
+}
+
+function getInventoryActionTypeBadge(actionType) {
+  var badgeClass = {
+    usage: 'badge-blue',
+    return: 'badge-green',
+    damage: 'badge-orange',
+    loss: 'badge-red'
+  }[actionType] || 'badge-gray';
+  return '<span class="badge ' + badgeClass + '">' + escapeHtml(getInventoryActionTypeLabel(actionType)) + '</span>';
+}
+
 function parseAllocationPreviewNumber(value) {
   if (value === undefined || value === null || value === '') return 0;
   var num = Number(value);
@@ -5043,6 +5058,35 @@ function getAllocationFormPreview(formState, currentAllocation) {
     availableStock: availableStock,
     warnings: warnings
   };
+}
+
+function renderEventInventoryActionsSection(actionsData) {
+  var actions = (actionsData && actionsData.actions) || [];
+  if (!actions.length) {
+    return '<div class="info-section"><div class="info-section-title">פעילות מלאי בפועל</div><div style="font-size:13px;color:var(--text3);padding:8px 0">אין עדיין פעולות מלאי בפועל לאירוע הזה. כשהמערכת תתמוך ברישום שימוש, החזרות או אובדן, הן יוצגו כאן כציר זמן נפרד מהתכנון.</div></div>';
+  }
+
+  var rows = actions.map(function(action) {
+    var stockMovementText = action.stock_movement && action.stock_movement.exists
+      ? 'תנועת מלאי קיימת #' + action.stock_movement.id + ' (' + (action.stock_movement.movement_type || '—') + ')'
+      : 'עדיין אין תנועת מלאי מקושרת';
+
+    return '<div style="border-right:3px solid var(--border);padding:0 12px 14px 0;margin:0 0 14px 0">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:6px">' +
+        '<div><div style="font-weight:700;color:var(--text)">' + escapeHtml(action.product_name || ('מוצר #' + action.product_id)) + '</div><div style="font-size:12px;color:var(--text3)">' + escapeHtml(action.product_category || 'ללא קטגוריה') + (action.product_sku ? ' | SKU: ' + escapeHtml(action.product_sku) : '') + '</div></div>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' + getInventoryActionTypeBadge(action.action_type) + '<span class="badge badge-gray">כמות ' + escapeHtml(formatProductStockValue(action.quantity)) + '</span></div>' +
+      '</div>' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--text3);margin-bottom:6px">' +
+        '<span>בוצע: ' + formatProductReportDate(action.performed_at) + '</span>' +
+        '<span>נרשם: ' + formatProductReportDate(action.created_at) + '</span>' +
+        '<span>הקצאה: ' + (action.allocation_id ? ('#' + action.allocation_id) : 'ללא') + '</span>' +
+        '<span>' + escapeHtml(stockMovementText) + '</span>' +
+      '</div>' +
+      (action.note ? '<div style="font-size:12px;color:var(--text2);white-space:pre-wrap"><strong>הערה:</strong> ' + escapeHtml(action.note) + '</div>' : '') +
+    '</div>';
+  }).join('');
+
+  return '<div class="info-section"><div class="info-section-title">פעילות מלאי בפועל</div><div style="font-size:12px;color:var(--text3);margin-bottom:10px">ציר זמן לקריאה בלבד של פעולות מלאי אמיתיות, נפרד מתכנון ההקצאות. כרגע זו תצוגה בלבד, בלי יצירה או שינוי.</div>' + rows + '</div>';
 }
 
 function renderEventInventoryPlanningSection(inventoryData, productOptions, formState) {
@@ -5149,13 +5193,15 @@ function openEventDetailsModal(id) {
     apiCall('GET', '/api/leads/' + id + '/employees').catch(function() { return { assignments: [] }; }),
     apiCall('GET', '/api/employees').catch(function() { return { employees: [] }; }),
     apiCall('GET', '/api/leads/' + id + '/inventory').catch(function() { return { allocations: [] }; }),
+    apiCall('GET', '/api/leads/' + id + '/inventory-actions').catch(function() { return { actions: [] }; }),
     apiCall('GET', '/api/products?includeInactive=1').catch(function() { return { products: [] }; })
   ]).then(function(results) {
     var data = results[0] || {};
     var assignmentsData = results[1] || { assignments: [] };
     var employeesData = results[2] || { employees: [] };
     var inventoryData = results[3] || { allocations: [] };
-    var productsData = results[4] || { products: [] };
+    var inventoryActionsData = results[4] || { actions: [] };
+    var productsData = results[5] || { products: [] };
     var l = data.lead || {};
     var assignments = assignmentsData.assignments || [];
     var employees = employeesData.employees || [];
@@ -5193,6 +5239,7 @@ function openEventDetailsModal(id) {
           '<div style="font-size:13px;color:var(--text2);line-height:1.7;white-space:pre-wrap">' + (l.details || l.notes || 'אין הערות') + '</div>' +
           '</div>' +
           '<div id="event-inventory-section"></div>' +
+          '<div id="event-inventory-actions-section"></div>' +
           '<div id="event-assignments-section"></div>' +
         '</div>' +
         '<div class="modal-footer">' +
@@ -5206,6 +5253,7 @@ function openEventDetailsModal(id) {
     renderEventAssignments(document.getElementById('event-assignments-section'), id, assignments, employees);
 
     var inventorySectionEl = document.getElementById('event-inventory-section');
+    var inventoryActionsSectionEl = document.getElementById('event-inventory-actions-section');
 
     function buildAllocationFormState(allocation, extra) {
       extra = extra || {};
@@ -5355,6 +5403,9 @@ function openEventDetailsModal(id) {
     }
 
     renderInventorySection(null);
+    if (inventoryActionsSectionEl) {
+      inventoryActionsSectionEl.innerHTML = renderEventInventoryActionsSection(inventoryActionsData);
+    }
 
     function close() { overlay.remove(); }
 
