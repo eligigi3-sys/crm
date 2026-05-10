@@ -4994,18 +4994,72 @@ function makeTinyEditButton(c, field, label, inputType) {
 }
 
 
-function renderEventInventoryPlanningSection(inventoryData) {
+function escapeHtml(value) {
+  return String(value === undefined || value === null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function getAllocationStatusLabel(status) {
+  var labels = { draft: 'טיוטה', reserved: 'שמור', cancelled: 'בוטל' };
+  return labels[status] || status || '—';
+}
+
+function renderEventInventoryPlanningSection(inventoryData, productOptions, formState) {
   var allocations = (inventoryData && inventoryData.allocations) || [];
-  if (!allocations.length) {
-    return '<div class="info-section"><div class="info-section-title">תכנון מלאי לאירוע</div><div style="font-size:13px;color:var(--text3)">אין עדיין תכנון מלאי לאירוע הזה.</div></div>';
+  var allProducts = Array.isArray(productOptions) ? productOptions : [];
+  var currentAllocation = null;
+  var formHtml = '';
+
+  if (formState && formState.allocationId) {
+    currentAllocation = allocations.find(function(item) { return Number(item.id) === Number(formState.allocationId); }) || null;
+  }
+
+  if (formState) {
+    var isEdit = formState.mode === 'edit';
+    var selectableProducts = allProducts.filter(function(product) {
+      if (isEdit && currentAllocation && Number(product.id) === Number(currentAllocation.product_id)) return true;
+      return Number(product.is_active) === 1;
+    });
+
+    var productOptionsHtml = ['<option value="">בחר מוצר</option>'].concat(selectableProducts.map(function(product) {
+      var selected = Number(formState.product_id) === Number(product.id) ? ' selected' : '';
+      var activeLabel = Number(product.is_active) === 0 ? ' (לא פעיל)' : '';
+      return '<option value="' + product.id + '"' + selected + '>' + escapeHtml(product.name || ('מוצר #' + product.id)) + activeLabel + '</option>';
+    })).join('');
+
+    formHtml =
+      '<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px;background:#f8fafc">' +
+        '<div style="font-weight:700;margin-bottom:10px">' + (isEdit ? 'עריכת הקצאה' : 'הוספת מוצר לתכנון') + '</div>' +
+        (formState.error ? '<div style="margin-bottom:10px;padding:8px 10px;border-radius:8px;background:#fef2f2;color:#b91c1c;font-size:12px">' + escapeHtml(formState.error) + '</div>' : '') +
+        '<div style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px">' +
+          '<select class="form-input" id="event-allocation-product">' + productOptionsHtml + '</select>' +
+          '<input class="form-input" id="event-allocation-planned" type="number" min="0" step="0.01" placeholder="כמות מתוכננת" value="' + escapeHtml(formState.planned_quantity) + '">' +
+          '<input class="form-input" id="event-allocation-reserved" type="number" min="0" step="0.01" placeholder="כמות שמורה" value="' + escapeHtml(formState.reserved_quantity) + '">' +
+          '<select class="form-input" id="event-allocation-status">' +
+            '<option value="draft"' + (formState.status === 'draft' ? ' selected' : '') + '>טיוטה</option>' +
+            '<option value="reserved"' + (formState.status === 'reserved' ? ' selected' : '') + '>שמור</option>' +
+            '<option value="cancelled"' + (formState.status === 'cancelled' ? ' selected' : '') + '>בוטל</option>' +
+          '</select>' +
+        '</div>' +
+        '<textarea class="form-input" id="event-allocation-note" rows="2" placeholder="הערה...">' + escapeHtml(formState.note) + '</textarea>' +
+        '<div style="margin-top:8px;font-size:12px;color:var(--text3)">אפשר לתכנן יותר מהמלאי הזמין, אבל אי אפשר לשמור כמות reserved שגדולה מהמלאי הזמין כרגע.</div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">' +
+          '<button class="btn btn-secondary btn-sm" id="event-allocation-form-cancel">ביטול</button>' +
+          '<button class="btn btn-primary btn-sm" id="event-allocation-form-save">שמור</button>' +
+        '</div>' +
+      '</div>';
   }
 
   var rows = allocations.map(function(item) {
     var stockBadge = item.is_short ? '<span class="badge badge-red">חסר מלאי</span>' : '<span class="badge badge-green">מספיק מלאי</span>';
     return '<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;background:#fafbfc">' +
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:8px">' +
-        '<div><div style="font-weight:700;color:var(--text)">' + (item.product_name || ('מוצר #' + item.product_id)) + '</div><div style="font-size:12px;color:var(--text3)">' + (item.product_category || 'ללא קטגוריה') + (item.product_sku ? ' | SKU: ' + item.product_sku : '') + (item.product_unit ? ' | יחידה: ' + item.product_unit : '') + '</div></div>' +
-        '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' + stockBadge + '<span class="badge badge-purple">' + (item.status || '—') + '</span></div>' +
+        '<div><div style="font-weight:700;color:var(--text)">' + escapeHtml(item.product_name || ('מוצר #' + item.product_id)) + '</div><div style="font-size:12px;color:var(--text3)">' + escapeHtml(item.product_category || 'ללא קטגוריה') + (item.product_sku ? ' | SKU: ' + escapeHtml(item.product_sku) : '') + (item.product_unit ? ' | יחידה: ' + escapeHtml(item.product_unit) : '') + '</div></div>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' + stockBadge + '<span class="badge badge-purple">' + escapeHtml(getAllocationStatusLabel(item.status)) + '</span></div>' +
       '</div>' +
       '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:8px">' +
         '<div style="font-size:12px;color:var(--text2)"><strong>מתוכנן:</strong> ' + formatProductStockValue(item.planned_quantity) + '</div>' +
@@ -5021,11 +5075,15 @@ function renderEventInventoryPlanningSection(inventoryData) {
         '<span>רכישות לא נקלטו: ' + (item.has_unreceived_purchases ? 'כן' : 'לא') + '</span>' +
         '<span>מוצר ' + (Number(item.product_is_active) === 0 ? 'מושבת' : 'פעיל') + '</span>' +
       '</div>' +
-      (item.note ? '<div style="margin-top:8px;font-size:12px;color:var(--text2);white-space:pre-wrap"><strong>הערה:</strong> ' + item.note + '</div>' : '') +
+      (item.note ? '<div style="margin-top:8px;font-size:12px;color:var(--text2);white-space:pre-wrap"><strong>הערה:</strong> ' + escapeHtml(item.note) + '</div>' : '') +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">' +
+        '<button class="btn btn-secondary btn-sm event-allocation-edit-btn" data-allocation-id="' + item.id + '">עריכה</button>' +
+        (item.status === 'cancelled' ? '' : '<button class="btn btn-ghost btn-sm event-allocation-cancel-btn" data-allocation-id="' + item.id + '">ביטול הקצאה</button>') +
+      '</div>' +
     '</div>';
   }).join('');
 
-  return '<div class="info-section"><div class="info-section-title">תכנון מלאי לאירוע</div><div style="font-size:12px;color:var(--text3);margin-bottom:10px">תצוגה לקריאה בלבד של הקצאות מלאי, בלי לבצע שמירה או צריכה בפועל.</div>' + rows + '</div>';
+  return '<div class="info-section"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px"><div class="info-section-title">תכנון מלאי לאירוע</div><button class="btn btn-secondary btn-sm" id="event-allocation-add-btn">הוסף מוצר לתכנון</button></div><div style="font-size:12px;color:var(--text3);margin-bottom:10px">תכנון ושמירה ידניים בלבד, בלי לבצע שינוי במלאי האמיתי.</div>' + formHtml + (rows || '<div style="font-size:13px;color:var(--text3)">אין עדיין תכנון מלאי לאירוע הזה.</div>') + '</div>';
 }
 
 function openEventDetailsModal(id) {
@@ -5033,15 +5091,19 @@ function openEventDetailsModal(id) {
     apiCall('GET', '/api/leads/' + id),
     apiCall('GET', '/api/leads/' + id + '/employees').catch(function() { return { assignments: [] }; }),
     apiCall('GET', '/api/employees').catch(function() { return { employees: [] }; }),
-    apiCall('GET', '/api/leads/' + id + '/inventory').catch(function() { return { allocations: [] }; })
+    apiCall('GET', '/api/leads/' + id + '/inventory').catch(function() { return { allocations: [] }; }),
+    apiCall('GET', '/api/products?includeInactive=1').catch(function() { return { products: [] }; })
   ]).then(function(results) {
     var data = results[0] || {};
     var assignmentsData = results[1] || { assignments: [] };
     var employeesData = results[2] || { employees: [] };
     var inventoryData = results[3] || { allocations: [] };
+    var productsData = results[4] || { products: [] };
     var l = data.lead || {};
     var assignments = assignmentsData.assignments || [];
     var employees = employeesData.employees || [];
+    var inventoryProducts = productsData.products || [];
+    var currentInventoryData = inventoryData;
     var old = document.getElementById('event-details-modal');
     if (old) old.remove();
 
@@ -5073,7 +5135,7 @@ function openEventDetailsModal(id) {
           '<div class="info-section"><div class="info-section-title">הערות</div>' +
           '<div style="font-size:13px;color:var(--text2);line-height:1.7;white-space:pre-wrap">' + (l.details || l.notes || 'אין הערות') + '</div>' +
           '</div>' +
-          renderEventInventoryPlanningSection(inventoryData) +
+          '<div id="event-inventory-section"></div>' +
           '<div id="event-assignments-section"></div>' +
         '</div>' +
         '<div class="modal-footer">' +
@@ -5085,6 +5147,128 @@ function openEventDetailsModal(id) {
 
     document.body.appendChild(overlay);
     renderEventAssignments(document.getElementById('event-assignments-section'), id, assignments, employees);
+
+    var inventorySectionEl = document.getElementById('event-inventory-section');
+
+    function buildAllocationFormState(allocation, extra) {
+      extra = extra || {};
+      return {
+        mode: extra.mode || (allocation ? 'edit' : 'create'),
+        allocationId: allocation ? allocation.id : null,
+        product_id: extra.product_id !== undefined ? extra.product_id : (allocation ? allocation.product_id : ''),
+        planned_quantity: extra.planned_quantity !== undefined ? extra.planned_quantity : (allocation ? String(allocation.planned_quantity) : ''),
+        reserved_quantity: extra.reserved_quantity !== undefined ? extra.reserved_quantity : (allocation ? String(allocation.reserved_quantity) : ''),
+        status: extra.status !== undefined ? extra.status : (allocation ? allocation.status : 'draft'),
+        note: extra.note !== undefined ? extra.note : (allocation ? (allocation.note || '') : ''),
+        error: extra.error || ''
+      };
+    }
+
+    function bindInventorySectionActions() {
+      var addBtn = document.getElementById('event-allocation-add-btn');
+      if (addBtn) {
+        addBtn.onclick = function() {
+          renderInventorySection(buildAllocationFormState(null, { mode: 'create' }));
+        };
+      }
+
+      var formCancelBtn = document.getElementById('event-allocation-form-cancel');
+      if (formCancelBtn) {
+        formCancelBtn.onclick = function() {
+          renderInventorySection(null);
+        };
+      }
+
+      var formSaveBtn = document.getElementById('event-allocation-form-save');
+      if (formSaveBtn) {
+        formSaveBtn.onclick = function() {
+          var formState = {
+            mode: formSaveBtn.getAttribute('data-mode') || 'create',
+            allocationId: formSaveBtn.getAttribute('data-allocation-id') || '',
+            product_id: document.getElementById('event-allocation-product').value,
+            planned_quantity: document.getElementById('event-allocation-planned').value,
+            reserved_quantity: document.getElementById('event-allocation-reserved').value,
+            status: document.getElementById('event-allocation-status').value,
+            note: document.getElementById('event-allocation-note').value
+          };
+
+          var payload = {
+            product_id: formState.product_id,
+            planned_quantity: formState.planned_quantity,
+            reserved_quantity: formState.reserved_quantity,
+            status: formState.status,
+            note: formState.note
+          };
+          var isEdit = formState.mode === 'edit' && formState.allocationId;
+          var requestPath = isEdit ? '/api/leads/' + id + '/inventory/' + formState.allocationId : '/api/leads/' + id + '/inventory';
+          var requestMethod = isEdit ? 'PUT' : 'POST';
+
+          apiCall(requestMethod, requestPath, payload).then(function() {
+            toast(isEdit ? 'הקצאה עודכנה' : 'הקצאה נוספה', 'success');
+            refreshInventorySection();
+          }).catch(function(e) {
+            renderInventorySection(buildAllocationFormState(isEdit ? currentInventoryData.allocations.find(function(item) { return String(item.id) === String(formState.allocationId); }) : null, {
+              mode: isEdit ? 'edit' : 'create',
+              allocationId: formState.allocationId,
+              product_id: formState.product_id,
+              planned_quantity: formState.planned_quantity,
+              reserved_quantity: formState.reserved_quantity,
+              status: formState.status,
+              note: formState.note,
+              error: e.message
+            }));
+          });
+        };
+      }
+
+      document.querySelectorAll('.event-allocation-edit-btn').forEach(function(btn) {
+        btn.onclick = function() {
+          var allocationId = Number(btn.getAttribute('data-allocation-id'));
+          var allocation = currentInventoryData.allocations.find(function(item) { return Number(item.id) === allocationId; });
+          if (!allocation) return;
+          renderInventorySection(buildAllocationFormState(allocation, { mode: 'edit' }));
+        };
+      });
+
+      document.querySelectorAll('.event-allocation-cancel-btn').forEach(function(btn) {
+        btn.onclick = function() {
+          var allocationId = btn.getAttribute('data-allocation-id');
+          if (!confirm('לבטל את ההקצאה הזו?')) return;
+          apiCall('POST', '/api/leads/' + id + '/inventory/' + allocationId + '/cancel').then(function() {
+            toast('ההקצאה בוטלה', 'success');
+            refreshInventorySection();
+          }).catch(function(e) {
+            toast(e.message, 'error');
+          });
+        };
+      });
+
+      var saveBtnEl = document.getElementById('event-allocation-form-save');
+      if (saveBtnEl && inventorySectionEl) {
+        var modeHolder = inventorySectionEl.getAttribute('data-form-mode') || '';
+        var allocationIdHolder = inventorySectionEl.getAttribute('data-form-allocation-id') || '';
+        saveBtnEl.setAttribute('data-mode', modeHolder);
+        saveBtnEl.setAttribute('data-allocation-id', allocationIdHolder);
+      }
+    }
+
+    function renderInventorySection(formState) {
+      inventorySectionEl.innerHTML = renderEventInventoryPlanningSection(currentInventoryData, inventoryProducts, formState);
+      inventorySectionEl.setAttribute('data-form-mode', formState ? formState.mode : '');
+      inventorySectionEl.setAttribute('data-form-allocation-id', formState && formState.allocationId ? formState.allocationId : '');
+      bindInventorySectionActions();
+    }
+
+    function refreshInventorySection(formState) {
+      apiCall('GET', '/api/leads/' + id + '/inventory').then(function(data) {
+        currentInventoryData = data || { allocations: [] };
+        renderInventorySection(formState || null);
+      }).catch(function(e) {
+        toast(e.message, 'error');
+      });
+    }
+
+    renderInventorySection(null);
 
     function close() { overlay.remove(); }
 

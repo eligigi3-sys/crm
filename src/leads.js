@@ -100,12 +100,89 @@ async function getReservedElsewhereForProduct(productId, eventId, env) {
   return Number(row && row.reserved_elsewhere !== undefined && row.reserved_elsewhere !== null ? row.reserved_elsewhere : 0);
 }
 
+async function getProductById(productId, env) {
+  return env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(productId).first();
+}
+
+async function getEventAllocationById(allocationId, env) {
+  return env.DB.prepare('SELECT * FROM event_product_allocations WHERE id = ?').bind(allocationId).first();
+}
+
+function normalizeAllocationStatus(value) {
+  const status = String(value || 'draft').trim().toLowerCase();
+  if (!['draft', 'reserved', 'cancelled'].includes(status)) throw new Error('סטטוס הקצאה לא תקין');
+  return status;
+}
+
+function normalizeAllocationNumber(value, fieldLabel) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) throw new Error(fieldLabel + ' לא תקין');
+  if (num < 0) throw new Error(fieldLabel + ' לא יכול להיות שלילי');
+  return Math.round(num * 100) / 100;
+}
+
+function normalizeAllocationNote(value) {
+  if (value === undefined || value === null) return null;
+  const text = String(value).trim();
+  return text ? text : null;
+}
+
+function isUniqueConstraintError(err) {
+  const text = String((err && err.message) || err || '');
+  return text.indexOf('UNIQUE constraint failed') !== -1;
+}
+
+async function validateAllocationPayload(payload, env, eventId, existingAllocation) {
+  const productId = Number(payload.product_id !== undefined ? payload.product_id : existingAllocation && existingAllocation.product_id);
+  if (!Number.isInteger(productId) || productId <= 0) throw new Error('product_id חובה');
+
+  const product = await getProductById(productId, env);
+  if (!product) throw new Error('מוצר לא נמצא');
+  if (!existingAllocation && Number(product.is_active) === 0) throw new Error('לא ניתן להוסיף מוצר לא פעיל לתכנון');
+
+  const plannedQuantity = normalizeAllocationNumber(
+    payload.planned_quantity !== undefined ? payload.planned_quantity : existingAllocation && existingAllocation.planned_quantity,
+    'כמות מתוכננת'
+  );
+  const reservedQuantity = normalizeAllocationNumber(
+    payload.reserved_quantity !== undefined ? payload.reserved_quantity : existingAllocation && existingAllocation.reserved_quantity,
+    'כמות שמורה'
+  );
+  const status = normalizeAllocationStatus(payload.status !== undefined ? payload.status : existingAllocation && existingAllocation.status);
+  const note = normalizeAllocationNote(payload.note !== undefined ? payload.note : existingAllocation && existingAllocation.note);
+
+  if (reservedQuantity > plannedQuantity) throw new Error('כמות שמורה לא יכולה להיות גדולה מכמות מתוכננת');
+  if (status === 'reserved' && reservedQuantity <= 0) throw new Error('כדי לסמן כשמור צריך כמות שמורה גדולה מ-0');
+
+  const currentStock = await getCurrentStockForProduct(productId, env);
+  const reservedElsewhere = await getReservedElsewhereForProduct(productId, eventId, env);
+  const availableStock = currentStock - reservedElsewhere;
+
+  if (reservedQuantity > availableStock) {
+    throw new Error('לא ניתן לשמור יותר מהמלאי הזמין כרגע');
+  }
+
+  return {
+    product,
+    productId,
+    plannedQuantity,
+    reservedQuantity,
+    status,
+    note,
+    currentStock,
+    reservedElsewhere,
+    availableStock
+  };
+}
+
 export async function handleLeads(request, env, path) {
   const method = request.method;
   const url = new URL(request.url);
   const assignmentIdMatch = path.match(/^\/api\/lead-employees\/(\d+)$/);
   const leadEmployeesMatch = path.match(/^\/api\/leads\/(\d+)\/employees$/);
   const leadInventoryMatch = path.match(/^\/api\/leads\/(\d+)\/inventory$/);
+  const leadInventoryAllocationMatch = path.match(/^\/api\/leads\/(\d+)\/inventory\/(\d+)$/);
+  const leadInventoryAllocationCancelMatch = path.match(/^\/api\/leads\/(\d+)\/inventory\/(\d+)\/cancel$/);
 
   if (leadInventoryMatch && method === 'GET') {
     const leadId = leadInventoryMatch[1];
@@ -205,6 +282,107 @@ export async function handleLeads(request, env, path) {
       },
       allocations
     };
+  }
+
+  if (leadInventoryMatch && method === 'POST') {
+    const leadId = Number(leadInventoryMatch[1]);
+    const lead = await getLeadById(leadId, env);
+    if (!lead) throw new Error('Lead not found');
+
+    const body = await request.json();
+    const validated = await validateAllocationPayload(body, env, leadId, null);
+
+    try {
+      const result = await env.DB.prepare(`
+        INSERT INTO event_product_allocations (
+          event_id,
+          product_id,
+          planned_quantity,
+          reserved_quantity,
+          status,
+          note,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `).bind(
+        leadId,
+        validated.productId,
+        validated.plannedQuantity,
+        validated.reservedQuantity,
+        validated.status,
+        validated.note
+      ).run();
+
+      const allocation = await getEventAllocationById(result.meta.last_row_id, env);
+      return { success: true, allocation };
+    } catch (err) {
+      if (isUniqueConstraintError(err)) throw new Error('כבר קיימת הקצאה למוצר הזה באירוע');
+      throw err;
+    }
+  }
+
+  if (leadInventoryAllocationMatch && method === 'PUT') {
+    const leadId = Number(leadInventoryAllocationMatch[1]);
+    const allocationId = Number(leadInventoryAllocationMatch[2]);
+    const lead = await getLeadById(leadId, env);
+    if (!lead) throw new Error('Lead not found');
+
+    const existingAllocation = await getEventAllocationById(allocationId, env);
+    if (!existingAllocation || Number(existingAllocation.event_id) !== leadId) throw new Error('הקצאה לא נמצאה');
+
+    const body = await request.json();
+    const validated = await validateAllocationPayload(body, env, leadId, existingAllocation);
+
+    if (validated.productId !== Number(existingAllocation.product_id)) {
+      const targetProduct = await getProductById(validated.productId, env);
+      if (!targetProduct || Number(targetProduct.is_active) === 0) throw new Error('לא ניתן להחליף למוצר לא פעיל');
+    }
+
+    try {
+      await env.DB.prepare(`
+        UPDATE event_product_allocations
+        SET
+          product_id = ?,
+          planned_quantity = ?,
+          reserved_quantity = ?,
+          status = ?,
+          note = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(
+        validated.productId,
+        validated.plannedQuantity,
+        validated.reservedQuantity,
+        validated.status,
+        validated.note,
+        allocationId
+      ).run();
+    } catch (err) {
+      if (isUniqueConstraintError(err)) throw new Error('כבר קיימת הקצאה למוצר הזה באירוע');
+      throw err;
+    }
+
+    const allocation = await getEventAllocationById(allocationId, env);
+    return { success: true, allocation };
+  }
+
+  if (leadInventoryAllocationCancelMatch && method === 'POST') {
+    const leadId = Number(leadInventoryAllocationCancelMatch[1]);
+    const allocationId = Number(leadInventoryAllocationCancelMatch[2]);
+    const lead = await getLeadById(leadId, env);
+    if (!lead) throw new Error('Lead not found');
+
+    const existingAllocation = await getEventAllocationById(allocationId, env);
+    if (!existingAllocation || Number(existingAllocation.event_id) !== leadId) throw new Error('הקצאה לא נמצאה');
+
+    await env.DB.prepare(`
+      UPDATE event_product_allocations
+      SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(allocationId).run();
+
+    const allocation = await getEventAllocationById(allocationId, env);
+    return { success: true, allocation };
   }
 
   if (leadEmployeesMatch && method === 'GET') {
