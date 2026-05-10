@@ -127,6 +127,120 @@ function normalizeAllocationNote(value) {
   return text ? text : null;
 }
 
+function normalizeInventoryActionQuantity(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) throw new Error('כמות שימוש חייבת להיות גדולה מ-0');
+  return Math.round(num * 100) / 100;
+}
+
+function normalizeOptionalAllocationId(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const allocationId = Number(value);
+  if (!Number.isInteger(allocationId) || allocationId <= 0) throw new Error('allocation_id לא תקין');
+  return allocationId;
+}
+
+function mapInventoryActionRow(row) {
+  return {
+    id: row.id,
+    action_type: row.action_type,
+    quantity: Number(row.quantity || 0),
+    note: row.note || null,
+    performed_at: row.performed_at || null,
+    created_at: row.created_at || null,
+    allocation_id: row.allocation_id || null,
+    product_id: row.product_id,
+    product_name: row.product_name,
+    product_category: row.product_category,
+    product_sku: row.product_sku,
+    product_unit: row.product_unit,
+    product_is_active: row.product_is_active,
+    stock_movement: row.stock_movement_id ? {
+      exists: true,
+      id: row.stock_movement_id,
+      movement_type: row.stock_movement_type,
+      quantity_change: Number(row.stock_movement_quantity_change || 0),
+      created_at: row.stock_movement_created_at || null
+    } : {
+      exists: false,
+      id: null,
+      movement_type: null,
+      quantity_change: null,
+      created_at: null
+    }
+  };
+}
+
+async function getInventoryActionWithMovementById(actionId, env) {
+  const row = await env.DB.prepare(`
+    SELECT
+      eia.id,
+      eia.event_id,
+      eia.allocation_id,
+      eia.product_id,
+      eia.action_type,
+      eia.quantity,
+      eia.note,
+      eia.performed_at,
+      eia.created_at,
+      eia.updated_at,
+      p.name AS product_name,
+      p.category AS product_category,
+      p.sku AS product_sku,
+      p.unit AS product_unit,
+      p.is_active AS product_is_active,
+      psm.id AS stock_movement_id,
+      psm.movement_type AS stock_movement_type,
+      psm.quantity_change AS stock_movement_quantity_change,
+      psm.created_at AS stock_movement_created_at
+    FROM event_inventory_actions eia
+    INNER JOIN products p ON p.id = eia.product_id
+    LEFT JOIN product_stock_movements psm ON psm.event_inventory_action_id = eia.id
+    WHERE eia.id = ?
+  `).bind(actionId).first();
+
+  return row ? mapInventoryActionRow(row) : null;
+}
+
+async function findRecentMatchingUsageAction(eventId, productId, quantity, allocationId, note, env) {
+  const row = await env.DB.prepare(`
+    SELECT
+      eia.id,
+      eia.event_id,
+      eia.allocation_id,
+      eia.product_id,
+      eia.action_type,
+      eia.quantity,
+      eia.note,
+      eia.performed_at,
+      eia.created_at,
+      eia.updated_at,
+      p.name AS product_name,
+      p.category AS product_category,
+      p.sku AS product_sku,
+      p.unit AS product_unit,
+      p.is_active AS product_is_active,
+      psm.id AS stock_movement_id,
+      psm.movement_type AS stock_movement_type,
+      psm.quantity_change AS stock_movement_quantity_change,
+      psm.created_at AS stock_movement_created_at
+    FROM event_inventory_actions eia
+    INNER JOIN products p ON p.id = eia.product_id
+    INNER JOIN product_stock_movements psm ON psm.event_inventory_action_id = eia.id
+    WHERE eia.event_id = ?
+      AND eia.product_id = ?
+      AND eia.action_type = 'usage'
+      AND eia.quantity = ?
+      AND ((eia.allocation_id IS NULL AND ? IS NULL) OR eia.allocation_id = ?)
+      AND COALESCE(eia.note, '') = COALESCE(?, '')
+      AND eia.created_at >= datetime('now', '-15 seconds')
+    ORDER BY eia.id DESC
+    LIMIT 1
+  `).bind(eventId, productId, quantity, allocationId, allocationId, note).first();
+
+  return row ? mapInventoryActionRow(row) : null;
+}
+
 function isUniqueConstraintError(err) {
   const text = String((err && err.message) || err || '');
   return text.indexOf('UNIQUE constraint failed') !== -1;
@@ -327,36 +441,7 @@ export async function handleLeads(request, env, path) {
       ORDER BY eia.performed_at DESC, eia.id DESC
     `).bind(leadId).all();
 
-    const actions = (results || []).map(function(row) {
-      return {
-        id: row.id,
-        action_type: row.action_type,
-        quantity: Number(row.quantity || 0),
-        note: row.note || null,
-        performed_at: row.performed_at || null,
-        created_at: row.created_at || null,
-        allocation_id: row.allocation_id || null,
-        product_id: row.product_id,
-        product_name: row.product_name,
-        product_category: row.product_category,
-        product_sku: row.product_sku,
-        product_unit: row.product_unit,
-        product_is_active: row.product_is_active,
-        stock_movement: row.stock_movement_id ? {
-          exists: true,
-          id: row.stock_movement_id,
-          movement_type: row.stock_movement_type,
-          quantity_change: Number(row.stock_movement_quantity_change || 0),
-          created_at: row.stock_movement_created_at || null
-        } : {
-          exists: false,
-          id: null,
-          movement_type: null,
-          quantity_change: null,
-          created_at: null
-        }
-      };
-    });
+    const actions = (results || []).map(mapInventoryActionRow);
 
     return {
       event,
@@ -364,6 +449,116 @@ export async function handleLeads(request, env, path) {
         action_count: actions.length
       },
       actions
+    };
+  }
+
+  if (leadInventoryActionsMatch && method === 'POST') {
+    const leadId = Number(leadInventoryActionsMatch[1]);
+    const lead = await getLeadById(leadId, env);
+    if (!lead) throw new Error('Lead not found');
+
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      throw new Error('בקשה לא תקינה');
+    }
+
+    const productId = Number(body.product_id);
+    if (!Number.isInteger(productId) || productId <= 0) throw new Error('product_id חובה');
+
+    const product = await getProductById(productId, env);
+    if (!product) throw new Error('מוצר לא נמצא');
+
+    const quantity = normalizeInventoryActionQuantity(body.quantity);
+    const allocationId = normalizeOptionalAllocationId(body.allocation_id);
+    const note = normalizeAllocationNote(body.note);
+
+    if (allocationId !== null) {
+      const allocation = await getEventAllocationById(allocationId, env);
+      if (!allocation || Number(allocation.event_id) !== leadId) throw new Error('הקצאה לא שייכת לאירוע הזה');
+      if (Number(allocation.product_id) !== productId) throw new Error('הקצאה לא שייכת למוצר הזה');
+    }
+
+    const duplicateAction = await findRecentMatchingUsageAction(leadId, productId, quantity, allocationId, note, env);
+    if (duplicateAction) {
+      return {
+        success: true,
+        already_processed: true,
+        action: duplicateAction,
+        movement: duplicateAction.stock_movement,
+        current_stock: await getCurrentStockForProduct(productId, env)
+      };
+    }
+
+    const currentStockBefore = await getCurrentStockForProduct(productId, env);
+    if (quantity > currentStockBefore) throw new Error('לא ניתן לרשום שימוש גדול מהמלאי הקיים');
+
+    const actionInsert = await env.DB.prepare(`
+      INSERT INTO event_inventory_actions (
+        event_id,
+        allocation_id,
+        product_id,
+        action_type,
+        quantity,
+        note,
+        performed_at,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, 'usage', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `).bind(
+      leadId,
+      allocationId,
+      productId,
+      quantity,
+      note
+    ).run();
+
+    const actionId = actionInsert.meta.last_row_id;
+
+    try {
+      await env.DB.prepare(`
+        INSERT INTO product_stock_movements (
+          product_id,
+          movement_type,
+          quantity_change,
+          reference_type,
+          reference_id,
+          event_id,
+          reason,
+          note,
+          event_inventory_action_id,
+          created_at,
+          updated_at
+        ) VALUES (?, 'event_usage', ?, 'event', ?, ?, 'שימוש בפועל באירוע', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `).bind(
+        productId,
+        -quantity,
+        leadId,
+        leadId,
+        note,
+        actionId
+      ).run();
+    } catch (err) {
+      if (!isUniqueConstraintError(err)) throw err;
+      const existingAction = await getInventoryActionWithMovementById(actionId, env);
+      if (!existingAction || !existingAction.stock_movement || !existingAction.stock_movement.exists) throw err;
+      return {
+        success: true,
+        already_processed: true,
+        action: existingAction,
+        movement: existingAction.stock_movement,
+        current_stock: await getCurrentStockForProduct(productId, env)
+      };
+    }
+
+    const action = await getInventoryActionWithMovementById(actionId, env);
+    return {
+      success: true,
+      already_processed: false,
+      action,
+      movement: action && action.stock_movement ? action.stock_movement : null,
+      current_stock: await getCurrentStockForProduct(productId, env)
     };
   }
 

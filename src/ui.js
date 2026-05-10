@@ -5060,15 +5060,63 @@ function getAllocationFormPreview(formState, currentAllocation) {
   };
 }
 
-function renderEventInventoryActionsSection(actionsData) {
+function renderEventInventoryActionsSection(actionsData, inventoryData, productOptions, formState) {
   var actions = (actionsData && actionsData.actions) || [];
-  if (!actions.length) {
-    return '<div class="info-section"><div class="info-section-title">פעילות מלאי בפועל</div><div style="font-size:13px;color:var(--text3);padding:8px 0">אין עדיין פעולות מלאי בפועל לאירוע הזה. כשהמערכת תתמוך ברישום שימוש, החזרות או אובדן, הן יוצגו כאן כציר זמן נפרד מהתכנון.</div></div>';
+  var allocations = (inventoryData && inventoryData.allocations) || [];
+  var products = Array.isArray(productOptions) ? productOptions : [];
+  var matchingAllocation = null;
+  var formHtml = '';
+
+  if (formState) {
+    matchingAllocation = allocations.find(function(item) {
+      if (formState.allocation_id) return Number(item.id) === Number(formState.allocation_id);
+      if (formState.product_id) return Number(item.product_id) === Number(formState.product_id);
+      return false;
+    }) || null;
+
+    var productOptionsHtml = ['<option value="">בחר מוצר</option>'].concat(products.map(function(product) {
+      var selected = Number(formState.product_id) === Number(product.id) ? ' selected' : '';
+      var activeLabel = Number(product.is_active) === 0 ? ' (לא פעיל)' : '';
+      return '<option value="' + product.id + '"' + selected + '>' + escapeHtml(product.name || ('מוצר #' + product.id)) + activeLabel + '</option>';
+    })).join('');
+
+    var allocationOptions = allocations.filter(function(item) {
+      if (item.status === 'cancelled') return false;
+      if (!formState.product_id) return true;
+      return Number(item.product_id) === Number(formState.product_id);
+    });
+
+    var allocationOptionsHtml = ['<option value="">ללא הקצאה</option>'].concat(allocationOptions.map(function(item) {
+      var selected = Number(formState.allocation_id) === Number(item.id) ? ' selected' : '';
+      return '<option value="' + item.id + '"' + selected + '>#' + item.id + ' · ' + escapeHtml(item.product_name || ('מוצר #' + item.product_id)) + ' · שמור ' + escapeHtml(formatProductStockValue(item.reserved_quantity)) + '</option>';
+    })).join('');
+
+    formHtml =
+      '<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px;background:#f8fafc">' +
+        '<div style="font-weight:700;margin-bottom:10px">רישום שימוש בפועל</div>' +
+        '<div style="margin-bottom:10px;padding:8px 10px;border-radius:8px;background:#fef2f2;color:#b91c1c;font-size:12px">פעולה זו מורידה מלאי אמיתי</div>' +
+        (formState.error ? '<div style="margin-bottom:10px;padding:8px 10px;border-radius:8px;background:#fef2f2;color:#b91c1c;font-size:12px">' + escapeHtml(formState.error) + '</div>' : '') +
+        '<div style="display:grid;grid-template-columns:1.2fr 0.8fr 1fr;gap:8px;margin-bottom:8px">' +
+          '<select class="form-input" id="event-usage-product">' + productOptionsHtml + '</select>' +
+          '<input class="form-input" id="event-usage-quantity" type="number" min="0.01" step="0.01" placeholder="כמות בשימוש" value="' + escapeHtml(formState.quantity) + '">' +
+          '<select class="form-input" id="event-usage-allocation">' + allocationOptionsHtml + '</select>' +
+        '</div>' +
+        '<textarea class="form-input" id="event-usage-note" rows="2" placeholder="הערה...">' + escapeHtml(formState.note) + '</textarea>' +
+        '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--text3);margin-top:8px">' +
+          '<span>הקצאה מקושרת: ' + (matchingAllocation ? ('#' + matchingAllocation.id) : 'ללא') + '</span>' +
+          '<span>מלאי נוכחי: ' + (matchingAllocation ? formatProductStockValue(matchingAllocation.current_stock) : '—') + '</span>' +
+          '<span>מלאי זמין בתכנון: ' + (matchingAllocation ? formatProductStockValue(matchingAllocation.available_stock) : '—') + '</span>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">' +
+          '<button class="btn btn-secondary btn-sm" id="event-usage-form-reset">נקה</button>' +
+          '<button class="btn btn-primary btn-sm" id="event-usage-form-save">רשום שימוש</button>' +
+        '</div>' +
+      '</div>';
   }
 
   var rows = actions.map(function(action) {
     var stockMovementText = action.stock_movement && action.stock_movement.exists
-      ? 'תנועת מלאי קיימת #' + action.stock_movement.id + ' (' + (action.stock_movement.movement_type || '—') + ')'
+      ? 'תנועת מלאי #' + action.stock_movement.id + ' (' + (action.stock_movement.movement_type || '—') + ', ' + (Number(action.stock_movement.quantity_change) > 0 ? '+' : '') + formatProductStockValue(action.stock_movement.quantity_change) + ')'
       : 'עדיין אין תנועת מלאי מקושרת';
 
     return '<div style="border-right:3px solid var(--border);padding:0 12px 14px 0;margin:0 0 14px 0">' +
@@ -5086,7 +5134,7 @@ function renderEventInventoryActionsSection(actionsData) {
     '</div>';
   }).join('');
 
-  return '<div class="info-section"><div class="info-section-title">פעילות מלאי בפועל</div><div style="font-size:12px;color:var(--text3);margin-bottom:10px">ציר זמן לקריאה בלבד של פעולות מלאי אמיתיות, נפרד מתכנון ההקצאות. כרגע זו תצוגה בלבד, בלי יצירה או שינוי.</div>' + rows + '</div>';
+  return '<div class="info-section"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px"><div class="info-section-title">פעילות מלאי בפועל</div><button class="btn btn-secondary btn-sm" id="event-usage-add-btn">רישום שימוש</button></div><div style="font-size:12px;color:var(--text3);margin-bottom:10px">פעולות מלאי אמיתיות נרשמות כאן בנפרד מתכנון ההקצאות. אין עריכה או מחיקה לפעולות שכבר נרשמו.</div>' + formHtml + (rows || '<div style="font-size:13px;color:var(--text3);padding:8px 0">אין עדיין פעולות מלאי בפועל לאירוע הזה.</div>') + '</div>';
 }
 
 function renderEventInventoryPlanningSection(inventoryData, productOptions, formState) {
@@ -5207,6 +5255,7 @@ function openEventDetailsModal(id) {
     var employees = employeesData.employees || [];
     var inventoryProducts = productsData.products || [];
     var currentInventoryData = inventoryData;
+    var currentInventoryActionsData = inventoryActionsData;
     var old = document.getElementById('event-details-modal');
     if (old) old.remove();
 
@@ -5265,6 +5314,17 @@ function openEventDetailsModal(id) {
         reserved_quantity: extra.reserved_quantity !== undefined ? extra.reserved_quantity : (allocation ? String(allocation.reserved_quantity) : ''),
         status: extra.status !== undefined ? extra.status : (allocation ? allocation.status : 'draft'),
         note: extra.note !== undefined ? extra.note : (allocation ? (allocation.note || '') : ''),
+        error: extra.error || ''
+      };
+    }
+
+    function buildUsageActionFormState(extra) {
+      extra = extra || {};
+      return {
+        product_id: extra.product_id !== undefined ? extra.product_id : '',
+        quantity: extra.quantity !== undefined ? extra.quantity : '',
+        allocation_id: extra.allocation_id !== undefined ? extra.allocation_id : '',
+        note: extra.note !== undefined ? extra.note : '',
         error: extra.error || ''
       };
     }
@@ -5394,7 +5454,7 @@ function openEventDetailsModal(id) {
     }
 
     function refreshInventorySection(formState) {
-      apiCall('GET', '/api/leads/' + id + '/inventory').then(function(data) {
+      return apiCall('GET', '/api/leads/' + id + '/inventory').then(function(data) {
         currentInventoryData = data || { allocations: [] };
         renderInventorySection(formState || null);
       }).catch(function(e) {
@@ -5402,10 +5462,88 @@ function openEventDetailsModal(id) {
       });
     }
 
-    renderInventorySection(null);
-    if (inventoryActionsSectionEl) {
-      inventoryActionsSectionEl.innerHTML = renderEventInventoryActionsSection(inventoryActionsData);
+    function bindInventoryActionsSection(formState) {
+      var addBtn = document.getElementById('event-usage-add-btn');
+      if (addBtn) {
+        addBtn.onclick = function() {
+          renderInventoryActionsSection(buildUsageActionFormState());
+        };
+      }
+
+      var resetBtn = document.getElementById('event-usage-form-reset');
+      if (resetBtn) {
+        resetBtn.onclick = function() {
+          renderInventoryActionsSection(buildUsageActionFormState());
+        };
+      }
+
+      var productSelect = document.getElementById('event-usage-product');
+      if (productSelect) {
+        productSelect.onchange = function() {
+          var matchingAllocation = currentInventoryData.allocations.find(function(item) {
+            return Number(item.product_id) === Number(productSelect.value) && item.status !== 'cancelled';
+          });
+          renderInventoryActionsSection(buildUsageActionFormState({
+            product_id: productSelect.value,
+            quantity: document.getElementById('event-usage-quantity') ? document.getElementById('event-usage-quantity').value : '',
+            allocation_id: document.getElementById('event-usage-allocation') ? document.getElementById('event-usage-allocation').value : (matchingAllocation ? String(matchingAllocation.id) : ''),
+            note: document.getElementById('event-usage-note') ? document.getElementById('event-usage-note').value : ''
+          }));
+        };
+      }
+
+      var saveBtn = document.getElementById('event-usage-form-save');
+      if (saveBtn) {
+        saveBtn.onclick = function() {
+          if (saveBtn.disabled) return;
+          var formState = {
+            product_id: document.getElementById('event-usage-product').value,
+            quantity: document.getElementById('event-usage-quantity').value,
+            allocation_id: document.getElementById('event-usage-allocation').value,
+            note: document.getElementById('event-usage-note').value
+          };
+          var payload = {
+            product_id: formState.product_id,
+            quantity: formState.quantity,
+            allocation_id: formState.allocation_id || null,
+            note: formState.note
+          };
+
+          saveBtn.disabled = true;
+          apiCall('POST', '/api/leads/' + id + '/inventory-actions', payload).then(function(response) {
+            toast(response && response.already_processed ? 'השימוש כבר נרשם קודם' : 'השימוש נרשם', 'success');
+            return Promise.all([
+              apiCall('GET', '/api/leads/' + id + '/inventory-actions'),
+              apiCall('GET', '/api/leads/' + id + '/inventory')
+            ]);
+          }).then(function(results) {
+            currentInventoryActionsData = results[0] || { actions: [] };
+            currentInventoryData = results[1] || { allocations: [] };
+            renderInventorySection(null);
+            renderInventoryActionsSection(buildUsageActionFormState());
+          }).catch(function(e) {
+            renderInventoryActionsSection(buildUsageActionFormState({
+              product_id: formState.product_id,
+              quantity: formState.quantity,
+              allocation_id: formState.allocation_id,
+              note: formState.note,
+              error: e.message
+            }));
+          }).finally(function() {
+            saveBtn.disabled = false;
+          });
+        };
+      }
     }
+
+    function renderInventoryActionsSection(formState) {
+      if (!inventoryActionsSectionEl) return;
+      inventoryActionsSectionEl.innerHTML = renderEventInventoryActionsSection(currentInventoryActionsData, currentInventoryData, inventoryProducts, formState);
+      bindInventoryActionsSection(formState || null);
+    }
+
+    renderInventorySection(null);
+    renderInventoryActionsSection(buildUsageActionFormState());
 
     function close() { overlay.remove(); }
 
