@@ -1,3 +1,5 @@
+import { requireTenantContext } from './auth.js';
+
 // ============================================================
 // products.js - ניהול מוצרים / מלאי בסיסי
 // ============================================================
@@ -81,6 +83,12 @@ async function getProductById(productId, env) {
   return product;
 }
 
+async function getProductByIdForTenant(productId, tenantId, env) {
+  const product = await env.DB.prepare('SELECT * FROM products WHERE id = ? AND tenant_id = ?').bind(productId, tenantId).first();
+  if (!product) throw new Error('מוצר לא נמצא');
+  return product;
+}
+
 async function getShoppingListById(listId, env) {
   if (!listId) return null;
   const shoppingList = await env.DB.prepare('SELECT id, name FROM shopping_lists WHERE id = ?').bind(listId).first();
@@ -111,12 +119,40 @@ async function getProductPurchaseById(purchaseId, env) {
   return purchase;
 }
 
+async function getProductPurchaseByIdForTenant(purchaseId, tenantId, env) {
+  const purchase = await env.DB.prepare(
+    `SELECT pp.*, 
+        EXISTS(
+          SELECT 1
+          FROM product_stock_movements psm
+          WHERE psm.movement_type = 'purchase_intake'
+            AND psm.product_purchase_id = pp.id
+            AND psm.tenant_id = pp.tenant_id
+        ) AS stock_received
+     FROM product_purchases pp
+     WHERE pp.id = ?
+       AND pp.tenant_id = ?`
+  ).bind(purchaseId, tenantId).first();
+  if (!purchase) throw new Error('רשומת רכישה לא נמצאה');
+  return purchase;
+}
+
 async function getCurrentStockForProduct(productId, env) {
   const row = await env.DB.prepare(
     `SELECT COALESCE(SUM(quantity_change), 0) AS current_stock
      FROM product_stock_movements
      WHERE product_id = ?`
   ).bind(productId).first();
+  return Number(row && row.current_stock !== undefined && row.current_stock !== null ? row.current_stock : 0);
+}
+
+async function getCurrentStockForProductForTenant(productId, tenantId, env) {
+  const row = await env.DB.prepare(
+    `SELECT COALESCE(SUM(quantity_change), 0) AS current_stock
+     FROM product_stock_movements
+     WHERE product_id = ?
+       AND tenant_id = ?`
+  ).bind(productId, tenantId).first();
   return Number(row && row.current_stock !== undefined && row.current_stock !== null ? row.current_stock : 0);
 }
 
@@ -161,15 +197,19 @@ export async function handleProducts(request, env, path) {
   const productPurchaseReceiveStockMatch = path.match(/^\/api\/product-purchases\/(\d+)\/receive-stock$/);
 
   if (path === '/api/products' && method === 'GET') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const search = (url.searchParams.get('search') || '').trim();
     const includeInactive = url.searchParams.get('includeInactive') === '1';
 
     let query = `
       SELECT *
       FROM products
-      WHERE 1=1
+      WHERE tenant_id = ?
     `;
-    const params = [];
+    const params = [tenantId];
 
     if (!includeInactive) {
       query += ` AND is_active = 1`;
@@ -195,18 +235,24 @@ export async function handleProducts(request, env, path) {
   }
 
   if (path === '/api/inventory/low-stock' && method === 'GET') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const includeInactive = url.searchParams.get('includeInactive') === '1';
-    const params = [];
+    const params = [tenantId, tenantId];
     let query = `SELECT
          p.*, 
          COALESCE(sm.current_stock, 0) AS current_stock
        FROM products p
        LEFT JOIN (
-         SELECT product_id, SUM(quantity_change) AS current_stock
+         SELECT product_id, tenant_id, SUM(quantity_change) AS current_stock
          FROM product_stock_movements
-         GROUP BY product_id
-       ) sm ON sm.product_id = p.id
-       WHERE p.min_stock_alert IS NOT NULL
+         WHERE tenant_id = ?
+         GROUP BY product_id, tenant_id
+       ) sm ON sm.product_id = p.id AND sm.tenant_id = p.tenant_id
+       WHERE p.tenant_id = ?
+         AND p.min_stock_alert IS NOT NULL
          AND COALESCE(sm.current_stock, 0) <= p.min_stock_alert`;
 
     if (!includeInactive) {
@@ -233,9 +279,13 @@ export async function handleProducts(request, env, path) {
   }
 
   if (productStockMatch && method === 'GET') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const productId = Number(productStockMatch[1]);
-    const product = await getProductById(productId, env);
-    const currentStock = await getCurrentStockForProduct(productId, env);
+    const product = await getProductByIdForTenant(productId, tenantId, env);
+    const currentStock = await getCurrentStockForProductForTenant(productId, tenantId, env);
     const minStockAlert = product.min_stock_alert;
     const isLowStock = minStockAlert !== null && minStockAlert !== undefined && minStockAlert !== ''
       ? currentStock <= Number(minStockAlert)
@@ -250,8 +300,12 @@ export async function handleProducts(request, env, path) {
   }
 
   if (productStockMovementsMatch && method === 'GET') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const productId = Number(productStockMovementsMatch[1]);
-    await getProductById(productId, env);
+    await getProductByIdForTenant(productId, tenantId, env);
 
     let limit = Number(url.searchParams.get('limit') || 100);
     if (!Number.isFinite(limit)) limit = 100;
@@ -265,17 +319,19 @@ export async function handleProducts(request, env, path) {
       `SELECT *
        FROM product_stock_movements
        WHERE product_id = ?
+         AND tenant_id = ?
        ORDER BY created_at DESC, id DESC
        LIMIT ? OFFSET ?`
-    ).bind(productId, limit, offset).all();
+    ).bind(productId, tenantId, limit, offset).all();
 
     const hasMoreRow = await env.DB.prepare(
       `SELECT 1
        FROM product_stock_movements
        WHERE product_id = ?
+         AND tenant_id = ?
        ORDER BY created_at DESC, id DESC
        LIMIT 1 OFFSET ?`
-    ).bind(productId, offset + limit).first();
+    ).bind(productId, tenantId, offset + limit).first();
 
     return {
       movements: movementsResult.results || [],
@@ -340,8 +396,12 @@ export async function handleProducts(request, env, path) {
   }
 
   if (productPurchasesMatch && method === 'GET') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const productId = Number(productPurchasesMatch[1]);
-    await getProductById(productId, env);
+    await getProductByIdForTenant(productId, tenantId, env);
 
     let limit = Number(url.searchParams.get('limit') || 50);
     if (!Number.isFinite(limit)) limit = 50;
@@ -358,20 +418,23 @@ export async function handleProducts(request, env, path) {
             FROM product_stock_movements psm
             WHERE psm.movement_type = 'purchase_intake'
               AND psm.product_purchase_id = pp.id
+              AND psm.tenant_id = pp.tenant_id
           ) AS stock_received
        FROM product_purchases pp
        WHERE pp.product_id = ?
+         AND pp.tenant_id = ?
        ORDER BY pp.purchase_date DESC, pp.id DESC
        LIMIT ? OFFSET ?`
-    ).bind(productId, limit, offset).all();
+    ).bind(productId, tenantId, limit, offset).all();
 
     const hasMoreRow = await env.DB.prepare(
       `SELECT 1
        FROM product_purchases
        WHERE product_id = ?
+         AND tenant_id = ?
        ORDER BY purchase_date DESC, id DESC
        LIMIT 1 OFFSET ?`
-    ).bind(productId, offset + limit).first();
+    ).bind(productId, tenantId, offset + limit).first();
 
     return {
       purchases: purchasesResult.results || [],
@@ -384,8 +447,12 @@ export async function handleProducts(request, env, path) {
   }
 
   if (productPurchaseMatch && method === 'GET') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const purchaseId = Number(productPurchaseMatch[1]);
-    const purchase = await getProductPurchaseById(purchaseId, env);
+    const purchase = await getProductPurchaseByIdForTenant(purchaseId, tenantId, env);
     return { purchase };
   }
 
@@ -468,10 +535,14 @@ export async function handleProducts(request, env, path) {
   }
 
   if (idMatch && method === 'GET') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const id = idMatch[1];
     const product = await env.DB.prepare(
-      'SELECT * FROM products WHERE id = ?'
-    ).bind(id).first();
+      'SELECT * FROM products WHERE id = ? AND tenant_id = ?'
+    ).bind(id, tenantId).first();
 
     if (!product) throw new Error('מוצר לא נמצא');
 
