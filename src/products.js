@@ -96,9 +96,23 @@ async function getShoppingListById(listId, env) {
   return shoppingList;
 }
 
+async function getShoppingListByIdForTenant(listId, tenantId, env) {
+  if (!listId) return null;
+  const shoppingList = await env.DB.prepare('SELECT id, name FROM shopping_lists WHERE id = ? AND tenant_id = ?').bind(listId, tenantId).first();
+  if (!shoppingList) throw new Error('ספק / חנות לא נמצאו');
+  return shoppingList;
+}
+
 async function getShoppingPurchaseById(purchaseId, env) {
   if (!purchaseId) return null;
   const shoppingPurchase = await env.DB.prepare('SELECT id, list_id, purchase_date FROM shopping_purchases WHERE id = ?').bind(purchaseId).first();
+  if (!shoppingPurchase) throw new Error('רכישת קניות לא נמצאה');
+  return shoppingPurchase;
+}
+
+async function getShoppingPurchaseByIdForTenant(purchaseId, tenantId, env) {
+  if (!purchaseId) return null;
+  const shoppingPurchase = await env.DB.prepare('SELECT id, list_id, purchase_date FROM shopping_purchases WHERE id = ? AND tenant_id = ?').bind(purchaseId, tenantId).first();
   if (!shoppingPurchase) throw new Error('רכישת קניות לא נמצאה');
   return shoppingPurchase;
 }
@@ -158,6 +172,12 @@ async function getCurrentStockForProductForTenant(productId, tenantId, env) {
 
 async function getStockMovementById(movementId, env) {
   const movement = await env.DB.prepare('SELECT * FROM product_stock_movements WHERE id = ?').bind(movementId).first();
+  if (!movement) throw new Error('תנועת מלאי לא נמצאה');
+  return movement;
+}
+
+async function getStockMovementByIdForTenant(movementId, tenantId, env) {
+  const movement = await env.DB.prepare('SELECT * FROM product_stock_movements WHERE id = ? AND tenant_id = ?').bind(movementId, tenantId).first();
   if (!movement) throw new Error('תנועת מלאי לא נמצאה');
   return movement;
 }
@@ -344,8 +364,12 @@ export async function handleProducts(request, env, path) {
   }
 
   if (productStockAdjustmentsMatch && method === 'POST') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const productId = Number(productStockAdjustmentsMatch[1]);
-    await getProductById(productId, env);
+    await getProductByIdForTenant(productId, tenantId, env);
 
     let b;
     try {
@@ -368,19 +392,21 @@ export async function handleProducts(request, env, path) {
         reference_type,
         reason,
         note,
+        tenant_id,
         created_at,
         updated_at
-      ) VALUES (?, 'adjustment', ?, 'manual', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+      ) VALUES (?, 'adjustment', ?, 'manual', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
     ).bind(
       productId,
       quantityChange,
       reason,
-      note
+      note,
+      tenantId
     ).run();
 
-    const movement = await getStockMovementById(result.meta.last_row_id, env);
-    const currentStock = await getCurrentStockForProduct(productId, env);
-    const product = await getProductById(productId, env);
+    const movement = await getStockMovementByIdForTenant(result.meta.last_row_id, tenantId, env);
+    const currentStock = await getCurrentStockForProductForTenant(productId, tenantId, env);
+    const product = await getProductByIdForTenant(productId, tenantId, env);
     const minStockAlert = product.min_stock_alert;
     const isLowStock = minStockAlert !== null && minStockAlert !== undefined && minStockAlert !== ''
       ? currentStock <= Number(minStockAlert)
@@ -550,8 +576,12 @@ export async function handleProducts(request, env, path) {
   }
 
   if (productPurchasesMatch && method === 'POST') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const productId = Number(productPurchasesMatch[1]);
-    await getProductById(productId, env);
+    await getProductByIdForTenant(productId, tenantId, env);
 
     let b;
     try {
@@ -570,8 +600,8 @@ export async function handleProducts(request, env, path) {
     const supplierName = normalizeText(b.supplier_name);
     const notes = normalizeText(b.notes);
 
-    await getShoppingListById(shoppingListId, env);
-    const shoppingPurchase = await getShoppingPurchaseById(shoppingPurchaseId, env);
+    await getShoppingListByIdForTenant(shoppingListId, tenantId, env);
+    const shoppingPurchase = await getShoppingPurchaseByIdForTenant(shoppingPurchaseId, tenantId, env);
 
     if (shoppingListId && shoppingPurchase && Number(shoppingPurchase.list_id) !== shoppingListId) {
       throw new Error('רכישת הקניות לא שייכת לחנות שנבחרה');
@@ -589,9 +619,10 @@ export async function handleProducts(request, env, path) {
         shopping_purchase_id,
         supplier_name,
         notes,
+        tenant_id,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
     ).bind(
       productId,
       purchaseType,
@@ -602,10 +633,11 @@ export async function handleProducts(request, env, path) {
       shoppingListId,
       shoppingPurchaseId,
       supplierName,
-      notes
+      notes,
+      tenantId
     ).run();
 
-    const purchase = await getProductPurchaseById(result.meta.last_row_id, env);
+    const purchase = await getProductPurchaseByIdForTenant(result.meta.last_row_id, tenantId, env);
     return { success: true, purchase };
   }
 
@@ -657,8 +689,12 @@ export async function handleProducts(request, env, path) {
   }
 
   if (productPurchaseMatch && method === 'PUT') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const purchaseId = Number(productPurchaseMatch[1]);
-    const existingPurchase = await getProductPurchaseById(purchaseId, env);
+    const existingPurchase = await getProductPurchaseByIdForTenant(purchaseId, tenantId, env);
 
     let b;
     try {
@@ -677,9 +713,9 @@ export async function handleProducts(request, env, path) {
     const supplierName = normalizeText(b.supplier_name);
     const notes = normalizeText(b.notes);
 
-    await getProductById(existingPurchase.product_id, env);
-    await getShoppingListById(shoppingListId, env);
-    const shoppingPurchase = await getShoppingPurchaseById(shoppingPurchaseId, env);
+    await getProductByIdForTenant(existingPurchase.product_id, tenantId, env);
+    await getShoppingListByIdForTenant(shoppingListId, tenantId, env);
+    const shoppingPurchase = await getShoppingPurchaseByIdForTenant(shoppingPurchaseId, tenantId, env);
 
     if (shoppingListId && shoppingPurchase && Number(shoppingPurchase.list_id) !== shoppingListId) {
       throw new Error('רכישת הקניות לא שייכת לחנות שנבחרה');
@@ -698,7 +734,8 @@ export async function handleProducts(request, env, path) {
          supplier_name = ?,
          notes = ?,
          updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`
+       WHERE id = ?
+         AND tenant_id = ?`
     ).bind(
       purchaseType,
       purchaseDate,
@@ -709,10 +746,11 @@ export async function handleProducts(request, env, path) {
       shoppingPurchaseId,
       supplierName,
       notes,
-      purchaseId
+      purchaseId,
+      tenantId
     ).run();
 
-    const purchase = await getProductPurchaseById(purchaseId, env);
+    const purchase = await getProductPurchaseByIdForTenant(purchaseId, tenantId, env);
     return { success: true, purchase };
   }
 
