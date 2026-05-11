@@ -123,6 +123,15 @@ async function getShoppingPurchaseById(purchaseId, env) {
   `).bind(purchaseId).first();
 }
 
+async function getShoppingPurchaseByIdForTenant(purchaseId, tenantId, env) {
+  return env.DB.prepare(`
+    SELECT *
+    FROM shopping_purchases
+    WHERE id = ?
+      AND tenant_id = ?
+  `).bind(purchaseId, tenantId).first();
+}
+
 async function getShoppingPurchaseItems(purchaseId, env) {
   const result = await env.DB.prepare(`
     SELECT *
@@ -133,6 +142,17 @@ async function getShoppingPurchaseItems(purchaseId, env) {
   return result.results || [];
 }
 
+async function getShoppingPurchaseItemsForTenant(purchaseId, tenantId, env) {
+  const result = await env.DB.prepare(`
+    SELECT *
+    FROM shopping_purchase_items
+    WHERE purchase_id = ?
+      AND tenant_id = ?
+    ORDER BY created_at ASC, id ASC
+  `).bind(purchaseId, tenantId).all();
+  return result.results || [];
+}
+
 async function getProductPurchaseByShoppingPurchaseItemId(shoppingPurchaseItemId, env) {
   return env.DB.prepare(`
     SELECT id
@@ -140,6 +160,16 @@ async function getProductPurchaseByShoppingPurchaseItemId(shoppingPurchaseItemId
     WHERE shopping_purchase_item_id = ?
     LIMIT 1
   `).bind(shoppingPurchaseItemId).first();
+}
+
+async function getProductPurchaseByShoppingPurchaseItemIdForTenant(shoppingPurchaseItemId, tenantId, env) {
+  return env.DB.prepare(`
+    SELECT id
+    FROM product_purchases
+    WHERE shopping_purchase_item_id = ?
+      AND tenant_id = ?
+    LIMIT 1
+  `).bind(shoppingPurchaseItemId, tenantId).first();
 }
 
 async function insertProductPurchaseFromShoppingPurchaseItem(purchase, item, env) {
@@ -175,6 +205,44 @@ async function insertProductPurchaseFromShoppingPurchaseItem(purchase, item, env
     item.id,
     null,
     item.notes || null
+  ).run();
+}
+
+async function insertProductPurchaseFromShoppingPurchaseItemForTenant(purchase, item, tenantId, env) {
+  const productId = parseOptionalProductId(item.product_id);
+  await assertValidShoppingProductLinkForTenant(productId, tenantId, env);
+  const quantity = normalizeShoppingPurchaseQuantity(item.quantity);
+  const totalPrice = normalizeShoppingPurchaseLineTotal(item.price);
+  const unitPrice = calculateShoppingUnitPrice(totalPrice, quantity);
+
+  await env.DB.prepare(`
+    INSERT INTO product_purchases (
+      product_id,
+      purchase_type,
+      purchase_date,
+      quantity,
+      unit_price,
+      total_price,
+      shopping_list_id,
+      shopping_purchase_id,
+      shopping_purchase_item_id,
+      supplier_name,
+      notes,
+      tenant_id
+    )
+    VALUES (?, 'shopping', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    productId,
+    purchase.purchase_date,
+    quantity,
+    unitPrice,
+    totalPrice,
+    purchase.list_id,
+    purchase.id,
+    item.id,
+    null,
+    item.notes || null,
+    tenantId
   ).run();
 }
 
@@ -507,11 +575,15 @@ export async function handleShopping(request, env, path) {
   const purchaseSyncProductsMatch = path.match(/^\/api\/shopping-purchases\/(\d+)\/sync-products$/);
 
   if (purchaseSyncProductsMatch && method === 'POST') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const purchaseId = Number(purchaseSyncProductsMatch[1]);
-    const purchase = await getShoppingPurchaseById(purchaseId, env);
+    const purchase = await getShoppingPurchaseByIdForTenant(purchaseId, tenantId, env);
     if (!purchase) throw new Error('רכישת קניות לא נמצאה');
 
-    const items = await getShoppingPurchaseItems(purchaseId, env);
+    const items = await getShoppingPurchaseItemsForTenant(purchaseId, tenantId, env);
     const summary = {
       purchase_id: purchaseId,
       eligible_count: 0,
@@ -531,14 +603,14 @@ export async function handleShopping(request, env, path) {
 
       summary.eligible_count++;
 
-      const existing = await getProductPurchaseByShoppingPurchaseItemId(item.id, env);
+      const existing = await getProductPurchaseByShoppingPurchaseItemIdForTenant(item.id, tenantId, env);
       if (existing) {
         summary.skipped_existing++;
         continue;
       }
 
       try {
-        await insertProductPurchaseFromShoppingPurchaseItem(purchase, item, env);
+        await insertProductPurchaseFromShoppingPurchaseItemForTenant(purchase, item, tenantId, env);
         summary.created_count++;
       } catch (error) {
         var errorMessage = error && error.message ? error.message : 'שגיאת סנכרון לא ידועה';
