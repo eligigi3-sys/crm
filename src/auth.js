@@ -11,12 +11,12 @@ function getBearerToken(request) {
   return match ? match[1].trim() : '';
 }
 
-async function getUserById(userId, env) {
+export async function getUserById(userId, env) {
   if (!userId) return null;
   return env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
 }
 
-export async function requireTenantContext(request, env) {
+export async function requireAuthUser(request, env) {
   const token = getBearerToken(request);
   if (!token) {
     return json({ error: 'נדרש טוקן התחברות' }, 401);
@@ -32,6 +32,32 @@ export async function requireTenantContext(request, env) {
   const user = await getUserById(payload.userId, env);
   if (!user) {
     return json({ error: 'המשתמש לא נמצא' }, 401);
+  }
+
+  return user;
+}
+
+export async function requireSuperAdmin(request, env) {
+  const user = await requireAuthUser(request, env);
+  if (user instanceof Response) return user;
+
+  if (String(user.role || '').trim().toLowerCase() !== 'super_admin') {
+    return json({ error: 'גישה זו מותרת לסופר אדמין בלבד' }, 403);
+  }
+
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      role: user.role
+    }
+  };
+}
+
+export async function requireTenantContext(request, env) {
+  const user = await requireAuthUser(request, env);
+  if (user instanceof Response) {
+    return user;
   }
 
   const memberships = await env.DB.prepare(

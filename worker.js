@@ -5,6 +5,7 @@ import { handleGoogle, handleGoogleCallback } from './src/google-calendar.js';
 import { handleContacts } from './src/contacts.js';
 import { handleEmployees } from './src/employees.js';
 import { handleProducts } from './src/products.js';
+import { handleAdmin } from './src/admin.js';
 import { serveHTML } from './src/ui.js';
 
 export default {
@@ -39,6 +40,8 @@ export default {
 
         if (path.startsWith('/api/auth')) {
           response = await handleAuth(request, env, path);
+        } else if (path.startsWith('/api/admin')) {
+          response = await handleAdmin(request, env, path);
         } else if (path.startsWith('/api/dashboard')) {
           response = await handleDashboard(request, env, path);
         } else if (path.startsWith('/api/leads') || path.startsWith('/api/lead-employees')) {
