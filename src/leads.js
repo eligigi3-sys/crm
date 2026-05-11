@@ -62,6 +62,44 @@ async function findOrCreateContact(name, phone, email, env) {
   return contact;
 }
 
+async function findOrCreateContactForTenant(name, phone, email, tenantId, env) {
+  let contact = null;
+
+  if (phone) {
+    contact = await env.DB.prepare(
+      'SELECT * FROM contacts WHERE phone = ? AND tenant_id = ?'
+    ).bind(phone, tenantId).first();
+  }
+
+  if (!contact && email) {
+    contact = await env.DB.prepare(
+      'SELECT * FROM contacts WHERE email = ? AND tenant_id = ?'
+    ).bind(email, tenantId).first();
+  }
+
+  if (!contact) {
+    const contactNum = await getNextCounter('contacts', env);
+
+    const result = await env.DB.prepare(
+      `INSERT INTO contacts
+        (contact_num, name, phone, email, tenant_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    ).bind(
+      contactNum,
+      name || 'לקוח ללא שם',
+      phone || null,
+      email || null,
+      tenantId
+    ).run();
+
+    contact = await env.DB.prepare(
+      'SELECT * FROM contacts WHERE id = ? AND tenant_id = ?'
+    ).bind(result.meta.last_row_id, tenantId).first();
+  }
+
+  return contact;
+}
+
 function normalizeAssignmentText(value) {
   if (value === undefined || value === null) return null;
   const text = String(value).trim();
@@ -981,15 +1019,19 @@ export async function handleLeads(request, env, path) {
   // CREATE EVENT
   // ===============================
   if (path === '/api/leads' && method === 'POST') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const b = await request.json();
 
     if (!b.name) throw new Error('שם חובה');
 
-    // 🔥 קודם מזהים/יוצרים לקוח
-    const contact = await findOrCreateContact(
+    const contact = await findOrCreateContactForTenant(
       b.name,
       b.phone,
       b.email,
+      tenantId,
       env
     );
 
@@ -1011,9 +1053,10 @@ export async function handleLeads(request, env, path) {
         deposit,
         status,
         details,
-        notes
+        notes,
+        tenant_id
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       leadNum,
       contact.id,
@@ -1029,7 +1072,8 @@ export async function handleLeads(request, env, path) {
       b.deposit || 0,
       b.status || 'lead',
       b.details || null,
-      b.notes || null
+      b.notes || null,
+      tenantId
     ).run();
 
     try {
@@ -1050,8 +1094,15 @@ export async function handleLeads(request, env, path) {
   // UPDATE EVENT
   // ===============================
   if (idMatch && method === 'PUT') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const id = idMatch[1];
     const b = await request.json();
+
+    const existingLead = await getLeadByIdForTenant(id, tenantId, env);
+    if (!existingLead) throw new Error('Lead not found');
 
     await env.DB.prepare(`
       UPDATE leads SET
@@ -1067,6 +1118,7 @@ export async function handleLeads(request, env, path) {
         notes = ?,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
+        AND tenant_id = ?
     `).bind(
       b.event_type || null,
       b.event_date || null,
@@ -1078,7 +1130,8 @@ export async function handleLeads(request, env, path) {
       b.status || 'lead',
       b.details || null,
       b.notes || null,
-      id
+      id,
+      tenantId
     ).run();
 
     try {
