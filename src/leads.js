@@ -992,6 +992,10 @@ export async function handleLeads(request, env, path) {
   // CREATE NOTE
   // ===============================
   if (noteMatch && method === 'POST') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const leadId = noteMatch[1];
     const b = await request.json();
     const note = (b.note || '').trim();
@@ -999,18 +1003,18 @@ export async function handleLeads(request, env, path) {
     if (!note) throw new Error('הערה חובה');
 
     const existingLead = await env.DB.prepare(
-      'SELECT id FROM leads WHERE id = ?'
-    ).bind(leadId).first();
+      'SELECT id FROM leads WHERE id = ? AND tenant_id = ?'
+    ).bind(leadId, tenantId).first();
 
     if (!existingLead) throw new Error('Lead not found');
 
     const result = await env.DB.prepare(
-      'INSERT INTO lead_notes (lead_id, note, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)'
-    ).bind(leadId, note).run();
+      'INSERT INTO lead_notes (lead_id, note, tenant_id, created_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)'
+    ).bind(leadId, note, tenantId).run();
 
     const created = await env.DB.prepare(
-      'SELECT * FROM lead_notes WHERE id = ?'
-    ).bind(result.meta.last_row_id).first();
+      'SELECT * FROM lead_notes WHERE id = ? AND tenant_id = ?'
+    ).bind(result.meta.last_row_id, tenantId).first();
 
     return { success: true, note: created };
   }
