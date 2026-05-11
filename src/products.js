@@ -193,6 +193,18 @@ async function getPurchaseIntakeMovementByPurchaseId(purchaseId, env) {
   ).bind(purchaseId).first();
 }
 
+async function getPurchaseIntakeMovementByPurchaseIdForTenant(purchaseId, tenantId, env) {
+  return await env.DB.prepare(
+    `SELECT *
+     FROM product_stock_movements
+     WHERE movement_type = 'purchase_intake'
+       AND product_purchase_id = ?
+       AND tenant_id = ?
+     ORDER BY id DESC
+     LIMIT 1`
+  ).bind(purchaseId, tenantId).first();
+}
+
 function buildPurchaseIntakeNote(purchase) {
   var parts = [];
   if (purchase.purchase_date) parts.push('תאריך: ' + purchase.purchase_date);
@@ -483,13 +495,17 @@ export async function handleProducts(request, env, path) {
   }
 
   if (productPurchaseReceiveStockMatch && method === 'POST') {
-    const purchaseId = Number(productPurchaseReceiveStockMatch[1]);
-    const purchase = await getProductPurchaseById(purchaseId, env);
-    const product = await getProductById(purchase.product_id, env);
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
 
-    const existingMovement = await getPurchaseIntakeMovementByPurchaseId(purchaseId, env);
+    const tenantId = tenantCtx.tenant.id;
+    const purchaseId = Number(productPurchaseReceiveStockMatch[1]);
+    const purchase = await getProductPurchaseByIdForTenant(purchaseId, tenantId, env);
+    const product = await getProductByIdForTenant(purchase.product_id, tenantId, env);
+
+    const existingMovement = await getPurchaseIntakeMovementByPurchaseIdForTenant(purchaseId, tenantId, env);
     if (existingMovement) {
-      const currentStock = await getCurrentStockForProduct(purchase.product_id, env);
+      const currentStock = await getCurrentStockForProductForTenant(purchase.product_id, tenantId, env);
       const minStockAlert = product.min_stock_alert;
       const isLowStock = minStockAlert !== null && minStockAlert !== undefined && minStockAlert !== ''
         ? currentStock <= Number(minStockAlert)
@@ -515,23 +531,25 @@ export async function handleProducts(request, env, path) {
           product_purchase_id,
           reason,
           note,
+          tenant_id,
           created_at,
           updated_at
-        ) VALUES (?, 'purchase_intake', ?, 'product_purchase', ?, ?, 'קליטת מלאי מרכישה', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+        ) VALUES (?, 'purchase_intake', ?, 'product_purchase', ?, ?, 'קליטת מלאי מרכישה', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
       ).bind(
         purchase.product_id,
         purchase.quantity,
         purchase.id,
         purchase.id,
-        buildPurchaseIntakeNote(purchase)
+        buildPurchaseIntakeNote(purchase),
+        tenantId
       ).run();
 
-      movement = await getStockMovementById(result.meta.last_row_id, env);
+      movement = await getStockMovementByIdForTenant(result.meta.last_row_id, tenantId, env);
     } catch (err) {
       if (!isUniqueConstraintError(err)) throw err;
-      const racedMovement = await getPurchaseIntakeMovementByPurchaseId(purchaseId, env);
+      const racedMovement = await getPurchaseIntakeMovementByPurchaseIdForTenant(purchaseId, tenantId, env);
       if (!racedMovement) throw err;
-      const currentStock = await getCurrentStockForProduct(purchase.product_id, env);
+      const currentStock = await getCurrentStockForProductForTenant(purchase.product_id, tenantId, env);
       const minStockAlert = product.min_stock_alert;
       const isLowStock = minStockAlert !== null && minStockAlert !== undefined && minStockAlert !== ''
         ? currentStock <= Number(minStockAlert)
@@ -545,7 +563,7 @@ export async function handleProducts(request, env, path) {
       };
     }
 
-    const currentStock = await getCurrentStockForProduct(purchase.product_id, env);
+    const currentStock = await getCurrentStockForProductForTenant(purchase.product_id, tenantId, env);
     const minStockAlert = product.min_stock_alert;
     const isLowStock = minStockAlert !== null && minStockAlert !== undefined && minStockAlert !== ''
       ? currentStock <= Number(minStockAlert)
