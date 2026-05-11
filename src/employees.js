@@ -1,3 +1,5 @@
+import { requireTenantContext } from './auth.js';
+
 // ============================================================
 // employees.js - ניהול עובדים
 // ============================================================
@@ -17,6 +19,10 @@ function normalizeNumber(value) {
 function normalizeActive(value) {
   if (value === 0 || value === '0' || value === false) return 0;
   return 1;
+}
+
+async function getEmployeeByIdForTenant(employeeId, tenantId, env) {
+  return env.DB.prepare('SELECT * FROM employees WHERE id = ? AND tenant_id = ?').bind(employeeId, tenantId).first();
 }
 
 export async function handleEmployees(request, env, path) {
@@ -110,6 +116,10 @@ export async function handleEmployees(request, env, path) {
 
   // POST /api/employees
   if (path === '/api/employees' && method === 'POST') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const b = await request.json();
     const fullName = normalizeText(b.full_name);
     const phone = normalizeText(b.phone);
@@ -133,9 +143,10 @@ export async function handleEmployees(request, env, path) {
         payment_method,
         bank_details_notes,
         internal_notes,
+        tenant_id,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
     ).bind(
       fullName,
       phone,
@@ -150,18 +161,23 @@ export async function handleEmployees(request, env, path) {
       normalizeText(b.preferred_work_area),
       normalizeText(b.payment_method),
       normalizeText(b.bank_details_notes),
-      normalizeText(b.internal_notes)
+      normalizeText(b.internal_notes),
+      tenantId
     ).run();
 
     const employee = await env.DB.prepare(
-      'SELECT * FROM employees WHERE id = ?'
-    ).bind(result.meta.last_row_id).first();
+      'SELECT * FROM employees WHERE id = ? AND tenant_id = ?'
+    ).bind(result.meta.last_row_id, tenantId).first();
 
     return { success: true, employee };
   }
 
   // PUT /api/employees/:id
   if (idMatch && method === 'PUT') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const id = idMatch[1];
     const b = await request.json();
     const fullName = normalizeText(b.full_name);
@@ -171,8 +187,8 @@ export async function handleEmployees(request, env, path) {
     if (!phone) throw new Error('טלפון חובה');
 
     const existing = await env.DB.prepare(
-      'SELECT id FROM employees WHERE id = ?'
-    ).bind(id).first();
+      'SELECT id FROM employees WHERE id = ? AND tenant_id = ?'
+    ).bind(id, tenantId).first();
 
     if (!existing) throw new Error('עובד לא נמצא');
 
@@ -194,7 +210,8 @@ export async function handleEmployees(request, env, path) {
          bank_details_notes = ?,
          internal_notes = ?,
          updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`
+       WHERE id = ?
+         AND tenant_id = ?`
     ).bind(
       fullName,
       phone,
@@ -210,33 +227,38 @@ export async function handleEmployees(request, env, path) {
       normalizeText(b.payment_method),
       normalizeText(b.bank_details_notes),
       normalizeText(b.internal_notes),
-      id
+      id,
+      tenantId
     ).run();
 
     const employee = await env.DB.prepare(
-      'SELECT * FROM employees WHERE id = ?'
-    ).bind(id).first();
+      'SELECT * FROM employees WHERE id = ? AND tenant_id = ?'
+    ).bind(id, tenantId).first();
 
     return { success: true, employee };
   }
 
   // DELETE /api/employees/:id (soft delete)
   if (idMatch && method === 'DELETE') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const id = idMatch[1];
 
     const existing = await env.DB.prepare(
-      'SELECT * FROM employees WHERE id = ?'
-    ).bind(id).first();
+      'SELECT * FROM employees WHERE id = ? AND tenant_id = ?'
+    ).bind(id, tenantId).first();
 
     if (!existing) throw new Error('עובד לא נמצא');
 
     await env.DB.prepare(
-      'UPDATE employees SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-    ).bind(id).run();
+      'UPDATE employees SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ?'
+    ).bind(id, tenantId).run();
 
     const employee = await env.DB.prepare(
-      'SELECT * FROM employees WHERE id = ?'
-    ).bind(id).first();
+      'SELECT * FROM employees WHERE id = ? AND tenant_id = ?'
+    ).bind(id, tenantId).first();
 
     return { success: true, employee };
   }

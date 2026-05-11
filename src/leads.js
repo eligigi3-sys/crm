@@ -86,6 +86,10 @@ async function getEmployeeById(employeeId, env) {
   return env.DB.prepare('SELECT * FROM employees WHERE id = ?').bind(employeeId).first();
 }
 
+async function getEmployeeByIdForTenant(employeeId, tenantId, env) {
+  return env.DB.prepare('SELECT * FROM employees WHERE id = ? AND tenant_id = ?').bind(employeeId, tenantId).first();
+}
+
 async function getCurrentStockForProduct(productId, env) {
   const row = await env.DB.prepare(
     `SELECT COALESCE(SUM(quantity_change), 0) AS current_stock
@@ -733,8 +737,12 @@ export async function handleLeads(request, env, path) {
   }
 
   if (leadEmployeesMatch && method === 'POST') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const leadId = leadEmployeesMatch[1];
-    const lead = await getLeadById(leadId, env);
+    const lead = await getLeadByIdForTenant(leadId, tenantId, env);
 
     if (!lead) throw new Error('Lead not found');
 
@@ -742,13 +750,13 @@ export async function handleLeads(request, env, path) {
     const employeeId = Number(b.employee_id);
     if (!Number.isInteger(employeeId) || employeeId <= 0) throw new Error('employee_id חובה');
 
-    const employee = await getEmployeeById(employeeId, env);
+    const employee = await getEmployeeByIdForTenant(employeeId, tenantId, env);
     if (!employee) throw new Error('עובד לא נמצא');
     if (Number(employee.is_active) === 0) throw new Error('לא ניתן לשייך עובד לא פעיל');
 
     const existingAssignment = await env.DB.prepare(
-      'SELECT id FROM lead_employees WHERE lead_id = ? AND employee_id = ?'
-    ).bind(leadId, employeeId).first();
+      'SELECT id FROM lead_employees WHERE lead_id = ? AND employee_id = ? AND tenant_id = ?'
+    ).bind(leadId, employeeId, tenantId).first();
 
     if (existingAssignment) throw new Error('העובד כבר משויך לאירוע');
 
@@ -762,8 +770,9 @@ export async function handleLeads(request, env, path) {
         hours_actual,
         payment_status,
         notes,
+        tenant_id,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `).bind(
       leadId,
       employeeId,
@@ -772,7 +781,8 @@ export async function handleLeads(request, env, path) {
       normalizeAssignmentNumber(b.hours_planned),
       normalizeAssignmentNumber(b.hours_actual),
       normalizeAssignmentText(b.payment_status) || 'pending',
-      normalizeAssignmentText(b.notes)
+      normalizeAssignmentText(b.notes),
+      tenantId
     ).run();
 
     const assignment = await env.DB.prepare(`
@@ -785,36 +795,41 @@ export async function handleLeads(request, env, path) {
         employees.hourly_rate AS employee_hourly_rate,
         employees.is_active
       FROM lead_employees
-      INNER JOIN employees ON employees.id = lead_employees.employee_id
+      INNER JOIN employees ON employees.id = lead_employees.employee_id AND employees.tenant_id = lead_employees.tenant_id
       WHERE lead_employees.id = ?
-    `).bind(result.meta.last_row_id).first();
+        AND lead_employees.tenant_id = ?
+    `).bind(result.meta.last_row_id, tenantId).first();
 
     return { success: true, assignment };
   }
 
   if (assignmentIdMatch && method === 'PUT') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const assignmentId = assignmentIdMatch[1];
     const b = await request.json();
 
     const existingAssignment = await env.DB.prepare(
-      'SELECT * FROM lead_employees WHERE id = ?'
-    ).bind(assignmentId).first();
+      'SELECT * FROM lead_employees WHERE id = ? AND tenant_id = ?'
+    ).bind(assignmentId, tenantId).first();
 
     if (!existingAssignment) throw new Error('שיוך עובד לא נמצא');
 
     const employeeId = b.employee_id !== undefined ? Number(b.employee_id) : Number(existingAssignment.employee_id);
     if (!Number.isInteger(employeeId) || employeeId <= 0) throw new Error('employee_id חובה');
 
-    const employee = await getEmployeeById(employeeId, env);
+    const employee = await getEmployeeByIdForTenant(employeeId, tenantId, env);
     if (!employee) throw new Error('עובד לא נמצא');
     if (Number(employee.is_active) === 0) throw new Error('לא ניתן לשייך עובד לא פעיל');
 
-    const lead = await getLeadById(existingAssignment.lead_id, env);
+    const lead = await getLeadByIdForTenant(existingAssignment.lead_id, tenantId, env);
     if (!lead) throw new Error('Lead not found');
 
     const duplicateAssignment = await env.DB.prepare(
-      'SELECT id FROM lead_employees WHERE lead_id = ? AND employee_id = ? AND id != ?'
-    ).bind(existingAssignment.lead_id, employeeId, assignmentId).first();
+      'SELECT id FROM lead_employees WHERE lead_id = ? AND employee_id = ? AND id != ? AND tenant_id = ?'
+    ).bind(existingAssignment.lead_id, employeeId, assignmentId, tenantId).first();
 
     if (duplicateAssignment) throw new Error('העובד כבר משויך לאירוע');
 
@@ -829,6 +844,7 @@ export async function handleLeads(request, env, path) {
         payment_status = ?,
         notes = ?
       WHERE id = ?
+        AND tenant_id = ?
     `).bind(
       employeeId,
       normalizeAssignmentText(b.role_on_event),
@@ -837,7 +853,8 @@ export async function handleLeads(request, env, path) {
       normalizeAssignmentNumber(b.hours_actual),
       normalizeAssignmentText(b.payment_status) || 'pending',
       normalizeAssignmentText(b.notes),
-      assignmentId
+      assignmentId,
+      tenantId
     ).run();
 
     const assignment = await env.DB.prepare(`
@@ -850,25 +867,30 @@ export async function handleLeads(request, env, path) {
         employees.hourly_rate AS employee_hourly_rate,
         employees.is_active
       FROM lead_employees
-      INNER JOIN employees ON employees.id = lead_employees.employee_id
+      INNER JOIN employees ON employees.id = lead_employees.employee_id AND employees.tenant_id = lead_employees.tenant_id
       WHERE lead_employees.id = ?
-    `).bind(assignmentId).first();
+        AND lead_employees.tenant_id = ?
+    `).bind(assignmentId, tenantId).first();
 
     return { success: true, assignment };
   }
 
   if (assignmentIdMatch && method === 'DELETE') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const assignmentId = assignmentIdMatch[1];
 
     const existingAssignment = await env.DB.prepare(
-      'SELECT id FROM lead_employees WHERE id = ?'
-    ).bind(assignmentId).first();
+      'SELECT id FROM lead_employees WHERE id = ? AND tenant_id = ?'
+    ).bind(assignmentId, tenantId).first();
 
     if (!existingAssignment) throw new Error('שיוך עובד לא נמצא');
 
     await env.DB.prepare(
-      'DELETE FROM lead_employees WHERE id = ?'
-    ).bind(assignmentId).run();
+      'DELETE FROM lead_employees WHERE id = ? AND tenant_id = ?'
+    ).bind(assignmentId, tenantId).run();
 
     return { success: true };
   }
