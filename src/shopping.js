@@ -17,9 +17,27 @@ async function getProductById(productId, env) {
   `).bind(productId).first();
 }
 
+async function getProductByIdForTenant(productId, tenantId, env) {
+  return env.DB.prepare(`
+    SELECT id, is_active
+    FROM products
+    WHERE id = ?
+      AND tenant_id = ?
+  `).bind(productId, tenantId).first();
+}
+
 async function assertValidShoppingProductLink(productId, env) {
   if (productId === null) return null;
   const product = await getProductById(productId, env);
+  if (!product) {
+    throw new Error('המוצר המקושר לא נמצא');
+  }
+  return product;
+}
+
+async function assertValidShoppingProductLinkForTenant(productId, tenantId, env) {
+  if (productId === null) return null;
+  const product = await getProductByIdForTenant(productId, tenantId, env);
   if (!product) {
     throw new Error('המוצר המקושר לא נמצא');
   }
@@ -159,13 +177,17 @@ export async function handleShopping(request, env, path) {
   }
 
   if (path === '/api/shopping-lists' && method === 'POST') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const b = await request.json();
     if (!b.name) throw new Error('שם חנות חובה');
 
     const result = await env.DB.prepare(`
       INSERT INTO shopping_lists
-        (name, phone, address, notes, contact_name, contact_phone, extra_phone, opening_hours)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        (name, phone, address, notes, contact_name, contact_phone, extra_phone, opening_hours, tenant_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       b.name,
       b.phone || null,
@@ -174,7 +196,8 @@ export async function handleShopping(request, env, path) {
       b.contact_name || null,
       b.contact_phone || null,
       b.extra_phone || null,
-      b.opening_hours || null
+      b.opening_hours || null,
+      tenantId
     ).run();
 
     return { success: true, id: result.meta.last_row_id };
@@ -244,9 +267,16 @@ export async function handleShopping(request, env, path) {
   }
 
   if (listMatch && method === 'PUT') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const id = listMatch[1];
     const b = await request.json();
     if (!b.name) throw new Error('שם חנות חובה');
+
+    const existingList = await env.DB.prepare('SELECT id FROM shopping_lists WHERE id = ? AND tenant_id = ?').bind(id, tenantId).first();
+    if (!existingList) throw new Error('חנות לא נמצאה');
 
     await env.DB.prepare(`
       UPDATE shopping_lists
@@ -260,6 +290,7 @@ export async function handleShopping(request, env, path) {
         extra_phone = ?,
         opening_hours = ?
       WHERE id = ?
+        AND tenant_id = ?
     `).bind(
       b.name,
       b.phone || null,
@@ -269,19 +300,27 @@ export async function handleShopping(request, env, path) {
       b.contact_phone || null,
       b.extra_phone || null,
       b.opening_hours || null,
-      id
+      id,
+      tenantId
     ).run();
 
     return { success: true };
   }
 
   if (listMatch && method === 'DELETE') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const id = listMatch[1];
 
-    await env.DB.prepare('DELETE FROM shopping_items WHERE list_id = ?').bind(id).run();
-    await env.DB.prepare('DELETE FROM shopping_purchase_items WHERE purchase_id IN (SELECT id FROM shopping_purchases WHERE list_id = ?)').bind(id).run();
-    await env.DB.prepare('DELETE FROM shopping_purchases WHERE list_id = ?').bind(id).run();
-    await env.DB.prepare('DELETE FROM shopping_lists WHERE id = ?').bind(id).run();
+    const existingList = await env.DB.prepare('SELECT id FROM shopping_lists WHERE id = ? AND tenant_id = ?').bind(id, tenantId).first();
+    if (!existingList) throw new Error('חנות לא נמצאה');
+
+    await env.DB.prepare('DELETE FROM shopping_items WHERE list_id = ? AND tenant_id = ?').bind(id, tenantId).run();
+    await env.DB.prepare('DELETE FROM shopping_purchase_items WHERE tenant_id = ? AND purchase_id IN (SELECT id FROM shopping_purchases WHERE list_id = ? AND tenant_id = ?)').bind(tenantId, id, tenantId).run();
+    await env.DB.prepare('DELETE FROM shopping_purchases WHERE list_id = ? AND tenant_id = ?').bind(id, tenantId).run();
+    await env.DB.prepare('DELETE FROM shopping_lists WHERE id = ? AND tenant_id = ?').bind(id, tenantId).run();
 
     return { success: true };
   }
@@ -289,17 +328,24 @@ export async function handleShopping(request, env, path) {
   const itemsMatch = path.match(/^\/api\/shopping-lists\/(\d+)\/items$/);
 
   if (itemsMatch && method === 'POST') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const listId = itemsMatch[1];
     const b = await request.json();
 
+    const existingList = await env.DB.prepare('SELECT id FROM shopping_lists WHERE id = ? AND tenant_id = ?').bind(listId, tenantId).first();
+    if (!existingList) throw new Error('חנות לא נמצאה');
+
     if (!b.item_name) throw new Error('שם פריט חובה');
     const productId = parseOptionalProductId(b.product_id);
-    await assertValidShoppingProductLink(productId, env);
+    await assertValidShoppingProductLinkForTenant(productId, tenantId, env);
 
     const result = await env.DB.prepare(`
       INSERT INTO shopping_items
-        (list_id, item_name, quantity, status, notes, price, product_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+        (list_id, item_name, quantity, status, notes, price, product_id, tenant_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       listId,
       b.item_name,
@@ -307,7 +353,8 @@ export async function handleShopping(request, env, path) {
       b.status || 'pending',
       b.notes || null,
       Number(b.price || 0),
-      productId
+      productId,
+      tenantId
     ).run();
 
     return { success: true, id: result.meta.last_row_id };
@@ -316,12 +363,19 @@ export async function handleShopping(request, env, path) {
   const itemMatch = path.match(/^\/api\/shopping-items\/(\d+)$/);
 
   if (itemMatch && method === 'PUT') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const id = itemMatch[1];
     const b = await request.json();
 
+    const existingItem = await env.DB.prepare('SELECT id, list_id FROM shopping_items WHERE id = ? AND tenant_id = ?').bind(id, tenantId).first();
+    if (!existingItem) throw new Error('פריט לא נמצא');
+
     if (!b.item_name) throw new Error('שם פריט חובה');
     const productId = parseOptionalProductId(b.product_id);
-    await assertValidShoppingProductLink(productId, env);
+    await assertValidShoppingProductLinkForTenant(productId, tenantId, env);
 
     await env.DB.prepare(`
       UPDATE shopping_items
@@ -333,6 +387,7 @@ export async function handleShopping(request, env, path) {
         price = ?,
         product_id = ?
       WHERE id = ?
+        AND tenant_id = ?
     `).bind(
       b.item_name,
       b.quantity || null,
@@ -340,16 +395,24 @@ export async function handleShopping(request, env, path) {
       b.notes || null,
       Number(b.price || 0),
       productId,
-      id
+      id,
+      tenantId
     ).run();
 
     return { success: true };
   }
 
   if (itemMatch && method === 'DELETE') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const id = itemMatch[1];
 
-    await env.DB.prepare('DELETE FROM shopping_items WHERE id = ?').bind(id).run();
+    const existingItem = await env.DB.prepare('SELECT id FROM shopping_items WHERE id = ? AND tenant_id = ?').bind(id, tenantId).first();
+    if (!existingItem) throw new Error('פריט לא נמצא');
+
+    await env.DB.prepare('DELETE FROM shopping_items WHERE id = ? AND tenant_id = ?').bind(id, tenantId).run();
 
     return { success: true };
   }
