@@ -1,3 +1,5 @@
+import { requireTenantContext } from './auth.js';
+
 function parseOptionalProductId(value) {
   if (value === null || value === undefined || value === '') return null;
   const productId = Number(value);
@@ -137,16 +139,21 @@ export async function handleShopping(request, env, path) {
   const method = request.method;
 
   if (path === '/api/shopping-lists' && method === 'GET') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const lists = await env.DB.prepare(`
       SELECT 
         sl.*,
         COUNT(si.id) AS items_count,
         SUM(CASE WHEN si.status = 'done' THEN 1 ELSE 0 END) AS done_count
       FROM shopping_lists sl
-      LEFT JOIN shopping_items si ON si.list_id = sl.id
+      LEFT JOIN shopping_items si ON si.list_id = sl.id AND si.tenant_id = sl.tenant_id
+      WHERE sl.tenant_id = ?
       GROUP BY sl.id
       ORDER BY sl.created_at DESC
-    `).all();
+    `).bind(tenantId).all();
 
     return { lists: lists.results || [] };
   }
@@ -176,27 +183,36 @@ export async function handleShopping(request, env, path) {
   const listMatch = path.match(/^\/api\/shopping-lists\/(\d+)$/);
 
   if (listMatch && method === 'GET') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const id = listMatch[1];
 
     const list = await env.DB.prepare(`
       SELECT *
       FROM shopping_lists
       WHERE id = ?
-    `).bind(id).first();
+        AND tenant_id = ?
+    `).bind(id, tenantId).first();
+
+    if (!list) throw new Error('חנות לא נמצאה');
 
     const items = await env.DB.prepare(`
       SELECT *
       FROM shopping_items
       WHERE list_id = ?
+        AND tenant_id = ?
       ORDER BY status ASC, created_at DESC
-    `).bind(id).all();
+    `).bind(id, tenantId).all();
 
     const purchases = await env.DB.prepare(`
       SELECT *
       FROM shopping_purchases
       WHERE list_id = ?
+        AND tenant_id = ?
       ORDER BY purchase_date DESC, created_at DESC
-    `).bind(id).all();
+    `).bind(id, tenantId).all();
 
     const now = new Date();
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -212,7 +228,8 @@ export async function handleShopping(request, env, path) {
         SUM(CASE WHEN purchase_date >= ? THEN total_amount ELSE 0 END) AS year_total
       FROM shopping_purchases
       WHERE list_id = ?
-    `).bind(currentMonth, prevMonth, yearStart, id).first();
+        AND tenant_id = ?
+    `).bind(currentMonth, prevMonth, yearStart, id, tenantId).first();
 
     return {
       list,
@@ -446,27 +463,36 @@ export async function handleShopping(request, env, path) {
   const purchaseDetailsMatch = path.match(/^\/api\/shopping-purchases\/(\d+)$/);
 
   if (purchaseDetailsMatch && method === 'GET') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const id = purchaseDetailsMatch[1];
 
     const purchase = await env.DB.prepare(`
       SELECT sp.*, sl.name AS store_name
       FROM shopping_purchases sp
-      LEFT JOIN shopping_lists sl ON sl.id = sp.list_id
+      LEFT JOIN shopping_lists sl ON sl.id = sp.list_id AND sl.tenant_id = sp.tenant_id
       WHERE sp.id = ?
-    `).bind(id).first();
+        AND sp.tenant_id = ?
+    `).bind(id, tenantId).first();
+
+    if (!purchase) throw new Error('רכישת קניות לא נמצאה');
 
     const items = await env.DB.prepare(`
       SELECT *
       FROM shopping_purchase_items
       WHERE purchase_id = ?
+        AND tenant_id = ?
       ORDER BY created_at ASC
-    `).bind(id).all();
+    `).bind(id, tenantId).all();
 
     const stores = await env.DB.prepare(`
       SELECT id, name
       FROM shopping_lists
+      WHERE tenant_id = ?
       ORDER BY name ASC
-    `).all();
+    `).bind(tenantId).all();
 
     return {
       purchase,
