@@ -90,6 +90,31 @@ async function normalizeShoppingLedgerItem(rawItem, env) {
   };
 }
 
+async function normalizeShoppingLedgerItemForTenant(rawItem, tenantId, env) {
+  const productId = parseOptionalProductId(rawItem ? rawItem.product_id : null);
+  await assertValidShoppingProductLinkForTenant(productId, tenantId, env);
+
+  if (productId === null) {
+    return {
+      productId: null,
+      quantity: null,
+      totalPrice: null,
+      unitPrice: null
+    };
+  }
+
+  const quantity = normalizeShoppingPurchaseQuantity(rawItem.quantity);
+  const totalPrice = normalizeShoppingPurchaseLineTotal(rawItem.price);
+  const unitPrice = calculateShoppingUnitPrice(totalPrice, quantity);
+
+  return {
+    productId,
+    quantity,
+    totalPrice,
+    unitPrice
+  };
+}
+
 async function getShoppingPurchaseById(purchaseId, env) {
   return env.DB.prepare(`
     SELECT *
@@ -420,8 +445,15 @@ export async function handleShopping(request, env, path) {
   const purchaseMatch = path.match(/^\/api\/shopping-lists\/(\d+)\/purchases$/);
 
   if (purchaseMatch && method === 'POST') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const listId = purchaseMatch[1];
     const b = await request.json();
+
+    const shoppingList = await env.DB.prepare('SELECT id FROM shopping_lists WHERE id = ? AND tenant_id = ?').bind(listId, tenantId).first();
+    if (!shoppingList) throw new Error('חנות לא נמצאה');
 
     const items = Array.isArray(b.items) ? b.items : [];
     const total = items.reduce((sum, item) => sum + Number(item.price || 0), 0);
@@ -430,18 +462,19 @@ export async function handleShopping(request, env, path) {
     for (const item of items) {
       normalizedItems.push({
         raw: item,
-        ledger: await normalizeShoppingLedgerItem(item, env)
+        ledger: await normalizeShoppingLedgerItemForTenant(item, tenantId, env)
       });
     }
 
     const purchase = await env.DB.prepare(`
-      INSERT INTO shopping_purchases (list_id, purchase_date, total_amount, notes)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO shopping_purchases (list_id, purchase_date, total_amount, notes, tenant_id)
+      VALUES (?, ?, ?, ?, ?)
     `).bind(
       listId,
       b.purchase_date || new Date().toISOString().slice(0, 10),
       Number(b.total_amount || total || 0),
-      b.notes || null
+      b.notes || null,
+      tenantId
     ).run();
 
     const purchaseId = purchase.meta.last_row_id;
@@ -452,19 +485,20 @@ export async function handleShopping(request, env, path) {
 
       await env.DB.prepare(`
         INSERT INTO shopping_purchase_items
-          (purchase_id, item_name, quantity, price, notes, product_id)
-        VALUES (?, ?, ?, ?, ?, ?)
+          (purchase_id, item_name, quantity, price, notes, product_id, tenant_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `).bind(
         purchaseId,
         item.item_name,
         item.quantity || null,
         Number(item.price || 0),
         item.notes || null,
-        ledger.productId
+        ledger.productId,
+        tenantId
       ).run();
     }
 
-    await env.DB.prepare('DELETE FROM shopping_items WHERE list_id = ?').bind(listId).run();
+    await env.DB.prepare('DELETE FROM shopping_items WHERE list_id = ? AND tenant_id = ?').bind(listId, tenantId).run();
 
     return { success: true, id: purchaseId };
   }
@@ -565,34 +599,56 @@ export async function handleShopping(request, env, path) {
   }
 
   if (purchaseDetailsMatch && method === 'PUT') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const id = purchaseDetailsMatch[1];
     const b = await request.json();
+
+    const existingPurchase = await env.DB.prepare('SELECT id, list_id FROM shopping_purchases WHERE id = ? AND tenant_id = ?').bind(id, tenantId).first();
+    if (!existingPurchase) throw new Error('רכישת קניות לא נמצאה');
+
+    const targetListId = Number(b.list_id || existingPurchase.list_id);
+    const shoppingList = await env.DB.prepare('SELECT id FROM shopping_lists WHERE id = ? AND tenant_id = ?').bind(targetListId, tenantId).first();
+    if (!shoppingList) throw new Error('חנות לא נמצאה');
+
+    const items = Array.isArray(b.items) ? b.items : [];
+    for (const item of items) {
+      const productId = parseOptionalProductId(item.product_id);
+      await assertValidShoppingProductLinkForTenant(productId, tenantId, env);
+    }
 
     await env.DB.prepare(`
       UPDATE shopping_purchases
       SET list_id = ?, purchase_date = ?, total_amount = ?, notes = ?, receipt_image = ?
       WHERE id = ?
+        AND tenant_id = ?
     `).bind(
-      b.list_id,
+      targetListId,
       b.purchase_date,
       Number(b.total_amount || 0),
       b.notes || null,
       b.receipt_image || null,
-      id
+      id,
+      tenantId
     ).run();
 
-    await env.DB.prepare('DELETE FROM shopping_purchase_items WHERE purchase_id = ?').bind(id).run();
+    await env.DB.prepare('DELETE FROM shopping_purchase_items WHERE purchase_id = ? AND tenant_id = ?').bind(id, tenantId).run();
 
-    for (const item of (b.items || [])) {
+    for (const item of items) {
+      const productId = parseOptionalProductId(item.product_id);
       await env.DB.prepare(`
-        INSERT INTO shopping_purchase_items (purchase_id, item_name, quantity, price, notes)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO shopping_purchase_items (purchase_id, item_name, quantity, price, notes, product_id, tenant_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `).bind(
         id,
         item.item_name,
         item.quantity || null,
         Number(item.price || 0),
-        item.notes || null
+        item.notes || null,
+        productId,
+        tenantId
       ).run();
     }
 
@@ -600,10 +656,17 @@ export async function handleShopping(request, env, path) {
   }
 
   if (purchaseDetailsMatch && method === 'DELETE') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const id = purchaseDetailsMatch[1];
 
-    await env.DB.prepare('DELETE FROM shopping_purchase_items WHERE purchase_id = ?').bind(id).run();
-    await env.DB.prepare('DELETE FROM shopping_purchases WHERE id = ?').bind(id).run();
+    const existingPurchase = await env.DB.prepare('SELECT id FROM shopping_purchases WHERE id = ? AND tenant_id = ?').bind(id, tenantId).first();
+    if (!existingPurchase) throw new Error('רכישת קניות לא נמצאה');
+
+    await env.DB.prepare('DELETE FROM shopping_purchase_items WHERE purchase_id = ? AND tenant_id = ?').bind(id, tenantId).run();
+    await env.DB.prepare('DELETE FROM shopping_purchases WHERE id = ? AND tenant_id = ?').bind(id, tenantId).run();
 
     return { success: true };
   }
