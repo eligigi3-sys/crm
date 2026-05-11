@@ -610,6 +610,10 @@ export async function handleProducts(request, env, path) {
   }
 
   if (path === '/api/products' && method === 'POST') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const b = await request.json();
     const name = normalizeText(b.name);
 
@@ -627,9 +631,10 @@ export async function handleProducts(request, env, path) {
         min_stock_alert,
         notes,
         is_active,
+        tenant_id,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
     ).bind(
       name,
       normalizeText(b.category),
@@ -640,12 +645,13 @@ export async function handleProducts(request, env, path) {
       normalizeNumber(b.stock_quantity, 0),
       normalizeNumber(b.min_stock_alert),
       normalizeText(b.notes),
-      normalizeActive(b.is_active)
+      normalizeActive(b.is_active),
+      tenantId
     ).run();
 
     const product = await env.DB.prepare(
-      'SELECT * FROM products WHERE id = ?'
-    ).bind(result.meta.last_row_id).first();
+      'SELECT * FROM products WHERE id = ? AND tenant_id = ?'
+    ).bind(result.meta.last_row_id, tenantId).first();
 
     return { success: true, product };
   }
@@ -711,6 +717,10 @@ export async function handleProducts(request, env, path) {
   }
 
   if (idMatch && method === 'PUT') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const id = idMatch[1];
     const b = await request.json();
     const name = normalizeText(b.name);
@@ -718,8 +728,8 @@ export async function handleProducts(request, env, path) {
     if (!name) throw new Error('שם מוצר חובה');
 
     const existing = await env.DB.prepare(
-      'SELECT id FROM products WHERE id = ?'
-    ).bind(id).first();
+      'SELECT id FROM products WHERE id = ? AND tenant_id = ?'
+    ).bind(id, tenantId).first();
 
     if (!existing) throw new Error('מוצר לא נמצא');
 
@@ -737,7 +747,8 @@ export async function handleProducts(request, env, path) {
          notes = ?,
          is_active = ?,
          updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`
+       WHERE id = ?
+         AND tenant_id = ?`
     ).bind(
       name,
       normalizeText(b.category),
@@ -749,22 +760,27 @@ export async function handleProducts(request, env, path) {
       normalizeNumber(b.min_stock_alert),
       normalizeText(b.notes),
       normalizeActive(b.is_active),
-      id
+      id,
+      tenantId
     ).run();
 
     const product = await env.DB.prepare(
-      'SELECT * FROM products WHERE id = ?'
-    ).bind(id).first();
+      'SELECT * FROM products WHERE id = ? AND tenant_id = ?'
+    ).bind(id, tenantId).first();
 
     return { success: true, product };
   }
 
   if (idMatch && method === 'DELETE') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const id = idMatch[1];
 
     const existing = await env.DB.prepare(
-      'SELECT * FROM products WHERE id = ?'
-    ).bind(id).first();
+      'SELECT * FROM products WHERE id = ? AND tenant_id = ?'
+    ).bind(id, tenantId).first();
 
     if (!existing) throw new Error('מוצר לא נמצא');
 
@@ -772,12 +788,13 @@ export async function handleProducts(request, env, path) {
       `UPDATE products
        SET is_active = 0,
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`
-    ).bind(id).run();
+       WHERE id = ?
+         AND tenant_id = ?`
+    ).bind(id, tenantId).run();
 
     const product = await env.DB.prepare(
-      'SELECT * FROM products WHERE id = ?'
-    ).bind(id).first();
+      'SELECT * FROM products WHERE id = ? AND tenant_id = ?'
+    ).bind(id, tenantId).first();
 
     return { success: true, product };
   }
