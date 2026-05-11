@@ -5,6 +5,81 @@ function json(body, status = 200, extraHeaders = {}) {
   });
 }
 
+function getBearerToken(request) {
+  const authHeader = request.headers.get('Authorization') || request.headers.get('authorization') || '';
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1].trim() : '';
+}
+
+async function getUserById(userId, env) {
+  if (!userId) return null;
+  return env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+}
+
+export async function requireTenantContext(request, env) {
+  const token = getBearerToken(request);
+  if (!token) {
+    return json({ error: 'נדרש טוקן התחברות' }, 401);
+  }
+
+  let payload;
+  try {
+    payload = await verifyToken(token, env.JWT_SECRET);
+  } catch {
+    return json({ error: 'טוקן לא תקין או שפג תוקפו' }, 401);
+  }
+
+  const user = await getUserById(payload.userId, env);
+  if (!user) {
+    return json({ error: 'המשתמש לא נמצא' }, 401);
+  }
+
+  const memberships = await env.DB.prepare(
+    `SELECT
+       tm.id,
+       tm.tenant_id,
+       tm.role,
+       tm.status,
+       t.slug AS tenant_slug,
+       t.status AS tenant_status
+     FROM tenant_memberships tm
+     JOIN tenants t ON t.id = tm.tenant_id
+     WHERE tm.user_id = ?
+       AND tm.status = 'active'
+     ORDER BY tm.id ASC`
+  ).bind(user.id).all();
+
+  const activeMemberships = (memberships.results || []).filter(function(item) {
+    return item.tenant_status === 'active';
+  });
+
+  if (activeMemberships.length === 0) {
+    return json({ error: 'אין למשתמש שיוך פעיל לעסק' }, 403);
+  }
+
+  if (activeMemberships.length > 1) {
+    return json({ error: 'נדרשת בחירת עסק פעיל לפני המשך' }, 409);
+  }
+
+  const membership = activeMemberships[0];
+  return {
+    user: {
+      id: user.id,
+      email: user.email
+    },
+    tenant: {
+      id: membership.tenant_id,
+      slug: membership.tenant_slug,
+      status: membership.tenant_status
+    },
+    membership: {
+      id: membership.id,
+      role: membership.role,
+      status: membership.status
+    }
+  };
+}
+
 export async function handleAuth(request, env, path) {
   const method = request.method;
 
@@ -60,6 +135,16 @@ export async function handleAuth(request, env, path) {
     const { token } = await request.json();
     const payload = await verifyToken(token, env.JWT_SECRET);
     return { valid: true, user: payload };
+  }
+
+  if (path === '/api/auth/tenant-context' && method === 'GET') {
+    const ctx = await requireTenantContext(request, env);
+    if (ctx instanceof Response) return ctx;
+    return {
+      user: ctx.user,
+      tenant: ctx.tenant,
+      membership: ctx.membership
+    };
   }
 
   return json({ error: 'Auth route not found' }, 404);
