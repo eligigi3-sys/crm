@@ -1,3 +1,5 @@
+import { requireTenantContext } from './auth.js';
+
 // ============================================================
 // leads.js - לוגיקת אירועים (נפרדת מלקוחות!)
 // ============================================================
@@ -76,6 +78,10 @@ async function getLeadById(leadId, env) {
   return env.DB.prepare('SELECT * FROM leads WHERE id = ?').bind(leadId).first();
 }
 
+async function getLeadByIdForTenant(leadId, tenantId, env) {
+  return env.DB.prepare('SELECT * FROM leads WHERE id = ? AND tenant_id = ?').bind(leadId, tenantId).first();
+}
+
 async function getEmployeeById(employeeId, env) {
   return env.DB.prepare('SELECT * FROM employees WHERE id = ?').bind(employeeId).first();
 }
@@ -89,6 +95,16 @@ async function getCurrentStockForProduct(productId, env) {
   return Number(row && row.current_stock !== undefined && row.current_stock !== null ? row.current_stock : 0);
 }
 
+async function getCurrentStockForProductForTenant(productId, tenantId, env) {
+  const row = await env.DB.prepare(
+    `SELECT COALESCE(SUM(quantity_change), 0) AS current_stock
+     FROM product_stock_movements
+     WHERE product_id = ?
+       AND tenant_id = ?`
+  ).bind(productId, tenantId).first();
+  return Number(row && row.current_stock !== undefined && row.current_stock !== null ? row.current_stock : 0);
+}
+
 async function getReservedElsewhereForProduct(productId, eventId, env) {
   const row = await env.DB.prepare(
     `SELECT COALESCE(SUM(reserved_quantity), 0) AS reserved_elsewhere
@@ -97,6 +113,18 @@ async function getReservedElsewhereForProduct(productId, eventId, env) {
        AND event_id != ?
        AND status IN ('reserved', 'partial')`
   ).bind(productId, eventId).first();
+  return Number(row && row.reserved_elsewhere !== undefined && row.reserved_elsewhere !== null ? row.reserved_elsewhere : 0);
+}
+
+async function getReservedElsewhereForProductForTenant(productId, eventId, tenantId, env) {
+  const row = await env.DB.prepare(
+    `SELECT COALESCE(SUM(reserved_quantity), 0) AS reserved_elsewhere
+     FROM event_product_allocations
+     WHERE product_id = ?
+       AND event_id != ?
+       AND tenant_id = ?
+       AND status IN ('reserved', 'partial')`
+  ).bind(productId, eventId, tenantId).first();
   return Number(row && row.reserved_elsewhere !== undefined && row.reserved_elsewhere !== null ? row.reserved_elsewhere : 0);
 }
 
@@ -300,16 +328,21 @@ export async function handleLeads(request, env, path) {
   const leadInventoryAllocationCancelMatch = path.match(/^\/api\/leads\/(\d+)\/inventory\/(\d+)\/cancel$/);
 
   if (leadInventoryMatch && method === 'GET') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
     const leadId = leadInventoryMatch[1];
+    const tenantId = tenantCtx.tenant.id;
     const event = await env.DB.prepare(`
       SELECT
         leads.*,
         contacts.contact_num,
         contacts.name AS contact_name
       FROM leads
-      LEFT JOIN contacts ON leads.contact_id = contacts.id
+      LEFT JOIN contacts ON leads.contact_id = contacts.id AND contacts.tenant_id = leads.tenant_id
       WHERE leads.id = ?
-    `).bind(leadId).first();
+        AND leads.tenant_id = ?
+    `).bind(leadId, tenantId).first();
 
     if (!event) throw new Error('Lead not found');
 
@@ -355,14 +388,15 @@ export async function handleLeads(request, env, path) {
             )
         ) AS has_unreceived_purchases
       FROM event_product_allocations epa
-      INNER JOIN products p ON p.id = epa.product_id
+      INNER JOIN products p ON p.id = epa.product_id AND p.tenant_id = epa.tenant_id
       WHERE epa.event_id = ?
+        AND epa.tenant_id = ?
       ORDER BY p.name COLLATE NOCASE ASC, epa.id ASC
-    `).bind(leadId).all();
+    `).bind(leadId, tenantId).all();
 
     const allocations = await Promise.all((results || []).map(async function(row) {
-      const currentStock = await getCurrentStockForProduct(row.product_id, env);
-      const reservedElsewhere = await getReservedElsewhereForProduct(row.product_id, leadId, env);
+      const currentStock = await getCurrentStockForProductForTenant(row.product_id, tenantId, env);
+      const reservedElsewhere = await getReservedElsewhereForProductForTenant(row.product_id, leadId, tenantId, env);
       const availableStock = currentStock - reservedElsewhere;
       const shortageAmount = Math.max(Number(row.reserved_quantity || 0) - availableStock, 0);
 
@@ -400,16 +434,21 @@ export async function handleLeads(request, env, path) {
   }
 
   if (leadInventoryActionsMatch && method === 'GET') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
     const leadId = Number(leadInventoryActionsMatch[1]);
+    const tenantId = tenantCtx.tenant.id;
     const event = await env.DB.prepare(`
       SELECT
         leads.*,
         contacts.contact_num,
         contacts.name AS contact_name
       FROM leads
-      LEFT JOIN contacts ON leads.contact_id = contacts.id
+      LEFT JOIN contacts ON leads.contact_id = contacts.id AND contacts.tenant_id = leads.tenant_id
       WHERE leads.id = ?
-    `).bind(leadId).first();
+        AND leads.tenant_id = ?
+    `).bind(leadId, tenantId).first();
 
     if (!event) throw new Error('Lead not found');
 
@@ -435,11 +474,12 @@ export async function handleLeads(request, env, path) {
         psm.quantity_change AS stock_movement_quantity_change,
         psm.created_at AS stock_movement_created_at
       FROM event_inventory_actions eia
-      INNER JOIN products p ON p.id = eia.product_id
-      LEFT JOIN product_stock_movements psm ON psm.event_inventory_action_id = eia.id
+      INNER JOIN products p ON p.id = eia.product_id AND p.tenant_id = eia.tenant_id
+      LEFT JOIN product_stock_movements psm ON psm.event_inventory_action_id = eia.id AND psm.tenant_id = eia.tenant_id
       WHERE eia.event_id = ?
+        AND eia.tenant_id = ?
       ORDER BY eia.performed_at DESC, eia.id DESC
-    `).bind(leadId).all();
+    `).bind(leadId, tenantId).all();
 
     const actions = (results || []).map(mapInventoryActionRow);
 
@@ -664,8 +704,12 @@ export async function handleLeads(request, env, path) {
   }
 
   if (leadEmployeesMatch && method === 'GET') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
     const leadId = leadEmployeesMatch[1];
-    const lead = await getLeadById(leadId, env);
+    const tenantId = tenantCtx.tenant.id;
+    const lead = await getLeadByIdForTenant(leadId, tenantId, env);
 
     if (!lead) throw new Error('Lead not found');
 
@@ -679,10 +723,11 @@ export async function handleLeads(request, env, path) {
         employees.hourly_rate AS employee_hourly_rate,
         employees.is_active
       FROM lead_employees
-      INNER JOIN employees ON employees.id = lead_employees.employee_id
+      INNER JOIN employees ON employees.id = lead_employees.employee_id AND employees.tenant_id = lead_employees.tenant_id
       WHERE lead_employees.lead_id = ?
+        AND lead_employees.tenant_id = ?
       ORDER BY lead_employees.created_at DESC, lead_employees.id DESC
-    `).bind(leadId).all();
+    `).bind(leadId, tenantId).all();
 
     return { assignments: results };
   }
@@ -832,16 +877,21 @@ export async function handleLeads(request, env, path) {
   // GET ALL
   // ===============================
   if (path === '/api/leads' && method === 'GET') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const { results } = await env.DB.prepare(`
       SELECT
         leads.*,
         contacts.contact_num,
         contacts.name AS contact_name
       FROM leads
-      LEFT JOIN contacts ON leads.contact_id = contacts.id
+      LEFT JOIN contacts ON leads.contact_id = contacts.id AND contacts.tenant_id = leads.tenant_id
+      WHERE leads.tenant_id = ?
       ORDER BY leads.created_at DESC
       LIMIT 200
-    `).all();
+    `).bind(tenantId).all();
 
     return { leads: results };
   }
@@ -852,7 +902,11 @@ export async function handleLeads(request, env, path) {
   // GET SINGLE
   // ===============================
   if (idMatch && method === 'GET') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
     const id = idMatch[1];
+    const tenantId = tenantCtx.tenant.id;
 
     const lead = await env.DB.prepare(`
       SELECT
@@ -860,13 +914,14 @@ export async function handleLeads(request, env, path) {
         contacts.contact_num,
         contacts.name AS contact_name
       FROM leads
-      LEFT JOIN contacts ON leads.contact_id = contacts.id
+      LEFT JOIN contacts ON leads.contact_id = contacts.id AND contacts.tenant_id = leads.tenant_id
       WHERE leads.id = ?
-    `).bind(id).first();
+        AND leads.tenant_id = ?
+    `).bind(id, tenantId).first();
 
     const { results: notes } = await env.DB.prepare(
-      'SELECT * FROM lead_notes WHERE lead_id = ? ORDER BY created_at DESC'
-    ).bind(id).all();
+      'SELECT * FROM lead_notes WHERE lead_id = ? AND tenant_id = ? ORDER BY created_at DESC'
+    ).bind(id, tenantId).all();
 
     return { lead, notes };
   }
@@ -1032,6 +1087,10 @@ export async function handleLeads(request, env, path) {
 }
 
 export async function handleDashboard(request, env, path) {
+  const tenantCtx = await requireTenantContext(request, env);
+  if (tenantCtx instanceof Response) return tenantCtx;
+
+  const tenantId = tenantCtx.tenant.id;
   const now = new Date();
 
   const y = now.getFullYear();
@@ -1063,31 +1122,31 @@ export async function handleDashboard(request, env, path) {
     revCurr,
     revNext
   ] = await Promise.all([
-    env.DB.prepare('SELECT COUNT(*) AS c FROM leads').first(),
+    env.DB.prepare('SELECT COUNT(*) AS c FROM leads WHERE tenant_id = ?').bind(tenantId).first(),
 
     env.DB.prepare(
-      "SELECT COUNT(*) AS c, SUM(price) AS rev FROM leads WHERE status = 'closed'"
-    ).first(),
+      "SELECT COUNT(*) AS c, SUM(price) AS rev FROM leads WHERE tenant_id = ? AND status = 'closed'"
+    ).bind(tenantId).first(),
 
     env.DB.prepare(
-      "SELECT COUNT(*) AS c FROM leads WHERE status = 'quote'"
-    ).first(),
+      "SELECT COUNT(*) AS c FROM leads WHERE tenant_id = ? AND status = 'quote'"
+    ).bind(tenantId).first(),
 
     env.DB.prepare(
-      "SELECT COUNT(*) AS c FROM leads WHERE status = 'lead'"
-    ).first(),
+      "SELECT COUNT(*) AS c FROM leads WHERE tenant_id = ? AND status = 'lead'"
+    ).bind(tenantId).first(),
 
     env.DB.prepare(
-      "SELECT SUM(price) AS rev FROM leads WHERE status = 'closed' AND event_date >= ? AND event_date <= ?"
-    ).bind(prevStart, prevEnd).first(),
+      "SELECT SUM(price) AS rev FROM leads WHERE tenant_id = ? AND status = 'closed' AND event_date >= ? AND event_date <= ?"
+    ).bind(tenantId, prevStart, prevEnd).first(),
 
     env.DB.prepare(
-      "SELECT SUM(price) AS rev FROM leads WHERE status = 'closed' AND event_date >= ? AND event_date <= ?"
-    ).bind(currStart, currEnd).first(),
+      "SELECT SUM(price) AS rev FROM leads WHERE tenant_id = ? AND status = 'closed' AND event_date >= ? AND event_date <= ?"
+    ).bind(tenantId, currStart, currEnd).first(),
 
     env.DB.prepare(
-      "SELECT SUM(price) AS rev FROM leads WHERE status = 'closed' AND event_date >= ? AND event_date <= ?"
-    ).bind(nextStart, nextEnd).first()
+      "SELECT SUM(price) AS rev FROM leads WHERE tenant_id = ? AND status = 'closed' AND event_date >= ? AND event_date <= ?"
+    ).bind(tenantId, nextStart, nextEnd).first()
   ]);
 
   const today = now.toISOString().split('T')[0];
@@ -1098,12 +1157,13 @@ export async function handleDashboard(request, env, path) {
       contacts.contact_num AS contact_num,
       contacts.name AS contact_name
      FROM leads
-     LEFT JOIN contacts ON leads.contact_id = contacts.id
-     WHERE leads.next_contact <= ?
+     LEFT JOIN contacts ON leads.contact_id = contacts.id AND contacts.tenant_id = leads.tenant_id
+     WHERE leads.tenant_id = ?
+       AND leads.next_contact <= ?
        AND leads.status NOT IN ('closed', 'cancelled')
      ORDER BY leads.next_contact ASC
      LIMIT 5`
-  ).bind(today).all();
+  ).bind(tenantId, today).all();
 
   const { results: upcoming } = await env.DB.prepare(
     `SELECT
@@ -1111,12 +1171,13 @@ export async function handleDashboard(request, env, path) {
       contacts.contact_num AS contact_num,
       contacts.name AS contact_name
      FROM leads
-     LEFT JOIN contacts ON leads.contact_id = contacts.id
-     WHERE leads.event_date >= ?
+     LEFT JOIN contacts ON leads.contact_id = contacts.id AND contacts.tenant_id = leads.tenant_id
+     WHERE leads.tenant_id = ?
+       AND leads.event_date >= ?
        AND leads.status = 'closed'
      ORDER BY leads.event_date ASC
      LIMIT 5`
-  ).bind(today).all();
+  ).bind(tenantId, today).all();
 
   const { results: recentLeads } = await env.DB.prepare(
     `SELECT
@@ -1124,10 +1185,11 @@ export async function handleDashboard(request, env, path) {
       contacts.contact_num AS contact_num,
       contacts.name AS contact_name
      FROM leads
-     LEFT JOIN contacts ON leads.contact_id = contacts.id
+     LEFT JOIN contacts ON leads.contact_id = contacts.id AND contacts.tenant_id = leads.tenant_id
+     WHERE leads.tenant_id = ?
      ORDER BY leads.created_at DESC
      LIMIT 5`
-  ).all();
+  ).bind(tenantId).all();
 
   const { results: allLeads } = await env.DB.prepare(
     `SELECT
@@ -1143,10 +1205,11 @@ export async function handleDashboard(request, env, path) {
       contacts.contact_num AS contact_num,
       contacts.name AS contact_name
      FROM leads
-     LEFT JOIN contacts ON leads.contact_id = contacts.id
-     WHERE leads.event_date IS NOT NULL
-        OR leads.next_contact IS NOT NULL`
-  ).all();
+     LEFT JOIN contacts ON leads.contact_id = contacts.id AND contacts.tenant_id = leads.tenant_id
+     WHERE leads.tenant_id = ?
+       AND (leads.event_date IS NOT NULL
+        OR leads.next_contact IS NOT NULL)`
+  ).bind(tenantId).all();
 
   return {
     stats: {
