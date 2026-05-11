@@ -174,8 +174,16 @@ async function getProductById(productId, env) {
   return env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(productId).first();
 }
 
+async function getProductByIdForTenant(productId, tenantId, env) {
+  return env.DB.prepare('SELECT * FROM products WHERE id = ? AND tenant_id = ?').bind(productId, tenantId).first();
+}
+
 async function getEventAllocationById(allocationId, env) {
   return env.DB.prepare('SELECT * FROM event_product_allocations WHERE id = ?').bind(allocationId).first();
+}
+
+async function getEventAllocationByIdForTenant(allocationId, tenantId, env) {
+  return env.DB.prepare('SELECT * FROM event_product_allocations WHERE id = ? AND tenant_id = ?').bind(allocationId, tenantId).first();
 }
 
 function normalizeAllocationStatus(value) {
@@ -272,6 +280,38 @@ async function getInventoryActionWithMovementById(actionId, env) {
   return row ? mapInventoryActionRow(row) : null;
 }
 
+async function getInventoryActionWithMovementByIdForTenant(actionId, tenantId, env) {
+  const row = await env.DB.prepare(`
+    SELECT
+      eia.id,
+      eia.event_id,
+      eia.allocation_id,
+      eia.product_id,
+      eia.action_type,
+      eia.quantity,
+      eia.note,
+      eia.performed_at,
+      eia.created_at,
+      eia.updated_at,
+      p.name AS product_name,
+      p.category AS product_category,
+      p.sku AS product_sku,
+      p.unit AS product_unit,
+      p.is_active AS product_is_active,
+      psm.id AS stock_movement_id,
+      psm.movement_type AS stock_movement_type,
+      psm.quantity_change AS stock_movement_quantity_change,
+      psm.created_at AS stock_movement_created_at
+    FROM event_inventory_actions eia
+    INNER JOIN products p ON p.id = eia.product_id AND p.tenant_id = eia.tenant_id
+    LEFT JOIN product_stock_movements psm ON psm.event_inventory_action_id = eia.id AND psm.tenant_id = eia.tenant_id
+    WHERE eia.id = ?
+      AND eia.tenant_id = ?
+  `).bind(actionId, tenantId).first();
+
+  return row ? mapInventoryActionRow(row) : null;
+}
+
 async function findRecentMatchingUsageAction(eventId, productId, quantity, allocationId, note, env) {
   const row = await env.DB.prepare(`
     SELECT
@@ -311,6 +351,46 @@ async function findRecentMatchingUsageAction(eventId, productId, quantity, alloc
   return row ? mapInventoryActionRow(row) : null;
 }
 
+async function findRecentMatchingUsageActionForTenant(eventId, productId, quantity, allocationId, note, tenantId, env) {
+  const row = await env.DB.prepare(`
+    SELECT
+      eia.id,
+      eia.event_id,
+      eia.allocation_id,
+      eia.product_id,
+      eia.action_type,
+      eia.quantity,
+      eia.note,
+      eia.performed_at,
+      eia.created_at,
+      eia.updated_at,
+      p.name AS product_name,
+      p.category AS product_category,
+      p.sku AS product_sku,
+      p.unit AS product_unit,
+      p.is_active AS product_is_active,
+      psm.id AS stock_movement_id,
+      psm.movement_type AS stock_movement_type,
+      psm.quantity_change AS stock_movement_quantity_change,
+      psm.created_at AS stock_movement_created_at
+    FROM event_inventory_actions eia
+    INNER JOIN products p ON p.id = eia.product_id AND p.tenant_id = eia.tenant_id
+    INNER JOIN product_stock_movements psm ON psm.event_inventory_action_id = eia.id AND psm.tenant_id = eia.tenant_id
+    WHERE eia.event_id = ?
+      AND eia.product_id = ?
+      AND eia.tenant_id = ?
+      AND eia.action_type = 'usage'
+      AND eia.quantity = ?
+      AND ((eia.allocation_id IS NULL AND ? IS NULL) OR eia.allocation_id = ?)
+      AND COALESCE(eia.note, '') = COALESCE(?, '')
+      AND eia.created_at >= datetime('now', '-15 seconds')
+    ORDER BY eia.id DESC
+    LIMIT 1
+  `).bind(eventId, productId, tenantId, quantity, allocationId, allocationId, note).first();
+
+  return row ? mapInventoryActionRow(row) : null;
+}
+
 function isUniqueConstraintError(err) {
   const text = String((err && err.message) || err || '');
   return text.indexOf('UNIQUE constraint failed') !== -1;
@@ -340,6 +420,49 @@ async function validateAllocationPayload(payload, env, eventId, existingAllocati
 
   const currentStock = await getCurrentStockForProduct(productId, env);
   const reservedElsewhere = await getReservedElsewhereForProduct(productId, eventId, env);
+  const availableStock = currentStock - reservedElsewhere;
+
+  if (reservedQuantity > availableStock) {
+    throw new Error('לא ניתן לשמור יותר מהמלאי הזמין כרגע');
+  }
+
+  return {
+    product,
+    productId,
+    plannedQuantity,
+    reservedQuantity,
+    status,
+    note,
+    currentStock,
+    reservedElsewhere,
+    availableStock
+  };
+}
+
+async function validateAllocationPayloadForTenant(payload, env, eventId, existingAllocation, tenantId) {
+  const productId = Number(payload.product_id !== undefined ? payload.product_id : existingAllocation && existingAllocation.product_id);
+  if (!Number.isInteger(productId) || productId <= 0) throw new Error('product_id חובה');
+
+  const product = await getProductByIdForTenant(productId, tenantId, env);
+  if (!product) throw new Error('מוצר לא נמצא');
+  if (!existingAllocation && Number(product.is_active) === 0) throw new Error('לא ניתן להוסיף מוצר לא פעיל לתכנון');
+
+  const plannedQuantity = normalizeAllocationNumber(
+    payload.planned_quantity !== undefined ? payload.planned_quantity : existingAllocation && existingAllocation.planned_quantity,
+    'כמות מתוכננת'
+  );
+  const reservedQuantity = normalizeAllocationNumber(
+    payload.reserved_quantity !== undefined ? payload.reserved_quantity : existingAllocation && existingAllocation.reserved_quantity,
+    'כמות שמורה'
+  );
+  const status = normalizeAllocationStatus(payload.status !== undefined ? payload.status : existingAllocation && existingAllocation.status);
+  const note = normalizeAllocationNote(payload.note !== undefined ? payload.note : existingAllocation && existingAllocation.note);
+
+  if (reservedQuantity > plannedQuantity) throw new Error('כמות שמורה לא יכולה להיות גדולה מכמות מתוכננת');
+  if (status === 'reserved' && reservedQuantity <= 0) throw new Error('כדי לסמן כשמור צריך כמות שמורה גדולה מ-0');
+
+  const currentStock = await getCurrentStockForProductForTenant(productId, tenantId, env);
+  const reservedElsewhere = await getReservedElsewhereForProductForTenant(productId, eventId, tenantId, env);
   const availableStock = currentStock - reservedElsewhere;
 
   if (reservedQuantity > availableStock) {
@@ -535,8 +658,12 @@ export async function handleLeads(request, env, path) {
   }
 
   if (leadInventoryActionsMatch && method === 'POST') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const leadId = Number(leadInventoryActionsMatch[1]);
-    const lead = await getLeadById(leadId, env);
+    const lead = await getLeadByIdForTenant(leadId, tenantId, env);
     if (!lead) throw new Error('Lead not found');
 
     let body;
@@ -549,7 +676,7 @@ export async function handleLeads(request, env, path) {
     const productId = Number(body.product_id);
     if (!Number.isInteger(productId) || productId <= 0) throw new Error('product_id חובה');
 
-    const product = await getProductById(productId, env);
+    const product = await getProductByIdForTenant(productId, tenantId, env);
     if (!product) throw new Error('מוצר לא נמצא');
 
     const quantity = normalizeInventoryActionQuantity(body.quantity);
@@ -557,23 +684,23 @@ export async function handleLeads(request, env, path) {
     const note = normalizeAllocationNote(body.note);
 
     if (allocationId !== null) {
-      const allocation = await getEventAllocationById(allocationId, env);
+      const allocation = await getEventAllocationByIdForTenant(allocationId, tenantId, env);
       if (!allocation || Number(allocation.event_id) !== leadId) throw new Error('הקצאה לא שייכת לאירוע הזה');
       if (Number(allocation.product_id) !== productId) throw new Error('הקצאה לא שייכת למוצר הזה');
     }
 
-    const duplicateAction = await findRecentMatchingUsageAction(leadId, productId, quantity, allocationId, note, env);
+    const duplicateAction = await findRecentMatchingUsageActionForTenant(leadId, productId, quantity, allocationId, note, tenantId, env);
     if (duplicateAction) {
       return {
         success: true,
         already_processed: true,
         action: duplicateAction,
         movement: duplicateAction.stock_movement,
-        current_stock: await getCurrentStockForProduct(productId, env)
+        current_stock: await getCurrentStockForProductForTenant(productId, tenantId, env)
       };
     }
 
-    const currentStockBefore = await getCurrentStockForProduct(productId, env);
+    const currentStockBefore = await getCurrentStockForProductForTenant(productId, tenantId, env);
     if (quantity > currentStockBefore) throw new Error('לא ניתן לרשום שימוש גדול מהמלאי הקיים');
 
     const actionInsert = await env.DB.prepare(`
@@ -584,16 +711,18 @@ export async function handleLeads(request, env, path) {
         action_type,
         quantity,
         note,
+        tenant_id,
         performed_at,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, 'usage', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ) VALUES (?, ?, ?, 'usage', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `).bind(
       leadId,
       allocationId,
       productId,
       quantity,
-      note
+      note,
+      tenantId
     ).run();
 
     const actionId = actionInsert.meta.last_row_id;
@@ -610,47 +739,53 @@ export async function handleLeads(request, env, path) {
           reason,
           note,
           event_inventory_action_id,
+          tenant_id,
           created_at,
           updated_at
-        ) VALUES (?, 'event_usage', ?, 'event', ?, ?, 'שימוש בפועל באירוע', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ) VALUES (?, 'event_usage', ?, 'event', ?, ?, 'שימוש בפועל באירוע', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `).bind(
         productId,
         -quantity,
         leadId,
         leadId,
         note,
-        actionId
+        actionId,
+        tenantId
       ).run();
     } catch (err) {
       if (!isUniqueConstraintError(err)) throw err;
-      const existingAction = await getInventoryActionWithMovementById(actionId, env);
+      const existingAction = await getInventoryActionWithMovementByIdForTenant(actionId, tenantId, env);
       if (!existingAction || !existingAction.stock_movement || !existingAction.stock_movement.exists) throw err;
       return {
         success: true,
         already_processed: true,
         action: existingAction,
         movement: existingAction.stock_movement,
-        current_stock: await getCurrentStockForProduct(productId, env)
+        current_stock: await getCurrentStockForProductForTenant(productId, tenantId, env)
       };
     }
 
-    const action = await getInventoryActionWithMovementById(actionId, env);
+    const action = await getInventoryActionWithMovementByIdForTenant(actionId, tenantId, env);
     return {
       success: true,
       already_processed: false,
       action,
       movement: action && action.stock_movement ? action.stock_movement : null,
-      current_stock: await getCurrentStockForProduct(productId, env)
+      current_stock: await getCurrentStockForProductForTenant(productId, tenantId, env)
     };
   }
 
   if (leadInventoryMatch && method === 'POST') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const leadId = Number(leadInventoryMatch[1]);
-    const lead = await getLeadById(leadId, env);
+    const lead = await getLeadByIdForTenant(leadId, tenantId, env);
     if (!lead) throw new Error('Lead not found');
 
     const body = await request.json();
-    const validated = await validateAllocationPayload(body, env, leadId, null);
+    const validated = await validateAllocationPayloadForTenant(body, env, leadId, null, tenantId);
 
     try {
       const result = await env.DB.prepare(`
@@ -661,19 +796,21 @@ export async function handleLeads(request, env, path) {
           reserved_quantity,
           status,
           note,
+          tenant_id,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `).bind(
         leadId,
         validated.productId,
         validated.plannedQuantity,
         validated.reservedQuantity,
         validated.status,
-        validated.note
+        validated.note,
+        tenantId
       ).run();
 
-      const allocation = await getEventAllocationById(result.meta.last_row_id, env);
+      const allocation = await getEventAllocationByIdForTenant(result.meta.last_row_id, tenantId, env);
       return { success: true, allocation };
     } catch (err) {
       if (isUniqueConstraintError(err)) throw new Error('כבר קיימת הקצאה למוצר הזה באירוע');
@@ -682,19 +819,23 @@ export async function handleLeads(request, env, path) {
   }
 
   if (leadInventoryAllocationMatch && method === 'PUT') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const leadId = Number(leadInventoryAllocationMatch[1]);
     const allocationId = Number(leadInventoryAllocationMatch[2]);
-    const lead = await getLeadById(leadId, env);
+    const lead = await getLeadByIdForTenant(leadId, tenantId, env);
     if (!lead) throw new Error('Lead not found');
 
-    const existingAllocation = await getEventAllocationById(allocationId, env);
+    const existingAllocation = await getEventAllocationByIdForTenant(allocationId, tenantId, env);
     if (!existingAllocation || Number(existingAllocation.event_id) !== leadId) throw new Error('הקצאה לא נמצאה');
 
     const body = await request.json();
-    const validated = await validateAllocationPayload(body, env, leadId, existingAllocation);
+    const validated = await validateAllocationPayloadForTenant(body, env, leadId, existingAllocation, tenantId);
 
     if (validated.productId !== Number(existingAllocation.product_id)) {
-      const targetProduct = await getProductById(validated.productId, env);
+      const targetProduct = await getProductByIdForTenant(validated.productId, tenantId, env);
       if (!targetProduct || Number(targetProduct.is_active) === 0) throw new Error('לא ניתן להחליף למוצר לא פעיל');
     }
 
@@ -709,39 +850,46 @@ export async function handleLeads(request, env, path) {
           note = ?,
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
+          AND tenant_id = ?
       `).bind(
         validated.productId,
         validated.plannedQuantity,
         validated.reservedQuantity,
         validated.status,
         validated.note,
-        allocationId
+        allocationId,
+        tenantId
       ).run();
     } catch (err) {
       if (isUniqueConstraintError(err)) throw new Error('כבר קיימת הקצאה למוצר הזה באירוע');
       throw err;
     }
 
-    const allocation = await getEventAllocationById(allocationId, env);
+    const allocation = await getEventAllocationByIdForTenant(allocationId, tenantId, env);
     return { success: true, allocation };
   }
 
   if (leadInventoryAllocationCancelMatch && method === 'POST') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const leadId = Number(leadInventoryAllocationCancelMatch[1]);
     const allocationId = Number(leadInventoryAllocationCancelMatch[2]);
-    const lead = await getLeadById(leadId, env);
+    const lead = await getLeadByIdForTenant(leadId, tenantId, env);
     if (!lead) throw new Error('Lead not found');
 
-    const existingAllocation = await getEventAllocationById(allocationId, env);
+    const existingAllocation = await getEventAllocationByIdForTenant(allocationId, tenantId, env);
     if (!existingAllocation || Number(existingAllocation.event_id) !== leadId) throw new Error('הקצאה לא נמצאה');
 
     await env.DB.prepare(`
       UPDATE event_product_allocations
       SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).bind(allocationId).run();
+        AND tenant_id = ?
+    `).bind(allocationId, tenantId).run();
 
-    const allocation = await getEventAllocationById(allocationId, env);
+    const allocation = await getEventAllocationByIdForTenant(allocationId, tenantId, env);
     return { success: true, allocation };
   }
 
