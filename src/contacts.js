@@ -36,6 +36,16 @@ async function getContactByIdForTenant(contactId, tenantId, env) {
   return env.DB.prepare('SELECT * FROM contacts WHERE id = ? AND tenant_id = ?').bind(contactId, tenantId).first();
 }
 
+async function getContactByPhoneForTenant(phone, tenantId, env) {
+  if (!phone) return null;
+  return env.DB.prepare('SELECT * FROM contacts WHERE phone = ? AND tenant_id = ?').bind(phone, tenantId).first();
+}
+
+async function getContactByEmailForTenant(email, tenantId, env) {
+  if (!email) return null;
+  return env.DB.prepare('SELECT * FROM contacts WHERE email = ? AND tenant_id = ?').bind(email, tenantId).first();
+}
+
 export async function handleContacts(request, env, path) {
   const method = request.method;
   const url = new URL(request.url);
@@ -200,24 +210,28 @@ export async function handleContacts(request, env, path) {
 
   // POST /api/contacts/:id/notes
   if (contactNoteMatch && method === 'POST') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
     const id = contactNoteMatch[1];
+    const tenantId = tenantCtx.tenant.id;
     const b = await request.json();
     const note = (b.note || '').trim();
 
     const contact = await env.DB.prepare(
-      'SELECT id FROM contacts WHERE id = ?'
-    ).bind(id).first();
+      'SELECT id FROM contacts WHERE id = ? AND tenant_id = ?'
+    ).bind(id, tenantId).first();
 
     if (!contact) throw new Error('לקוח לא נמצא');
     if (!note) throw new Error('הערה חובה');
 
     const result = await env.DB.prepare(
-      'INSERT INTO contact_notes (contact_id, note, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)'
-    ).bind(id, note).run();
+      'INSERT INTO contact_notes (contact_id, note, tenant_id, created_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)'
+    ).bind(id, note, tenantId).run();
 
     const created = await env.DB.prepare(
-      'SELECT * FROM contact_notes WHERE id = ?'
-    ).bind(result.meta.last_row_id).first();
+      'SELECT * FROM contact_notes WHERE id = ? AND tenant_id = ?'
+    ).bind(result.meta.last_row_id, tenantId).first();
 
     return { success: true, note: created };
   }
@@ -270,25 +284,23 @@ export async function handleContacts(request, env, path) {
 
   // POST /api/contacts
   if (path === '/api/contacts' && method === 'POST') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const b = await request.json();
 
     if (!b.name) throw new Error('שם לקוח חובה');
 
     if (b.phone) {
-      const existing = await env.DB.prepare(
-        'SELECT * FROM contacts WHERE phone = ?'
-      ).bind(b.phone).first();
-
+      const existing = await getContactByPhoneForTenant(b.phone, tenantId, env);
       if (existing) {
         return { existing: true, contact: existing };
       }
     }
 
     if (b.email) {
-      const existing = await env.DB.prepare(
-        'SELECT * FROM contacts WHERE email = ?'
-      ).bind(b.email).first();
-
+      const existing = await getContactByEmailForTenant(b.email, tenantId, env);
       if (existing) {
         return { existing: true, contact: existing };
       }
@@ -311,6 +323,7 @@ export async function handleContacts(request, env, path) {
           next_contact_date,
           general_notes,
           extra_contacts,
+          tenant_id,
           created_at,
           updated_at
         )
@@ -327,12 +340,13 @@ export async function handleContacts(request, env, path) {
       b.last_contact_date || null,
       b.next_contact_date || null,
       b.general_notes || null,
-      b.extra_contacts || null
+      b.extra_contacts || null,
+      tenantId
     ).run();
 
     const contact = await env.DB.prepare(
-      'SELECT * FROM contacts WHERE id = ?'
-    ).bind(result.meta.last_row_id).first();
+      'SELECT * FROM contacts WHERE id = ? AND tenant_id = ?'
+    ).bind(result.meta.last_row_id, tenantId).first();
 
     return {
       success: true,
@@ -343,10 +357,20 @@ export async function handleContacts(request, env, path) {
 
   // PUT /api/contacts/:id
   if (idMatch && method === 'PUT') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
     const id = idMatch[1];
+    const tenantId = tenantCtx.tenant.id;
     const b = await request.json();
 
     if (!b.name) throw new Error('שם לקוח חובה');
+
+    const existing = await env.DB.prepare(
+      'SELECT id FROM contacts WHERE id = ? AND tenant_id = ?'
+    ).bind(id, tenantId).first();
+
+    if (!existing) throw new Error('לקוח לא נמצא');
 
     await env.DB.prepare(
       `UPDATE contacts 
@@ -363,7 +387,8 @@ export async function handleContacts(request, env, path) {
          general_notes = ?,
          extra_contacts = ?,
          updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`
+       WHERE id = ?
+         AND tenant_id = ?`
     ).bind(
       b.name,
       b.phone || null,
@@ -376,12 +401,13 @@ export async function handleContacts(request, env, path) {
       b.next_contact_date || null,
       b.general_notes || null,
       b.extra_contacts || null,
-      id
+      id,
+      tenantId
     ).run();
 
     const contact = await env.DB.prepare(
-      'SELECT * FROM contacts WHERE id = ?'
-    ).bind(id).first();
+      'SELECT * FROM contacts WHERE id = ? AND tenant_id = ?'
+    ).bind(id, tenantId).first();
 
     return { success: true, contact };
   }
