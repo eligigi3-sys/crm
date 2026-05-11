@@ -1299,13 +1299,26 @@ export async function handleLeads(request, env, path) {
   // DELETE
   // ===============================
   if (idMatch && method === 'DELETE') {
-    await env.DB.prepare(
-      'DELETE FROM lead_notes WHERE lead_id = ?'
-    ).bind(idMatch[1]).run();
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
+    const leadId = idMatch[1];
+
+    const existingLead = await getLeadByIdForTenant(leadId, tenantId, env);
+    if (!existingLead) throw new Error('Lead not found');
 
     await env.DB.prepare(
-      'DELETE FROM leads WHERE id = ?'
-    ).bind(idMatch[1]).run();
+      'DELETE FROM lead_notes WHERE lead_id = ? AND tenant_id = ?'
+    ).bind(leadId, tenantId).run();
+
+    await env.DB.prepare(
+      'DELETE FROM lead_employees WHERE lead_id = ? AND tenant_id = ?'
+    ).bind(leadId, tenantId).run();
+
+    await env.DB.prepare(
+      'DELETE FROM leads WHERE id = ? AND tenant_id = ?'
+    ).bind(leadId, tenantId).run();
 
     return { success: true };
   }
