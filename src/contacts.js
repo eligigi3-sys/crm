@@ -1,3 +1,5 @@
+import { requireTenantContext } from './auth.js';
+
 // ============================================================
 // contacts.js - ניהול לקוחות קבועים וכרטיסי לקוח
 // לקוח = ישות קבועה עם מספר לקוח
@@ -30,12 +32,20 @@ function normalizeTags(tags) {
   return tags;
 }
 
+async function getContactByIdForTenant(contactId, tenantId, env) {
+  return env.DB.prepare('SELECT * FROM contacts WHERE id = ? AND tenant_id = ?').bind(contactId, tenantId).first();
+}
+
 export async function handleContacts(request, env, path) {
   const method = request.method;
   const url = new URL(request.url);
 
   // GET /api/contacts
   if (path === '/api/contacts' && method === 'GET') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const tenantId = tenantCtx.tenant.id;
     const search = url.searchParams.get('search') || '';
 
     let query = `
@@ -47,11 +57,11 @@ export async function handleContacts(request, env, path) {
         MAX(leads.event_date) AS last_event_date,
         MIN(CASE WHEN leads.event_date >= date('now') THEN leads.event_date ELSE NULL END) AS next_event_date
       FROM contacts
-      LEFT JOIN leads ON leads.contact_id = contacts.id
-      WHERE 1=1
+      LEFT JOIN leads ON leads.contact_id = contacts.id AND leads.tenant_id = contacts.tenant_id
+      WHERE contacts.tenant_id = ?
     `;
 
-    const params = [];
+    const params = [tenantId];
 
     if (search) {
       query += `
@@ -82,32 +92,38 @@ export async function handleContacts(request, env, path) {
 
   // GET /api/contacts/:id/timeline
   if (timelineMatch && method === 'GET') {
-    const id = timelineMatch[1];
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
 
-    const contact = await env.DB.prepare(
-      'SELECT * FROM contacts WHERE id = ?'
-    ).bind(id).first();
+    const id = timelineMatch[1];
+    const tenantId = tenantCtx.tenant.id;
+
+    const contact = await getContactByIdForTenant(id, tenantId, env);
 
     if (!contact) throw new Error('לקוח לא נמצא');
 
     const { results: leads } = await env.DB.prepare(
       `SELECT id, contact_id, lead_num, name, status, event_type, event_date, created_at, updated_at
        FROM leads
-       WHERE contact_id = ?`
-    ).bind(id).all();
+       WHERE contact_id = ?
+         AND tenant_id = ?`
+    ).bind(id, tenantId).all();
 
     const { results: notes } = await env.DB.prepare(
       `SELECT lead_notes.id, lead_notes.lead_id, lead_notes.note, lead_notes.created_at, leads.name, leads.event_type, leads.lead_num
        FROM lead_notes
-       LEFT JOIN leads ON lead_notes.lead_id = leads.id
-       WHERE leads.contact_id = ?`
-    ).bind(id).all();
+       LEFT JOIN leads ON lead_notes.lead_id = leads.id AND leads.tenant_id = lead_notes.tenant_id
+       WHERE leads.contact_id = ?
+         AND leads.tenant_id = ?
+         AND lead_notes.tenant_id = ?`
+    ).bind(id, tenantId, tenantId).all();
 
     const { results: contactNotes } = await env.DB.prepare(
       `SELECT id, contact_id, note, created_at
        FROM contact_notes
-       WHERE contact_id = ?`
-    ).bind(id).all();
+       WHERE contact_id = ?
+         AND tenant_id = ?`
+    ).bind(id, tenantId).all();
 
     const timeline = [];
 
@@ -208,11 +224,13 @@ export async function handleContacts(request, env, path) {
 
   // GET /api/contacts/:id
   if (idMatch && method === 'GET') {
-    const id = idMatch[1];
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
 
-    const contact = await env.DB.prepare(
-      'SELECT * FROM contacts WHERE id = ?'
-    ).bind(id).first();
+    const id = idMatch[1];
+    const tenantId = tenantCtx.tenant.id;
+
+    const contact = await getContactByIdForTenant(id, tenantId, env);
 
     if (!contact) throw new Error('לקוח לא נמצא');
 
@@ -220,9 +238,10 @@ export async function handleContacts(request, env, path) {
       `SELECT *
        FROM leads
        WHERE contact_id = ?
+         AND tenant_id = ?
        ORDER BY 
          CASE WHEN event_date IS NOT NULL THEN event_date ELSE created_at END DESC`
-    ).bind(id).all();
+    ).bind(id, tenantId).all();
 
     const stats = await env.DB.prepare(
       `SELECT 
@@ -232,8 +251,9 @@ export async function handleContacts(request, env, path) {
         MAX(event_date) AS last_event_date,
         MIN(CASE WHEN event_date >= date('now') THEN event_date ELSE NULL END) AS next_event_date
        FROM leads
-       WHERE contact_id = ?`
-    ).bind(id).first();
+       WHERE contact_id = ?
+         AND tenant_id = ?`
+    ).bind(id, tenantId).first();
 
     return {
       contact,
