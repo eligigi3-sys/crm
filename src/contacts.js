@@ -1,4 +1,4 @@
-import { requireTenantContext, assertTenantModuleEnabled } from './auth.js';
+import { requireTenantContext, assertTenantModuleEnabled, assertTenantRole } from './auth.js';
 
 // ============================================================
 // contacts.js - ניהול לקוחות קבועים וכרטיסי לקוח
@@ -222,6 +222,9 @@ export async function handleContacts(request, env, path) {
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'contacts');
     if (moduleState instanceof Response) return moduleState;
 
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
+
     const id = contactNoteMatch[1];
     const tenantId = tenantCtx.tenant.id;
     const b = await request.json();
@@ -302,6 +305,9 @@ export async function handleContacts(request, env, path) {
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'contacts');
     if (moduleState instanceof Response) return moduleState;
 
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
+
     const tenantId = tenantCtx.tenant.id;
     const b = await request.json();
 
@@ -377,6 +383,9 @@ export async function handleContacts(request, env, path) {
 
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'contacts');
     if (moduleState instanceof Response) return moduleState;
+
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
 
     const id = idMatch[1];
     const tenantId = tenantCtx.tenant.id;
