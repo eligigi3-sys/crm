@@ -1179,6 +1179,9 @@ export async function handleLeads(request, env, path) {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
 
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'leads');
+    if (moduleState instanceof Response) return moduleState;
+
     const tenantId = tenantCtx.tenant.id;
     const leadId = noteMatch[1];
     const b = await request.json();
@@ -1209,6 +1212,9 @@ export async function handleLeads(request, env, path) {
   if (path === '/api/leads' && method === 'POST') {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'leads');
+    if (moduleState instanceof Response) return moduleState;
 
     const tenantId = tenantCtx.tenant.id;
     const b = await request.json();
@@ -1284,6 +1290,9 @@ export async function handleLeads(request, env, path) {
   if (idMatch && method === 'PUT') {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'leads');
+    if (moduleState instanceof Response) return moduleState;
 
     const tenantId = tenantCtx.tenant.id;
     const id = idMatch[1];
