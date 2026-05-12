@@ -1204,12 +1204,27 @@ id="customers-search">
     </div>
     <div id="page-super-admin" class="page">
       <div class="page-header">
-        <div class="page-title">Super Admin <small>צפייה בלבד בעסקים ובמודולים</small></div>
+        <div class="page-title">Super Admin <small>צפייה וניהול בסיסי של עסקים</small></div>
+      </div>
+      <div class="table-card" style="margin-bottom:16px">
+        <div class="table-toolbar" style="display:block">
+          <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:10px">Create Tenant</div>
+          <div class="form-row-3" style="margin-bottom:10px">
+            <div class="form-group" style="margin-bottom:0"><label class="form-label">Name *</label><input class="form-input" id="super-admin-create-name" placeholder="Business name"></div>
+            <div class="form-group" style="margin-bottom:0"><label class="form-label">Slug *</label><input class="form-input" id="super-admin-create-slug" placeholder="business-slug"></div>
+            <div class="form-group" style="margin-bottom:0"><label class="form-label">Timezone</label><input class="form-input" id="super-admin-create-timezone" placeholder="Asia/Jerusalem"></div>
+          </div>
+          <div class="form-row-3" style="align-items:end">
+            <div class="form-group" style="margin-bottom:0"><label class="form-label">Currency</label><input class="form-input" id="super-admin-create-currency" placeholder="ILS"></div>
+            <div class="form-group" style="margin-bottom:0"><label class="form-label">Locale</label><input class="form-input" id="super-admin-create-locale" placeholder="he-IL"></div>
+            <div class="form-group" style="margin-bottom:0;display:flex;align-items:end"><button class="btn btn-primary" id="super-admin-create-btn">+ Create Tenant</button></div>
+          </div>
+        </div>
       </div>
       <div class="table-card">
         <table>
-          <thead><tr><th>ID</th><th>שם</th><th>Slug</th><th>סטטוס</th><th>נוצר</th></tr></thead>
-          <tbody id="super-admin-tenants-body"><tr class="empty-row"><td colspan="5">טוען...</td></tr></tbody>
+          <thead><tr><th>ID</th><th>שם</th><th>Slug</th><th>סטטוס</th><th>נוצר</th><th></th></tr></thead>
+          <tbody id="super-admin-tenants-body"><tr class="empty-row"><td colspan="6">טוען...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -1460,6 +1475,8 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   if (superAdminCloseFooter) superAdminCloseFooter.addEventListener('click', closeSuperAdminTenantModal);
   var superAdminModal = document.getElementById('super-admin-tenant-modal');
   if (superAdminModal) superAdminModal.addEventListener('click', function(e) { if (e.target === this) closeSuperAdminTenantModal(); });
+  var superAdminCreateBtn = document.getElementById('super-admin-create-btn');
+  if (superAdminCreateBtn) superAdminCreateBtn.addEventListener('click', createTenantFromSuperAdmin);
 
   if (token && currentUser) showApp();
 }
@@ -1547,23 +1564,73 @@ function logout() {
 function loadSuperAdminTenants() {
   var body = document.getElementById('super-admin-tenants-body');
   if (!body) return;
-  body.innerHTML = '<tr class="empty-row"><td colspan="5">טוען...</td></tr>';
+  body.innerHTML = '<tr class="empty-row"><td colspan="6">טוען...</td></tr>';
   apiCall('GET', '/api/admin/tenants').then(function(data) {
     var tenants = data.tenants || [];
     if (!tenants.length) {
-      body.innerHTML = '<tr class="empty-row"><td colspan="5">אין עסקים להצגה</td></tr>';
+      body.innerHTML = '<tr class="empty-row"><td colspan="6">אין עסקים להצגה</td></tr>';
       return;
     }
     body.innerHTML = tenants.map(function(t) {
-      return '<tr data-tenant-id="' + t.id + '"><td>' + t.id + '</td><td class="bold">' + escapeHtml(t.name || '—') + '</td><td>' + escapeHtml(t.slug || '—') + '</td><td>' + escapeHtml(t.status || '—') + '</td><td>' + escapeHtml(formatDate(t.created_at) || '—') + '</td></tr>';
+      var actionBtn = t.status === 'suspended'
+        ? '<button class="btn btn-secondary btn-sm" data-tenant-activate="' + t.id + '">Activate</button>'
+        : '<button class="btn btn-danger btn-sm" data-tenant-suspend="' + t.id + '">Suspend</button>';
+      return '<tr data-tenant-id="' + t.id + '"><td>' + t.id + '</td><td class="bold">' + escapeHtml(t.name || '—') + '</td><td>' + escapeHtml(t.slug || '—') + '</td><td>' + escapeHtml(t.status || '—') + '</td><td>' + escapeHtml(formatDate(t.created_at) || '—') + '</td><td>' + actionBtn + '</td></tr>';
     }).join('');
     body.querySelectorAll('tr[data-tenant-id]').forEach(function(row) {
       row.addEventListener('click', function() {
         openSuperAdminTenantModal(Number(this.getAttribute('data-tenant-id')));
       });
     });
+    body.querySelectorAll('[data-tenant-suspend]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        updateTenantStatus(Number(this.getAttribute('data-tenant-suspend')), 'suspend');
+      });
+    });
+    body.querySelectorAll('[data-tenant-activate]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        updateTenantStatus(Number(this.getAttribute('data-tenant-activate')), 'activate');
+      });
+    });
   }).catch(function(err) {
-    body.innerHTML = '<tr class="empty-row"><td colspan="5">' + escapeHtml(err.message || 'שגיאה בטעינת עסקים') + '</td></tr>';
+    body.innerHTML = '<tr class="empty-row"><td colspan="6">' + escapeHtml(err.message || 'שגיאה בטעינת עסקים') + '</td></tr>';
+  });
+}
+
+function createTenantFromSuperAdmin() {
+  var body = {
+    name: (document.getElementById('super-admin-create-name').value || '').trim(),
+    slug: (document.getElementById('super-admin-create-slug').value || '').trim(),
+    timezone: (document.getElementById('super-admin-create-timezone').value || '').trim(),
+    currency: (document.getElementById('super-admin-create-currency').value || '').trim(),
+    locale: (document.getElementById('super-admin-create-locale').value || '').trim()
+  };
+  if (!body.name) { toast('שם עסק חובה', 'error'); return; }
+  if (!body.slug) { toast('slug חובה', 'error'); return; }
+  apiCall('POST', '/api/admin/tenants', body).then(function(res) {
+    document.getElementById('super-admin-create-name').value = '';
+    document.getElementById('super-admin-create-slug').value = '';
+    document.getElementById('super-admin-create-timezone').value = '';
+    document.getElementById('super-admin-create-currency').value = '';
+    document.getElementById('super-admin-create-locale').value = '';
+    loadSuperAdminTenants();
+    toast('העסק נוצר', 'success');
+    if (res && res.tenant && res.tenant.id) openSuperAdminTenantModal(res.tenant.id);
+  }).catch(function(err) {
+    toast(err.message || 'שגיאה ביצירת עסק', 'error');
+  });
+}
+
+function updateTenantStatus(tenantId, action) {
+  var path = '/api/admin/tenants/' + tenantId + '/' + action;
+  apiCall('POST', path, {}).then(function() {
+    loadSuperAdminTenants();
+    closeSuperAdminTenantModal();
+    toast(action === 'activate' ? 'העסק הופעל' : 'העסק הושהה', 'success');
+  }).catch(function(err) {
+    toast(err.message || 'שגיאה בעדכון סטטוס עסק', 'error');
   });
 }
 
