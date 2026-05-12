@@ -5,6 +5,23 @@ function json(body, status = 200, extraHeaders = {}) {
   });
 }
 
+const TENANT_MODULE_KEYS = new Set([
+  'leads',
+  'contacts',
+  'employees',
+  'products',
+  'shopping',
+  'reports'
+]);
+
+function normalizeTenantModuleKey(moduleKey) {
+  const value = String(moduleKey || '').trim().toLowerCase();
+  if (!TENANT_MODULE_KEYS.has(value)) {
+    throw new Error('Module key not allowed');
+  }
+  return value;
+}
+
 function getBearerToken(request) {
   const authHeader = request.headers.get('Authorization') || request.headers.get('authorization') || '';
   const match = authHeader.match(/^Bearer\s+(.+)$/i);
@@ -104,6 +121,39 @@ export async function requireTenantContext(request, env) {
       status: membership.status
     }
   };
+}
+
+export async function getTenantModuleState(tenantId, moduleKey, env) {
+  const normalizedModuleKey = normalizeTenantModuleKey(moduleKey);
+  const row = await env.DB.prepare(
+    `SELECT module_key, is_enabled
+     FROM tenant_modules
+     WHERE tenant_id = ?
+       AND module_key = ?
+     LIMIT 1`
+  ).bind(tenantId, normalizedModuleKey).first();
+
+  if (!row) {
+    return {
+      module_key: normalizedModuleKey,
+      is_enabled: true,
+      source: 'default_enabled'
+    };
+  }
+
+  return {
+    module_key: normalizedModuleKey,
+    is_enabled: Number(row.is_enabled) === 1,
+    source: 'row'
+  };
+}
+
+export async function assertTenantModuleEnabled(ctx, env, moduleKey) {
+  const state = await getTenantModuleState(ctx && ctx.tenant ? ctx.tenant.id : null, moduleKey, env);
+  if (!state.is_enabled) {
+    return json({ error: 'Module disabled' }, 403);
+  }
+  return state;
 }
 
 export async function handleAuth(request, env, path) {
