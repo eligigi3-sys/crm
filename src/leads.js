@@ -1,4 +1,4 @@
-import { requireTenantContext, assertTenantModuleEnabled } from './auth.js';
+import { requireTenantContext, assertTenantModuleEnabled, assertTenantRole } from './auth.js';
 
 // ============================================================
 // leads.js - לוגיקת אירועים (נפרדת מלקוחות!)
@@ -950,6 +950,9 @@ export async function handleLeads(request, env, path) {
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'employees');
     if (moduleState instanceof Response) return moduleState;
 
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
+
     const tenantId = tenantCtx.tenant.id;
     const leadId = leadEmployeesMatch[1];
     const lead = await getLeadByIdForTenant(leadId, tenantId, env);
@@ -1019,6 +1022,9 @@ export async function handleLeads(request, env, path) {
 
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'employees');
     if (moduleState instanceof Response) return moduleState;
+
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
 
     const tenantId = tenantCtx.tenant.id;
     const assignmentId = assignmentIdMatch[1];
@@ -1094,6 +1100,9 @@ export async function handleLeads(request, env, path) {
 
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'employees');
     if (moduleState instanceof Response) return moduleState;
+
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
 
     const tenantId = tenantCtx.tenant.id;
     const assignmentId = assignmentIdMatch[1];
