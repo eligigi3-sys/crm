@@ -1,4 +1,4 @@
-import { requireTenantContext, assertTenantModuleEnabled } from './auth.js';
+import { requireTenantContext, assertTenantModuleEnabled, assertTenantRole } from './auth.js';
 
 // ============================================================
 // products.js - ניהול מוצרים / מלאי בסיסי
@@ -393,6 +393,9 @@ export async function handleProducts(request, env, path) {
 
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'products');
     if (moduleState instanceof Response) return moduleState;
+
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin']);
+    if (roleState instanceof Response) return roleState;
 
     const tenantId = tenantCtx.tenant.id;
     const productId = Number(productStockAdjustmentsMatch[1]);
