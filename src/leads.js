@@ -496,6 +496,9 @@ export async function handleLeads(request, env, path) {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
 
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'products');
+    if (moduleState instanceof Response) return moduleState;
+
     const leadId = leadInventoryMatch[1];
     const tenantId = tenantCtx.tenant.id;
     const event = await env.DB.prepare(`
@@ -601,6 +604,9 @@ export async function handleLeads(request, env, path) {
   if (leadInventoryActionsMatch && method === 'GET') {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'products');
+    if (moduleState instanceof Response) return moduleState;
 
     const leadId = Number(leadInventoryActionsMatch[1]);
     const tenantId = tenantCtx.tenant.id;
