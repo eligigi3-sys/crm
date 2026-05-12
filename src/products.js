@@ -519,6 +519,9 @@ export async function handleProducts(request, env, path) {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
 
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'products');
+    if (moduleState instanceof Response) return moduleState;
+
     const tenantId = tenantCtx.tenant.id;
     const purchaseId = Number(productPurchaseReceiveStockMatch[1]);
     const purchase = await getProductPurchaseByIdForTenant(purchaseId, tenantId, env);
