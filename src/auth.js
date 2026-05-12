@@ -156,6 +156,12 @@ export async function assertTenantModuleEnabled(ctx, env, moduleKey) {
   return state;
 }
 
+async function getEffectiveTenantModules(tenantId, env) {
+  return Promise.all(Array.from(TENANT_MODULE_KEYS).map(function(moduleKey) {
+    return getTenantModuleState(tenantId, moduleKey, env);
+  }));
+}
+
 export async function handleAuth(request, env, path) {
   const method = request.method;
 
@@ -220,6 +226,14 @@ export async function handleAuth(request, env, path) {
       user: ctx.user,
       tenant: ctx.tenant,
       membership: ctx.membership
+    };
+  }
+
+  if (path === '/api/auth/modules' && method === 'GET') {
+    const ctx = await requireTenantContext(request, env);
+    if (ctx instanceof Response) return ctx;
+    return {
+      modules: await getEffectiveTenantModules(ctx.tenant.id, env)
     };
   }
 

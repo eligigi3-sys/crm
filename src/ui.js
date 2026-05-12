@@ -1472,12 +1472,7 @@ function applyModuleVisibility() {
 
 function loadModuleStates() {
   moduleStateCache.loaded = false;
-  return apiCall('GET', '/api/auth/tenant-context').then(function(ctx) {
-    if (!ctx || !ctx.tenant || !ctx.tenant.id || !isSuperAdmin()) {
-      return { modules: [] };
-    }
-    return apiCall('GET', '/api/admin/tenants/' + ctx.tenant.id + '/modules');
-  }).then(function(data) {
+  return apiCall('GET', '/api/auth/modules').then(function(data) {
     var next = {
       leads: { is_enabled: true, source: 'default_enabled' },
       contacts: { is_enabled: true, source: 'default_enabled' },
