@@ -232,6 +232,9 @@ export async function handleProducts(request, env, path) {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
 
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'products');
+    if (moduleState instanceof Response) return moduleState;
+
     const tenantId = tenantCtx.tenant.id;
     const search = (url.searchParams.get('search') || '').trim();
     const includeInactive = url.searchParams.get('includeInactive') === '1';
@@ -317,6 +320,9 @@ export async function handleProducts(request, env, path) {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
 
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'products');
+    if (moduleState instanceof Response) return moduleState;
+
     const tenantId = tenantCtx.tenant.id;
     const productId = Number(productStockMatch[1]);
     const product = await getProductByIdForTenant(productId, tenantId, env);
@@ -337,6 +343,9 @@ export async function handleProducts(request, env, path) {
   if (productStockMovementsMatch && method === 'GET') {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'products');
+    if (moduleState instanceof Response) return moduleState;
 
     const tenantId = tenantCtx.tenant.id;
     const productId = Number(productStockMovementsMatch[1]);
@@ -440,6 +449,9 @@ export async function handleProducts(request, env, path) {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
 
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'products');
+    if (moduleState instanceof Response) return moduleState;
+
     const tenantId = tenantCtx.tenant.id;
     const productId = Number(productPurchasesMatch[1]);
     await getProductByIdForTenant(productId, tenantId, env);
@@ -490,6 +502,9 @@ export async function handleProducts(request, env, path) {
   if (productPurchaseMatch && method === 'GET') {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'products');
+    if (moduleState instanceof Response) return moduleState;
 
     const tenantId = tenantCtx.tenant.id;
     const purchaseId = Number(productPurchaseMatch[1]);
@@ -584,6 +599,9 @@ export async function handleProducts(request, env, path) {
   if (idMatch && method === 'GET') {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'products');
+    if (moduleState instanceof Response) return moduleState;
 
     const tenantId = tenantCtx.tenant.id;
     const id = idMatch[1];
