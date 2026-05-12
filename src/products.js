@@ -633,6 +633,9 @@ export async function handleProducts(request, env, path) {
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'products');
     if (moduleState instanceof Response) return moduleState;
 
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
+
     const tenantId = tenantCtx.tenant.id;
     const productId = Number(productPurchasesMatch[1]);
     await getProductByIdForTenant(productId, tenantId, env);
@@ -751,6 +754,9 @@ export async function handleProducts(request, env, path) {
 
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'products');
     if (moduleState instanceof Response) return moduleState;
+
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
 
     const tenantId = tenantCtx.tenant.id;
     const purchaseId = Number(productPurchaseMatch[1]);
