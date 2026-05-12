@@ -1323,6 +1323,17 @@ id="customers-search">
 <script>
 var token = localStorage.getItem('crm_token');
 var currentUser = JSON.parse(localStorage.getItem('crm_user') || 'null');
+var moduleStateCache = {
+  loaded: false,
+  byKey: {
+    leads: { is_enabled: true, source: 'default_enabled' },
+    contacts: { is_enabled: true, source: 'default_enabled' },
+    employees: { is_enabled: true, source: 'default_enabled' },
+    products: { is_enabled: true, source: 'default_enabled' },
+    shopping: { is_enabled: true, source: 'default_enabled' },
+    reports: { is_enabled: true, source: 'default_enabled' }
+  }
+};
 var searchTimer, currentLeadId, dupLeadId, selectedContactId = null, currentEmployeeId = null, currentProductId = null, currentProductPurchases = [], currentProductPurchaseEditId = null, currentProductPurchaseFormMode = null, currentProductPurchaseSaving = false, currentProductStock = null, currentProductStockMovements = [], currentProductAdjustmentMode = null, currentProductAdjustmentSaving = false, currentProductReceiveStockPurchaseId = null;
 var currentLowStockProducts = [];
 var currentOperationalUnreceivedPurchases = [];
@@ -1400,11 +1411,99 @@ function isSuperAdmin() {
   return !!(currentUser && String(currentUser.role || '').trim().toLowerCase() === 'super_admin');
 }
 
+function isModuleEnabled(moduleKey) {
+  var item = moduleStateCache && moduleStateCache.byKey ? moduleStateCache.byKey[moduleKey] : null;
+  return !item || item.is_enabled !== false;
+}
+
+function renderModuleDisabledPage(page, moduleKey) {
+  var map = {
+    leads: { bodyId: 'leads-body', colspan: 10 },
+    customers: { bodyId: 'customers-grid' },
+    shopping: { bodyId: 'shopping-grid' },
+    calendar: { bodyId: 'calendar-body', colspan: 8 },
+    employees: { bodyId: 'employees-grid' },
+    products: { bodyId: 'products-page-content' },
+    archive: { bodyId: 'archive-events-grid' }
+  };
+  var target = map[page];
+  if (!target) return;
+  var bodyEl = document.getElementById(target.bodyId);
+  if (!bodyEl) return;
+  if (target.colspan) {
+    bodyEl.innerHTML = '<tr class="empty-row"><td colspan="' + target.colspan + '">Module disabled</td></tr>';
+    return;
+  }
+  bodyEl.innerHTML = '<div class="table-card"><div class="dash-empty" style="padding:24px">Module disabled</div></div>';
+}
+
+function applyModuleVisibility() {
+  var navLeads = document.getElementById('nav-leads');
+  if (navLeads) navLeads.style.display = isModuleEnabled('contacts') ? 'flex' : 'none';
+  var navEmployees = document.getElementById('nav-employees');
+  if (navEmployees) navEmployees.style.display = isModuleEnabled('employees') ? 'flex' : 'none';
+  var navProducts = document.getElementById('nav-products');
+  if (navProducts) navProducts.style.display = isModuleEnabled('products') ? 'flex' : 'none';
+  var navShopping = document.getElementById('nav-shopping');
+  if (navShopping) navShopping.style.display = isModuleEnabled('shopping') ? 'flex' : 'none';
+  var navCalendar = document.getElementById('nav-calendar');
+  if (navCalendar) navCalendar.style.display = isModuleEnabled('leads') ? 'flex' : 'none';
+  var navArchive = document.getElementById('nav-archive');
+  if (navArchive) navArchive.style.display = isModuleEnabled('leads') ? 'flex' : 'none';
+  var btnNewLead = document.getElementById('btn-new-lead');
+  if (btnNewLead) btnNewLead.style.display = isModuleEnabled('leads') ? 'inline-flex' : 'none';
+  var btnNewLead2 = document.getElementById('btn-new-lead2');
+  if (btnNewLead2) btnNewLead2.style.display = isModuleEnabled('leads') ? 'inline-flex' : 'none';
+  var btnNewCustomer = document.getElementById('btn-new-customer');
+  if (btnNewCustomer) btnNewCustomer.style.display = isModuleEnabled('contacts') ? 'inline-flex' : 'none';
+  var btnNewEmployee = document.getElementById('btn-new-employee');
+  if (btnNewEmployee) btnNewEmployee.style.display = isModuleEnabled('employees') ? 'inline-flex' : 'none';
+  var btnNewProduct = document.getElementById('btn-new-product');
+  if (btnNewProduct) btnNewProduct.style.display = isModuleEnabled('products') ? 'inline-flex' : 'none';
+  var btnNewShoppingList = document.getElementById('btn-new-shopping-list');
+  if (btnNewShoppingList) btnNewShoppingList.style.display = isModuleEnabled('shopping') ? 'inline-flex' : 'none';
+  var reportsBtn = document.getElementById('btn-product-reports');
+  if (reportsBtn) reportsBtn.style.display = isModuleEnabled('reports') ? 'inline-flex' : 'none';
+  var lowStockSummary = document.getElementById('products-low-stock-summary');
+  if (lowStockSummary) lowStockSummary.style.display = isModuleEnabled('reports') ? 'block' : 'none';
+  var operationalWidgets = document.getElementById('products-operational-widgets');
+  if (operationalWidgets) operationalWidgets.style.display = isModuleEnabled('reports') ? 'block' : 'none';
+}
+
+function loadModuleStates() {
+  moduleStateCache.loaded = false;
+  return apiCall('GET', '/api/auth/tenant-context').then(function(ctx) {
+    if (!ctx || !ctx.tenant || !ctx.tenant.id || !isSuperAdmin()) {
+      return { modules: [] };
+    }
+    return apiCall('GET', '/api/admin/tenants/' + ctx.tenant.id + '/modules');
+  }).then(function(data) {
+    var next = {
+      leads: { is_enabled: true, source: 'default_enabled' },
+      contacts: { is_enabled: true, source: 'default_enabled' },
+      employees: { is_enabled: true, source: 'default_enabled' },
+      products: { is_enabled: true, source: 'default_enabled' },
+      shopping: { is_enabled: true, source: 'default_enabled' },
+      reports: { is_enabled: true, source: 'default_enabled' }
+    };
+    (data.modules || []).forEach(function(module) {
+      if (next[module.module_key]) next[module.module_key] = module;
+    });
+    moduleStateCache.byKey = next;
+    moduleStateCache.loaded = true;
+    applyModuleVisibility();
+  }).catch(function() {
+    moduleStateCache.loaded = true;
+    applyModuleVisibility();
+  });
+}
+
 function applySuperAdminVisibility() {
   var nav = document.getElementById('nav-super-admin');
   if (nav) nav.style.display = isSuperAdmin() ? 'flex' : 'none';
   var roleEl = document.getElementById('user-role-text');
   if (roleEl) roleEl.textContent = isSuperAdmin() ? 'Super Admin' : 'מנהל';
+  applyModuleVisibility();
 }
 
 function init() {
@@ -1482,6 +1581,27 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
 }
 
 function goTo(page, el) {
+  var pageModuleMap = {
+    leads: 'leads',
+    customers: 'contacts',
+    employees: 'employees',
+    products: 'products',
+    shopping: 'shopping',
+    calendar: 'leads',
+    archive: 'leads'
+  };
+  var requiredModule = pageModuleMap[page];
+  if (requiredModule && !isModuleEnabled(requiredModule)) {
+    document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+    document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
+    var blockedPage = document.getElementById('page-' + page);
+    if (!blockedPage) return;
+    blockedPage.classList.add('active');
+    if (el) el.classList.add('active');
+    renderModuleDisabledPage(page, requiredModule);
+    toast('Module disabled', 'error');
+    return;
+  }
   document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
   document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
   var pageEl = document.getElementById('page-' + page);
@@ -1550,12 +1670,24 @@ function showApp() {
   loadDashboard();
   preloadLeads();
   checkGoogleStatus();
+  loadModuleStates();
 }
 
 function logout() {
   localStorage.removeItem('crm_token');
   localStorage.removeItem('crm_user');
   token = null; currentUser = null;
+  moduleStateCache = {
+    loaded: false,
+    byKey: {
+      leads: { is_enabled: true, source: 'default_enabled' },
+      contacts: { is_enabled: true, source: 'default_enabled' },
+      employees: { is_enabled: true, source: 'default_enabled' },
+      products: { is_enabled: true, source: 'default_enabled' },
+      shopping: { is_enabled: true, source: 'default_enabled' },
+      reports: { is_enabled: true, source: 'default_enabled' }
+    }
+  };
   applySuperAdminVisibility();
   document.getElementById('login-page').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
@@ -4223,6 +4355,12 @@ function loadProducts() {
   if (reportsBtn && !reportsBtn.dataset.bound) {
     reportsBtn.dataset.bound = '1';
     reportsBtn.onclick = function() {
+      if (!isModuleEnabled('reports')) {
+        toast('Module disabled', 'error');
+        var contentBlocked = document.getElementById('products-page-content');
+        if (contentBlocked) contentBlocked.innerHTML = '<div class="table-card"><div class="dash-empty" style="padding:24px">Module disabled</div></div>';
+        return;
+      }
       loadProductPurchaseReports();
     };
   }
@@ -4230,6 +4368,7 @@ function loadProducts() {
   var grid = document.getElementById('products-grid');
   var lowStockSummary = document.getElementById('products-low-stock-summary');
   var operationalWidgets = document.getElementById('products-operational-widgets');
+  applyModuleVisibility();
   if (!grid) return;
 
   var search = document.getElementById('products-search') ? document.getElementById('products-search').value.trim() : '';
