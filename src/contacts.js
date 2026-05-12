@@ -1,4 +1,4 @@
-import { requireTenantContext } from './auth.js';
+import { requireTenantContext, assertTenantModuleEnabled } from './auth.js';
 
 // ============================================================
 // contacts.js - ניהול לקוחות קבועים וכרטיסי לקוח
@@ -55,6 +55,9 @@ export async function handleContacts(request, env, path) {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
 
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'contacts');
+    if (moduleState instanceof Response) return moduleState;
+
     const tenantId = tenantCtx.tenant.id;
     const search = url.searchParams.get('search') || '';
 
@@ -104,6 +107,9 @@ export async function handleContacts(request, env, path) {
   if (timelineMatch && method === 'GET') {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'contacts');
+    if (moduleState instanceof Response) return moduleState;
 
     const id = timelineMatch[1];
     const tenantId = tenantCtx.tenant.id;
@@ -240,6 +246,9 @@ export async function handleContacts(request, env, path) {
   if (idMatch && method === 'GET') {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'contacts');
+    if (moduleState instanceof Response) return moduleState;
 
     const id = idMatch[1];
     const tenantId = tenantCtx.tenant.id;
