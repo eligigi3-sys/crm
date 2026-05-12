@@ -1555,7 +1555,7 @@ function loadSuperAdminTenants() {
       return;
     }
     body.innerHTML = tenants.map(function(t) {
-      return '<tr data-tenant-id="' + t.id + '"><td>' + t.id + '</td><td class="bold">' + escapeHtml(t.name || '—') + '</td><td>' + escapeHtml(t.slug || '—') + '</td><td>' + escapeHtml(t.status || '—') + '</td><td>' + escapeHtml(formatDateTime(t.created_at) || '—') + '</td></tr>';
+      return '<tr data-tenant-id="' + t.id + '"><td>' + t.id + '</td><td class="bold">' + escapeHtml(t.name || '—') + '</td><td>' + escapeHtml(t.slug || '—') + '</td><td>' + escapeHtml(t.status || '—') + '</td><td>' + escapeHtml(formatDate(t.created_at) || '—') + '</td></tr>';
     }).join('');
     body.querySelectorAll('tr[data-tenant-id]').forEach(function(row) {
       row.addEventListener('click', function() {
