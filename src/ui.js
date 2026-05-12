@@ -98,6 +98,10 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .badge-purple{background:var(--accent-light);color:var(--accent)}
 .badge-gray{background:var(--bg);color:var(--text3);border:1px solid var(--border)}
 .badge-yellow{background:var(--yellow-light);color:var(--yellow)}
+.admin-module-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:12px}
+.admin-module-card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px}
+.admin-module-title{font-size:12px;font-weight:700;color:var(--text);margin-bottom:5px}
+.admin-module-sub{font-size:11px;color:var(--text3)}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
 .modal-overlay.open{display:flex}
 .modal{background:var(--white);border-radius:16px;width:620px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:var(--shadow-md)}
@@ -1042,11 +1046,12 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     <div class="nav-item" id="nav-shopping"><span class="nav-icon">🛒</span> רשימות קניות</div>
     <div class="nav-item" id="nav-calendar"><span class="nav-icon">📅</span> יומן אירועים</div>
     <div class="nav-item" id="nav-archive"><span class="nav-icon">🗂️</span> ארכיון אירועים</div>
+    <div class="nav-item" id="nav-super-admin" style="display:none"><span class="nav-icon">🛠️</span> Super Admin</div>
     <div id="gcal-status" style="margin:8px;padding:10px 12px;border-radius:8px;font-size:12px;display:none"></div>
     <div class="sidebar-bottom">
       <div class="user-row">
         <div class="user-avatar" id="user-avatar">מ</div>
-        <div><div class="user-name" id="user-name">טוען...</div><div class="user-role">מנהל</div></div>
+        <div><div class="user-name" id="user-name">טוען...</div><div class="user-role" id="user-role-text">מנהל</div></div>
         <button class="logout-btn" id="logout-btn">יציאה</button>
       </div>
     </div>
@@ -1197,6 +1202,24 @@ id="customers-search">
         </div>
       </div>
     </div>
+    <div id="page-super-admin" class="page">
+      <div class="page-header">
+        <div class="page-title">Super Admin <small>צפייה בלבד בעסקים ובמודולים</small></div>
+      </div>
+      <div class="table-card">
+        <table>
+          <thead><tr><th>ID</th><th>שם</th><th>Slug</th><th>סטטוס</th><th>נוצר</th></tr></thead>
+          <tbody id="super-admin-tenants-body"><tr class="empty-row"><td colspan="5">טוען...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="super-admin-tenant-modal">
+  <div class="modal" style="width:700px">
+    <div class="modal-header"><h2 id="super-admin-tenant-title">Tenant Details</h2><button class="modal-close" id="super-admin-tenant-close">✕</button></div>
+    <div class="modal-body" id="super-admin-tenant-body">טוען...</div>
+    <div class="modal-footer"><button class="btn btn-secondary" id="super-admin-tenant-close-footer">סגור</button></div>
   </div>
 </div>
 <div class="modal-overlay" id="modal-lead">
@@ -1358,6 +1381,17 @@ function getStatusLabel(status) {
   return map[status] || "🟢 פעיל";
 }
 
+function isSuperAdmin() {
+  return !!(currentUser && String(currentUser.role || '').trim().toLowerCase() === 'super_admin');
+}
+
+function applySuperAdminVisibility() {
+  var nav = document.getElementById('nav-super-admin');
+  if (nav) nav.style.display = isSuperAdmin() ? 'flex' : 'none';
+  var roleEl = document.getElementById('user-role-text');
+  if (roleEl) roleEl.textContent = isSuperAdmin() ? 'Super Admin' : 'מנהל';
+}
+
 function init() {
   var now = new Date();
   calYear = now.getFullYear();
@@ -1392,6 +1426,8 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   document.getElementById('nav-calendar').addEventListener('click', function() { goTo('calendar', this); });
   var navArchive = document.getElementById('nav-archive');
   if (navArchive) navArchive.addEventListener('click', function() { goTo('archive', this); });
+  var navSuperAdmin = document.getElementById('nav-super-admin');
+  if (navSuperAdmin) navSuperAdmin.addEventListener('click', function() { goTo('super-admin', this); });
   var navCustomers = document.getElementById('nav-customers');
   if (navCustomers) navCustomers.addEventListener('click', function() { goTo('customers', this); });
   document.getElementById('leads-search').addEventListener('input', function() {
@@ -1416,8 +1452,14 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   document.getElementById('dup-name').addEventListener('click', openDupLead);
   document.getElementById('dup-phone').addEventListener('click', openDupLead);
   document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') { closeLeadModal(); closeDrawer(); closeCustomerModal(); }
+    if (e.key === 'Escape') { closeLeadModal(); closeDrawer(); closeCustomerModal(); closeSuperAdminTenantModal(); }
   });
+  var superAdminClose = document.getElementById('super-admin-tenant-close');
+  if (superAdminClose) superAdminClose.addEventListener('click', closeSuperAdminTenantModal);
+  var superAdminCloseFooter = document.getElementById('super-admin-tenant-close-footer');
+  if (superAdminCloseFooter) superAdminCloseFooter.addEventListener('click', closeSuperAdminTenantModal);
+  var superAdminModal = document.getElementById('super-admin-tenant-modal');
+  if (superAdminModal) superAdminModal.addEventListener('click', function(e) { if (e.target === this) closeSuperAdminTenantModal(); });
 
   if (token && currentUser) showApp();
 }
@@ -1437,6 +1479,7 @@ function goTo(page, el) {
   if (page === 'employees') loadEmployees();
   if (page === 'products') loadProducts();
   if (page === 'archive') loadEventArchive();
+  if (page === 'super-admin') loadSuperAdminTenants();
 }
 
 function apiCall(method, path, body) {
@@ -1486,6 +1529,7 @@ function showApp() {
   document.getElementById('app').style.display = 'flex';
   document.getElementById('user-name').textContent = currentUser ? currentUser.name : '';
   document.getElementById('user-avatar').textContent = currentUser ? currentUser.name[0] : 'מ';
+  applySuperAdminVisibility();
   loadDashboard();
   preloadLeads();
   checkGoogleStatus();
@@ -1495,8 +1539,75 @@ function logout() {
   localStorage.removeItem('crm_token');
   localStorage.removeItem('crm_user');
   token = null; currentUser = null;
+  applySuperAdminVisibility();
   document.getElementById('login-page').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
+}
+
+function loadSuperAdminTenants() {
+  var body = document.getElementById('super-admin-tenants-body');
+  if (!body) return;
+  body.innerHTML = '<tr class="empty-row"><td colspan="5">טוען...</td></tr>';
+  apiCall('GET', '/api/admin/tenants').then(function(data) {
+    var tenants = data.tenants || [];
+    if (!tenants.length) {
+      body.innerHTML = '<tr class="empty-row"><td colspan="5">אין עסקים להצגה</td></tr>';
+      return;
+    }
+    body.innerHTML = tenants.map(function(t) {
+      return '<tr data-tenant-id="' + t.id + '"><td>' + t.id + '</td><td class="bold">' + escapeHtml(t.name || '—') + '</td><td>' + escapeHtml(t.slug || '—') + '</td><td>' + escapeHtml(t.status || '—') + '</td><td>' + escapeHtml(formatDateTime(t.created_at) || '—') + '</td></tr>';
+    }).join('');
+    body.querySelectorAll('tr[data-tenant-id]').forEach(function(row) {
+      row.addEventListener('click', function() {
+        openSuperAdminTenantModal(Number(this.getAttribute('data-tenant-id')));
+      });
+    });
+  }).catch(function(err) {
+    body.innerHTML = '<tr class="empty-row"><td colspan="5">' + escapeHtml(err.message || 'שגיאה בטעינת עסקים') + '</td></tr>';
+  });
+}
+
+function closeSuperAdminTenantModal() {
+  var modal = document.getElementById('super-admin-tenant-modal');
+  if (modal) modal.classList.remove('open');
+}
+
+function openSuperAdminTenantModal(tenantId) {
+  var modal = document.getElementById('super-admin-tenant-modal');
+  var title = document.getElementById('super-admin-tenant-title');
+  var body = document.getElementById('super-admin-tenant-body');
+  if (!modal || !title || !body) return;
+  title.textContent = 'Tenant #' + tenantId;
+  body.innerHTML = '<div class="dash-empty">טוען...</div>';
+  modal.classList.add('open');
+  Promise.all([
+    apiCall('GET', '/api/admin/tenants/' + tenantId),
+    apiCall('GET', '/api/admin/tenants/' + tenantId + '/modules')
+  ]).then(function(results) {
+    var tenant = results[0].tenant || {};
+    var modules = results[1].modules || [];
+    title.textContent = (tenant.name || 'Tenant') + ' · #' + tenant.id;
+    body.innerHTML = '' +
+      '<div class="info-grid">' +
+        '<div class="info-row"><span class="info-label">ID</span><span class="info-value">' + escapeHtml(String(tenant.id || '—')) + '</span></div>' +
+        '<div class="info-row"><span class="info-label">Slug</span><span class="info-value">' + escapeHtml(tenant.slug || '—') + '</span></div>' +
+        '<div class="info-row"><span class="info-label">סטטוס</span><span class="info-value">' + escapeHtml(tenant.status || '—') + '</span></div>' +
+        '<div class="info-row"><span class="info-label">Timezone</span><span class="info-value">' + escapeHtml(tenant.timezone || '—') + '</span></div>' +
+        '<div class="info-row"><span class="info-label">Currency</span><span class="info-value">' + escapeHtml(tenant.currency || '—') + '</span></div>' +
+        '<div class="info-row"><span class="info-label">Locale</span><span class="info-value">' + escapeHtml(tenant.locale || '—') + '</span></div>' +
+      '</div>' +
+      '<div class="form-section">Modules</div>' +
+      '<div class="admin-module-grid">' + modules.map(function(module) {
+        var enabled = module.is_enabled === true;
+        return '<div class="admin-module-card">' +
+          '<div class="admin-module-title">' + escapeHtml(module.module_key) + '</div>' +
+          '<div><span class="badge ' + (enabled ? 'badge-green' : 'badge-gray') + '">' + (enabled ? 'Enabled' : 'Disabled') + '</span></div>' +
+          '<div class="admin-module-sub">' + escapeHtml(module.source === 'default_enabled' ? 'default_enabled' : 'configured') + '</div>' +
+        '</div>';
+      }).join('') + '</div>';
+  }).catch(function(err) {
+    body.innerHTML = '<div class="dash-empty">' + escapeHtml(err.message || 'שגיאה בטעינת tenant') + '</div>';
+  });
 }
 
 function preloadLeads() {
