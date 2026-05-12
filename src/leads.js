@@ -667,6 +667,9 @@ export async function handleLeads(request, env, path) {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
 
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'products');
+    if (moduleState instanceof Response) return moduleState;
+
     const tenantId = tenantCtx.tenant.id;
     const leadId = Number(leadInventoryActionsMatch[1]);
     const lead = await getLeadByIdForTenant(leadId, tenantId, env);
@@ -785,6 +788,9 @@ export async function handleLeads(request, env, path) {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
 
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'products');
+    if (moduleState instanceof Response) return moduleState;
+
     const tenantId = tenantCtx.tenant.id;
     const leadId = Number(leadInventoryMatch[1]);
     const lead = await getLeadByIdForTenant(leadId, tenantId, env);
@@ -827,6 +833,9 @@ export async function handleLeads(request, env, path) {
   if (leadInventoryAllocationMatch && method === 'PUT') {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'products');
+    if (moduleState instanceof Response) return moduleState;
 
     const tenantId = tenantCtx.tenant.id;
     const leadId = Number(leadInventoryAllocationMatch[1]);
@@ -878,6 +887,9 @@ export async function handleLeads(request, env, path) {
   if (leadInventoryAllocationCancelMatch && method === 'POST') {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'products');
+    if (moduleState instanceof Response) return moduleState;
 
     const tenantId = tenantCtx.tenant.id;
     const leadId = Number(leadInventoryAllocationCancelMatch[1]);
