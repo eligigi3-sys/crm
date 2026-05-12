@@ -1091,6 +1091,9 @@ export async function handleLeads(request, env, path) {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
 
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'leads');
+    if (moduleState instanceof Response) return moduleState;
+
     const tenantId = tenantCtx.tenant.id;
     const { results } = await env.DB.prepare(`
       SELECT
@@ -1115,6 +1118,9 @@ export async function handleLeads(request, env, path) {
   if (idMatch && method === 'GET') {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'leads');
+    if (moduleState instanceof Response) return moduleState;
 
     const id = idMatch[1];
     const tenantId = tenantCtx.tenant.id;
@@ -1332,6 +1338,9 @@ export async function handleLeads(request, env, path) {
 export async function handleDashboard(request, env, path) {
   const tenantCtx = await requireTenantContext(request, env);
   if (tenantCtx instanceof Response) return tenantCtx;
+
+  const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'leads');
+  if (moduleState instanceof Response) return moduleState;
 
   const tenantId = tenantCtx.tenant.id;
   const now = new Date();
