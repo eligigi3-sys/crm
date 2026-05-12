@@ -1,4 +1,4 @@
-import { requireTenantContext } from './auth.js';
+import { requireTenantContext, assertTenantModuleEnabled } from './auth.js';
 
 function parseOptionalProductId(value) {
   if (value === null || value === undefined || value === '') return null;
@@ -253,6 +253,9 @@ export async function handleShopping(request, env, path) {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
 
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'shopping');
+    if (moduleState instanceof Response) return moduleState;
+
     const tenantId = tenantCtx.tenant.id;
     const lists = await env.DB.prepare(`
       SELECT 
@@ -301,6 +304,9 @@ export async function handleShopping(request, env, path) {
   if (listMatch && method === 'GET') {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'shopping');
+    if (moduleState instanceof Response) return moduleState;
 
     const tenantId = tenantCtx.tenant.id;
     const id = listMatch[1];
@@ -634,6 +640,9 @@ export async function handleShopping(request, env, path) {
   if (purchaseDetailsMatch && method === 'GET') {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'shopping');
+    if (moduleState instanceof Response) return moduleState;
 
     const tenantId = tenantCtx.tenant.id;
     const id = purchaseDetailsMatch[1];
