@@ -1359,6 +1359,9 @@ export async function handleLeads(request, env, path) {
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'leads');
     if (moduleState instanceof Response) return moduleState;
 
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin']);
+    if (roleState instanceof Response) return roleState;
+
     const tenantId = tenantCtx.tenant.id;
     const leadId = idMatch[1];
 
