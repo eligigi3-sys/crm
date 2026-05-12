@@ -1,4 +1,4 @@
-import { requireTenantContext } from './auth.js';
+import { requireTenantContext, assertTenantModuleEnabled } from './auth.js';
 
 // ============================================================
 // leads.js - לוגיקת אירועים (נפרדת מלקוחות!)
@@ -896,6 +896,9 @@ export async function handleLeads(request, env, path) {
   if (leadEmployeesMatch && method === 'GET') {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'employees');
+    if (moduleState instanceof Response) return moduleState;
 
     const leadId = leadEmployeesMatch[1];
     const tenantId = tenantCtx.tenant.id;

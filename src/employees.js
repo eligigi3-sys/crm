@@ -1,4 +1,4 @@
-import { requireTenantContext } from './auth.js';
+import { requireTenantContext, assertTenantModuleEnabled } from './auth.js';
 
 // ============================================================
 // employees.js - ניהול עובדים
@@ -33,15 +33,22 @@ export async function handleEmployees(request, env, path) {
 
   // GET /api/employees
   if (path === '/api/employees' && method === 'GET') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'employees');
+    if (moduleState instanceof Response) return moduleState;
+
+    const tenantId = tenantCtx.tenant.id;
     const includeInactive = url.searchParams.get('includeInactive') === '1';
     const search = (url.searchParams.get('search') || '').trim();
 
     let query = `
       SELECT *
       FROM employees
-      WHERE 1=1
+      WHERE tenant_id = ?
     `;
-    const params = [];
+    const params = [tenantId];
 
     if (!includeInactive) {
       query += ` AND is_active = 1`;
@@ -67,10 +74,17 @@ export async function handleEmployees(request, env, path) {
 
   // GET /api/employees/:id
   if (idMatch && method === 'GET') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'employees');
+    if (moduleState instanceof Response) return moduleState;
+
     const id = idMatch[1];
+    const tenantId = tenantCtx.tenant.id;
     const employee = await env.DB.prepare(
-      'SELECT * FROM employees WHERE id = ?'
-    ).bind(id).first();
+      'SELECT * FROM employees WHERE id = ? AND tenant_id = ?'
+    ).bind(id, tenantId).first();
 
     if (!employee) throw new Error('עובד לא נמצא');
 
@@ -79,11 +93,18 @@ export async function handleEmployees(request, env, path) {
 
   // GET /api/employees/:id/assignments
   if (assignmentsMatch && method === 'GET') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'employees');
+    if (moduleState instanceof Response) return moduleState;
+
     const id = assignmentsMatch[1];
+    const tenantId = tenantCtx.tenant.id;
 
     const employee = await env.DB.prepare(
-      'SELECT * FROM employees WHERE id = ?'
-    ).bind(id).first();
+      'SELECT * FROM employees WHERE id = ? AND tenant_id = ?'
+    ).bind(id, tenantId).first();
 
     if (!employee) throw new Error('עובד לא נמצא');
 
@@ -101,15 +122,16 @@ export async function handleEmployees(request, env, path) {
         employees.full_name,
         employees.hourly_rate AS employee_hourly_rate
       FROM lead_employees
-      INNER JOIN leads ON leads.id = lead_employees.lead_id
-      INNER JOIN employees ON employees.id = lead_employees.employee_id
-      LEFT JOIN contacts ON contacts.id = leads.contact_id
+      INNER JOIN leads ON leads.id = lead_employees.lead_id AND leads.tenant_id = lead_employees.tenant_id
+      INNER JOIN employees ON employees.id = lead_employees.employee_id AND employees.tenant_id = lead_employees.tenant_id
+      LEFT JOIN contacts ON contacts.id = leads.contact_id AND contacts.tenant_id = leads.tenant_id
       WHERE lead_employees.employee_id = ?
+        AND lead_employees.tenant_id = ?
       ORDER BY
         CASE WHEN leads.event_date IS NULL OR TRIM(leads.event_date) = '' THEN 1 ELSE 0 END,
         leads.event_date DESC,
         lead_employees.id DESC
-    `).bind(id).all();
+    `).bind(id, tenantId).all();
 
     return { assignments: results };
   }
