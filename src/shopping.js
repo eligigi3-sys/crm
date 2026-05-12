@@ -540,6 +540,9 @@ export async function handleShopping(request, env, path) {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
 
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'shopping');
+    if (moduleState instanceof Response) return moduleState;
+
     const tenantId = tenantCtx.tenant.id;
     const listId = purchaseMatch[1];
     const b = await request.json();
@@ -701,6 +704,9 @@ export async function handleShopping(request, env, path) {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
 
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'shopping');
+    if (moduleState instanceof Response) return moduleState;
+
     const tenantId = tenantCtx.tenant.id;
     const id = purchaseDetailsMatch[1];
     const b = await request.json();
@@ -757,6 +763,9 @@ export async function handleShopping(request, env, path) {
   if (purchaseDetailsMatch && method === 'DELETE') {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'shopping');
+    if (moduleState instanceof Response) return moduleState;
 
     const tenantId = tenantCtx.tenant.id;
     const id = purchaseDetailsMatch[1];
