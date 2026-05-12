@@ -14,6 +14,13 @@ const TENANT_MODULE_KEYS = new Set([
   'reports'
 ]);
 
+const TENANT_ROLE_HIERARCHY = {
+  employee: 1,
+  manager: 2,
+  admin: 3,
+  owner: 4
+};
+
 function normalizeTenantModuleKey(moduleKey) {
   const value = String(moduleKey || '').trim().toLowerCase();
   if (!TENANT_MODULE_KEYS.has(value)) {
@@ -154,6 +161,43 @@ export async function assertTenantModuleEnabled(ctx, env, moduleKey) {
     return json({ error: 'Module disabled' }, 403);
   }
   return state;
+}
+
+export function normalizeTenantRole(role) {
+  const value = String(role || '').trim().toLowerCase();
+  if (!TENANT_ROLE_HIERARCHY[value]) {
+    return null;
+  }
+  return value;
+}
+
+export async function assertTenantRole(ctx, allowedRoles) {
+  const currentRole = normalizeTenantRole(ctx && ctx.membership ? ctx.membership.role : null);
+  if (!currentRole) {
+    return json({ error: 'Permission denied' }, 403);
+  }
+
+  const normalizedAllowedRoles = Array.isArray(allowedRoles)
+    ? allowedRoles.map(normalizeTenantRole).filter(Boolean)
+    : [];
+
+  if (normalizedAllowedRoles.length === 0) {
+    return json({ error: 'Permission denied' }, 403);
+  }
+
+  const currentRank = TENANT_ROLE_HIERARCHY[currentRole];
+  const minimumAllowedRank = Math.min(...normalizedAllowedRoles.map(function(role) {
+    return TENANT_ROLE_HIERARCHY[role];
+  }));
+
+  if (currentRank < minimumAllowedRank) {
+    return json({ error: 'Permission denied' }, 403);
+  }
+
+  return {
+    role: currentRole,
+    allowed_roles: normalizedAllowedRoles
+  };
 }
 
 async function getEffectiveTenantModules(tenantId, env) {
