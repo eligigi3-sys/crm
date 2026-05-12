@@ -1347,6 +1347,9 @@ export async function handleLeads(request, env, path) {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
 
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'leads');
+    if (moduleState instanceof Response) return moduleState;
+
     const tenantId = tenantCtx.tenant.id;
     const leadId = idMatch[1];
 
