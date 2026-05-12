@@ -9,6 +9,27 @@ const MODULE_KEYS = [
   'reports'
 ];
 
+function normalizeOptionalText(value) {
+  if (value === undefined || value === null) return null;
+  const text = String(value).trim();
+  return text ? text : null;
+}
+
+function normalizeTenantName(value) {
+  const name = normalizeOptionalText(value);
+  if (!name) throw new Error('שם עסק חובה');
+  return name;
+}
+
+function normalizeTenantSlug(value) {
+  const slug = String(value || '').trim().toLowerCase();
+  if (!slug) throw new Error('slug חובה');
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+    throw new Error('slug לא תקין');
+  }
+  return slug;
+}
+
 function mapTenantRow(row) {
   return {
     id: row.id,
@@ -31,6 +52,14 @@ async function getTenantById(tenantId, env) {
   `).bind(tenantId).first();
 }
 
+async function getTenantBySlug(slug, env) {
+  return env.DB.prepare(`
+    SELECT id, name, slug, status, timezone, currency, locale, created_at, updated_at
+    FROM tenants
+    WHERE slug = ?
+  `).bind(slug).first();
+}
+
 export async function handleAdmin(request, env, path) {
   const method = request.method;
   const superAdminCtx = await requireSuperAdmin(request, env);
@@ -48,12 +77,84 @@ export async function handleAdmin(request, env, path) {
     };
   }
 
+  if (path === '/api/admin/tenants' && method === 'POST') {
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      throw new Error('בקשה לא תקינה');
+    }
+
+    const name = normalizeTenantName(body.name);
+    const slug = normalizeTenantSlug(body.slug);
+    const timezone = normalizeOptionalText(body.timezone);
+    const currency = normalizeOptionalText(body.currency);
+    const locale = normalizeOptionalText(body.locale);
+
+    const existingTenant = await getTenantBySlug(slug, env);
+    if (existingTenant) throw new Error('slug כבר קיים');
+
+    const result = await env.DB.prepare(`
+      INSERT INTO tenants (
+        name,
+        slug,
+        status,
+        timezone,
+        currency,
+        locale,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, 'active', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `).bind(
+      name,
+      slug,
+      timezone,
+      currency,
+      locale
+    ).run();
+
+    const tenant = await getTenantById(result.meta.last_row_id, env);
+    return { success: true, tenant: mapTenantRow(tenant) };
+  }
+
   const tenantMatch = path.match(/^\/api\/admin\/tenants\/(\d+)$/);
   if (tenantMatch && method === 'GET') {
     const tenantId = Number(tenantMatch[1]);
     const tenant = await getTenantById(tenantId, env);
     if (!tenant) throw new Error('Tenant not found');
     return { tenant: mapTenantRow(tenant) };
+  }
+
+  const tenantActivateMatch = path.match(/^\/api\/admin\/tenants\/(\d+)\/activate$/);
+  if (tenantActivateMatch && method === 'POST') {
+    const tenantId = Number(tenantActivateMatch[1]);
+    const tenant = await getTenantById(tenantId, env);
+    if (!tenant) throw new Error('Tenant not found');
+
+    await env.DB.prepare(`
+      UPDATE tenants
+      SET status = 'active', updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(tenantId).run();
+
+    const updatedTenant = await getTenantById(tenantId, env);
+    return { success: true, tenant: mapTenantRow(updatedTenant) };
+  }
+
+  const tenantSuspendMatch = path.match(/^\/api\/admin\/tenants\/(\d+)\/suspend$/);
+  if (tenantSuspendMatch && method === 'POST') {
+    const tenantId = Number(tenantSuspendMatch[1]);
+    const tenant = await getTenantById(tenantId, env);
+    if (!tenant) throw new Error('Tenant not found');
+
+    await env.DB.prepare(`
+      UPDATE tenants
+      SET status = 'suspended', updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(tenantId).run();
+
+    const updatedTenant = await getTenantById(tenantId, env);
+    return { success: true, tenant: mapTenantRow(updatedTenant) };
   }
 
   const tenantModulesMatch = path.match(/^\/api\/admin\/tenants\/(\d+)\/modules$/);
