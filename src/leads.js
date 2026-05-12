@@ -935,6 +935,9 @@ export async function handleLeads(request, env, path) {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
 
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'employees');
+    if (moduleState instanceof Response) return moduleState;
+
     const tenantId = tenantCtx.tenant.id;
     const leadId = leadEmployeesMatch[1];
     const lead = await getLeadByIdForTenant(leadId, tenantId, env);
@@ -1001,6 +1004,9 @@ export async function handleLeads(request, env, path) {
   if (assignmentIdMatch && method === 'PUT') {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'employees');
+    if (moduleState instanceof Response) return moduleState;
 
     const tenantId = tenantCtx.tenant.id;
     const assignmentId = assignmentIdMatch[1];
@@ -1073,6 +1079,9 @@ export async function handleLeads(request, env, path) {
   if (assignmentIdMatch && method === 'DELETE') {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'employees');
+    if (moduleState instanceof Response) return moduleState;
 
     const tenantId = tenantCtx.tenant.id;
     const assignmentId = assignmentIdMatch[1];
