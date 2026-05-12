@@ -1191,6 +1191,9 @@ export async function handleLeads(request, env, path) {
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'leads');
     if (moduleState instanceof Response) return moduleState;
 
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
+
     const tenantId = tenantCtx.tenant.id;
     const leadId = noteMatch[1];
     const b = await request.json();
@@ -1224,6 +1227,9 @@ export async function handleLeads(request, env, path) {
 
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'leads');
     if (moduleState instanceof Response) return moduleState;
+
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
 
     const tenantId = tenantCtx.tenant.id;
     const b = await request.json();
@@ -1302,6 +1308,9 @@ export async function handleLeads(request, env, path) {
 
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'leads');
     if (moduleState instanceof Response) return moduleState;
+
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
 
     const tenantId = tenantCtx.tenant.id;
     const id = idMatch[1];
