@@ -1795,13 +1795,59 @@ function goTo(page, el) {
   if (page === 'super-admin') loadSuperAdminTenants();
 }
 
+function resetSessionState() {
+  localStorage.removeItem('crm_token');
+  localStorage.removeItem('crm_user');
+  token = null;
+  currentUser = null;
+  moduleStateCache = {
+    loaded: false,
+    byKey: {
+      leads: { is_enabled: true, source: 'default_enabled' },
+      contacts: { is_enabled: true, source: 'default_enabled' },
+      employees: { is_enabled: true, source: 'default_enabled' },
+      products: { is_enabled: true, source: 'default_enabled' },
+      shopping: { is_enabled: true, source: 'default_enabled' },
+      reports: { is_enabled: true, source: 'default_enabled' }
+    }
+  };
+}
+
+function handleExpiredSession() {
+  resetSessionState();
+  applySuperAdminVisibility();
+  document.getElementById('login-page').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  var errEl = document.getElementById('login-error');
+  if (errEl) {
+    errEl.textContent = 'פג תוקף ההתחברות, נא להתחבר מחדש';
+    errEl.style.display = 'block';
+  }
+  toast('פג תוקף ההתחברות, נא להתחבר מחדש', 'error');
+}
+
 function apiCall(method, path, body) {
   var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
+  var hasAuthToken = !!token;
   if (token) opts.headers['Authorization'] = 'Bearer ' + token;
   if (body) opts.body = JSON.stringify(body);
-  return fetch(path, opts).then(function(res) { return res.json(); }).then(function(data) {
-    if (data.error) throw new Error(data.error);
-    return data;
+  return fetch(path, opts).then(function(res) {
+    return res.text().then(function(text) {
+      var data = {};
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          data = {};
+        }
+      }
+      if (res.status === 401 && hasAuthToken && path !== '/api/auth/login') {
+        handleExpiredSession();
+        throw new Error('פג תוקף ההתחברות, נא להתחבר מחדש');
+      }
+      if (data && data.error) throw new Error(data.error);
+      return data;
+    });
   });
 }
 
@@ -1866,23 +1912,15 @@ function showApp() {
 }
 
 function logout() {
-  localStorage.removeItem('crm_token');
-  localStorage.removeItem('crm_user');
-  token = null; currentUser = null;
-  moduleStateCache = {
-    loaded: false,
-    byKey: {
-      leads: { is_enabled: true, source: 'default_enabled' },
-      contacts: { is_enabled: true, source: 'default_enabled' },
-      employees: { is_enabled: true, source: 'default_enabled' },
-      products: { is_enabled: true, source: 'default_enabled' },
-      shopping: { is_enabled: true, source: 'default_enabled' },
-      reports: { is_enabled: true, source: 'default_enabled' }
-    }
-  };
+  resetSessionState();
   applySuperAdminVisibility();
   document.getElementById('login-page').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
+  var errEl = document.getElementById('login-error');
+  if (errEl) {
+    errEl.textContent = '';
+    errEl.style.display = 'none';
+  }
 }
 
 function loadSuperAdminTenants() {
