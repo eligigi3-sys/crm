@@ -1541,12 +1541,13 @@ function applyShellVisibility() {
   var mobileSwitcher = document.getElementById('mobile-shell-switcher');
   var enterCrmMobile = document.getElementById('btn-enter-crm-mobile');
   var backPlatformMobile = document.getElementById('btn-back-platform-mobile');
+  var isMobileViewport = window.matchMedia('(max-width: 768px)').matches;
   if (switcher) switcher.style.display = isAdminUser ? 'flex' : 'none';
   if (enterCrm) enterCrm.style.display = isAdminUser && isAdminShell ? 'flex' : 'none';
   if (backPlatform) backPlatform.style.display = isAdminUser && isCrmShell ? 'flex' : 'none';
-  if (mobileSwitcher) mobileSwitcher.style.display = isAdminUser ? 'block' : 'none';
-  if (enterCrmMobile) enterCrmMobile.style.display = isAdminUser && isAdminShell ? 'inline-flex' : 'none';
-  if (backPlatformMobile) backPlatformMobile.style.display = isAdminUser && isCrmShell ? 'inline-flex' : 'none';
+  if (mobileSwitcher) mobileSwitcher.style.display = isAdminUser && isMobileViewport ? 'block' : 'none';
+  if (enterCrmMobile) enterCrmMobile.style.display = isAdminUser && isMobileViewport && isAdminShell ? 'inline-flex' : 'none';
+  if (backPlatformMobile) backPlatformMobile.style.display = isAdminUser && isMobileViewport && isCrmShell ? 'inline-flex' : 'none';
 }
 
 function loadModuleStates() {
