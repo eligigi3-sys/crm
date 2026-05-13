@@ -137,6 +137,8 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .mobile-shell-switcher{display:none}
 .mobile-shell-switcher-inner{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
 .mobile-shell-switcher .btn{width:100%;justify-content:center}
+.mobile-session-actions{display:none;margin-bottom:14px}
+.mobile-session-actions .logout-btn{width:100%;min-height:42px;justify-content:center;display:inline-flex;align-items:center;margin-right:0;font-size:13px;padding:10px 14px}
 .login-top{text-align:center;margin-bottom:28px}
 .login-icon{width:60px;height:60px;background:linear-gradient(135deg,var(--accent),var(--accent-dark));border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 14px}
 .login-title{font-size:20px;font-weight:800;color:var(--text)}
@@ -811,6 +813,51 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     word-break: break-word;
   }
 
+  #page-calendar .table-card {
+    max-width: 100%;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #page-calendar .calendar-month-wrap {
+    min-width: 720px;
+  }
+
+  #page-calendar .calendar-top {
+    align-items: stretch !important;
+  }
+
+  #page-calendar .calendar-top > div {
+    width: 100%;
+  }
+
+  #page-calendar .calendar-top > div[style*="display:flex"] {
+    display: flex !important;
+    flex-wrap: wrap !important;
+  }
+
+  #page-calendar .calendar-top .form-select,
+  #page-calendar .calendar-top .btn {
+    flex: 1 1 100%;
+    width: 100% !important;
+    justify-content: center;
+  }
+
+  #page-calendar .calendar-day-real {
+    min-height: 84px;
+  }
+
+  #page-calendar .calendar-event-pill {
+    white-space: normal;
+    overflow: hidden;
+    text-overflow: initial;
+    line-height: 1.35;
+  }
+
+  .mobile-session-actions {
+    display: block;
+  }
+
   .modal {
     width: min(96vw, 640px) !important;
     margin: 8px !important;
@@ -1091,6 +1138,9 @@ tr:hover td{background:#fafbfc;cursor:pointer}
         <button class="btn btn-secondary" id="btn-enter-crm-mobile" style="display:none">Enter CRM</button>
         <button class="btn btn-secondary" id="btn-back-platform-mobile" style="display:none">Back to Platform Admin</button>
       </div>
+    </div>
+    <div id="mobile-session-actions" class="mobile-session-actions">
+      <button class="logout-btn" id="logout-btn-mobile">יציאה</button>
     </div>
     <div id="page-dashboard" class="page active">
       <div class="page-header">
@@ -1609,6 +1659,7 @@ function init() {
 
   document.getElementById('login-btn').addEventListener('click', doLogin);
   document.getElementById('logout-btn').addEventListener('click', logout);
+  document.getElementById('logout-btn-mobile').addEventListener('click', logout);
 document.getElementById('btn-new-lead').addEventListener('click', function() {
   goTo('customers', document.getElementById('nav-leads'));
 });
