@@ -28,7 +28,7 @@ export default {
       return handleGoogleCallback(request, env);
     }
 
-    if (path === '/' || path === '/index.html') {
+    if (path === '/' || path === '/index.html' || path === '/admin' || path === '/crm') {
       return new Response(serveHTML(), {
         headers: { 'Content-Type': 'text/html;charset=UTF-8' },
       });

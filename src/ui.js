@@ -1049,6 +1049,10 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     <div class="nav-item" id="nav-super-admin" style="display:none"><span class="nav-icon">🛠️</span> Super Admin</div>
     <div id="gcal-status" style="margin:8px;padding:10px 12px;border-radius:8px;font-size:12px;display:none"></div>
     <div class="sidebar-bottom">
+      <div id="shell-switcher" style="display:none;flex-direction:column;gap:8px;margin:0 8px 12px 8px">
+        <button class="btn btn-secondary" id="btn-enter-crm" style="display:none;width:100%;justify-content:center">Enter CRM</button>
+        <button class="btn btn-secondary" id="btn-back-platform" style="display:none;width:100%;justify-content:center">Back to Platform Admin</button>
+      </div>
       <div class="user-row">
         <div class="user-avatar" id="user-avatar">מ</div>
         <div><div class="user-name" id="user-name">טוען...</div><div class="user-role" id="user-role-text">מנהל</div></div>
@@ -1470,6 +1474,57 @@ function applyModuleVisibility() {
   if (operationalWidgets) operationalWidgets.style.display = isModuleEnabled('reports') ? 'block' : 'none';
 }
 
+function getShellMode() {
+  var path = window.location.pathname || '/';
+  if (path === '/admin') return 'admin';
+  if (path === '/crm') return 'crm';
+  return 'default';
+}
+
+function setShellPath(path) {
+  if (window.location.pathname !== path) {
+    window.history.replaceState({}, '', path);
+  }
+}
+
+function goToAdminShell() {
+  setShellPath('/admin');
+  applyShellVisibility();
+  goTo('super-admin', document.getElementById('nav-super-admin'));
+}
+
+function goToCrmShell() {
+  setShellPath('/crm');
+  applyShellVisibility();
+  goTo('dashboard', document.getElementById('nav-dashboard'));
+}
+
+function applyShellVisibility() {
+  var shellMode = getShellMode();
+  var isAdminShell = shellMode === 'admin';
+  var isCrmShell = shellMode === 'crm';
+  var isAdminUser = isSuperAdmin();
+  var crmNavIds = ['nav-dashboard', 'nav-leads', 'nav-employees', 'nav-products', 'nav-shopping', 'nav-calendar', 'nav-archive'];
+
+  crmNavIds.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = isAdminShell ? 'none' : 'flex';
+  });
+
+  var navSuperAdmin = document.getElementById('nav-super-admin');
+  if (navSuperAdmin) {
+    navSuperAdmin.style.display = isAdminUser && !isCrmShell ? 'flex' : 'none';
+  }
+
+  var switcher = document.getElementById('shell-switcher');
+  var enterCrm = document.getElementById('btn-enter-crm');
+  var backPlatform = document.getElementById('btn-back-platform');
+  if (switcher) switcher.style.display = isAdminUser ? 'flex' : 'none';
+  if (enterCrm) enterCrm.style.display = isAdminUser && isAdminShell ? 'flex' : 'none';
+  if (backPlatform) backPlatform.style.display = isAdminUser && isCrmShell ? 'flex' : 'none';
+}
+
 function loadModuleStates() {
   moduleStateCache.loaded = false;
   return apiCall('GET', '/api/auth/modules').then(function(data) {
@@ -1494,10 +1549,9 @@ function loadModuleStates() {
 }
 
 function applySuperAdminVisibility() {
-  var nav = document.getElementById('nav-super-admin');
-  if (nav) nav.style.display = isSuperAdmin() ? 'flex' : 'none';
   var roleEl = document.getElementById('user-role-text');
   if (roleEl) roleEl.textContent = isSuperAdmin() ? 'Super Admin' : 'מנהל';
+  applyShellVisibility();
   applyModuleVisibility();
 }
 
@@ -1537,6 +1591,10 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   if (navArchive) navArchive.addEventListener('click', function() { goTo('archive', this); });
   var navSuperAdmin = document.getElementById('nav-super-admin');
   if (navSuperAdmin) navSuperAdmin.addEventListener('click', function() { goTo('super-admin', this); });
+  var enterCrmBtn = document.getElementById('btn-enter-crm');
+  if (enterCrmBtn) enterCrmBtn.addEventListener('click', goToCrmShell);
+  var backPlatformBtn = document.getElementById('btn-back-platform');
+  if (backPlatformBtn) backPlatformBtn.addEventListener('click', goToAdminShell);
   var navCustomers = document.getElementById('nav-customers');
   if (navCustomers) navCustomers.addEventListener('click', function() { goTo('customers', this); });
   document.getElementById('leads-search').addEventListener('input', function() {
@@ -1661,10 +1719,26 @@ function showApp() {
   document.getElementById('app').style.display = 'flex';
   document.getElementById('user-name').textContent = currentUser ? currentUser.name : '';
   document.getElementById('user-avatar').textContent = currentUser ? currentUser.name[0] : 'מ';
+
+  var shellMode = getShellMode();
+  if (shellMode === 'default') {
+    setShellPath(isSuperAdmin() ? '/admin' : '/crm');
+    shellMode = getShellMode();
+  }
+
   applySuperAdminVisibility();
-  loadDashboard();
-  preloadLeads();
-  checkGoogleStatus();
+  if (shellMode === 'admin' && isSuperAdmin()) {
+    goTo('super-admin', document.getElementById('nav-super-admin'));
+  } else {
+    if (shellMode === 'admin' && !isSuperAdmin()) {
+      setShellPath('/crm');
+      applySuperAdminVisibility();
+    }
+    goTo('dashboard', document.getElementById('nav-dashboard'));
+    loadDashboard();
+    preloadLeads();
+    checkGoogleStatus();
+  }
   loadModuleStates();
 }
 
