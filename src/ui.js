@@ -814,12 +814,16 @@ tr:hover td{background:#fafbfc;cursor:pointer}
   }
 
   #page-calendar .table-card {
+    display: block;
+    width: 100%;
     max-width: 100%;
+    min-width: 0;
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
   }
 
   #page-calendar .calendar-month-wrap {
+    width: 720px;
     min-width: 720px;
   }
 
