@@ -629,6 +629,9 @@ export async function handleShopping(request, env, path) {
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'shopping');
     if (moduleState instanceof Response) return moduleState;
 
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin']);
+    if (roleState instanceof Response) return roleState;
+
     const tenantId = tenantCtx.tenant.id;
     const purchaseId = Number(purchaseSyncProductsMatch[1]);
     const purchase = await getShoppingPurchaseByIdForTenant(purchaseId, tenantId, env);
