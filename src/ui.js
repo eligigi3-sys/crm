@@ -1035,7 +1035,7 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     <div class="sidebar-logo">
       <div class="logo-row">
         <div class="logo-icon">🎈</div>
-        <div><div class="logo-title">אטרקציות CRM</div><div class="logo-sub">ניהול אירועים</div></div>
+        <div><div class="logo-title" id="shell-logo-title">אטרקציות CRM</div><div class="logo-sub" id="shell-logo-sub">ניהול אירועים</div></div>
       </div>
     </div>
     <div class="nav-section">תפריט</div>
@@ -1505,12 +1505,17 @@ function applyShellVisibility() {
   var isCrmShell = shellMode === 'crm';
   var isAdminUser = isSuperAdmin();
   var crmNavIds = ['nav-dashboard', 'nav-leads', 'nav-employees', 'nav-products', 'nav-shopping', 'nav-calendar', 'nav-archive'];
+  var logoTitle = document.getElementById('shell-logo-title');
+  var logoSub = document.getElementById('shell-logo-sub');
 
   crmNavIds.forEach(function(id) {
     var el = document.getElementById(id);
     if (!el) return;
     el.style.display = isAdminShell ? 'none' : 'flex';
   });
+
+  if (logoTitle) logoTitle.textContent = isAdminShell ? 'Platform Admin' : 'Comics Events CRM';
+  if (logoSub) logoSub.textContent = isAdminShell ? 'Super Admin Control Plane' : 'Tenant Business Workspace';
 
   var navSuperAdmin = document.getElementById('nav-super-admin');
   if (navSuperAdmin) {
