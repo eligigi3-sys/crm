@@ -1108,6 +1108,27 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .calendar-mobile-event-name{font-size:13px;font-weight:800;color:var(--text)}
 .calendar-mobile-event-meta{font-size:12px;color:var(--text2);line-height:1.5}
 .calendar-mobile-empty{padding:20px 14px;text-align:center;color:var(--text3);font-size:13px}
+.team-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.team-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;display:flex;flex-direction:column;gap:12px}
+.team-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.team-card-name{font-size:16px;font-weight:800;color:var(--text)}
+.team-card-meta{font-size:13px;color:var(--text2);line-height:1.6;word-break:break-word}
+.team-card-actions{display:flex;flex-wrap:wrap;gap:8px}
+.team-role-badge,.team-status-badge{display:inline-flex;align-items:center;justify-content:center;padding:5px 10px;border-radius:999px;font-size:11px;font-weight:800}
+.team-role-badge.owner{background:#fef3c7;color:#92400e}
+.team-role-badge.admin{background:#ede9fe;color:#6d28d9}
+.team-role-badge.manager{background:#dbeafe;color:#1d4ed8}
+.team-role-badge.employee{background:#f3f4f6;color:#374151}
+.team-status-badge.active{background:var(--green-light);color:var(--green)}
+.team-status-badge.inactive{background:var(--red-light);color:var(--red)}
+.team-card-badges{display:flex;flex-wrap:wrap;gap:8px}
+.team-inline-note{font-size:12px;color:var(--text3)}
+.team-empty{padding:28px 14px;text-align:center;color:var(--text3)}
+@media (max-width:768px){
+  .team-grid{grid-template-columns:1fr}
+  .team-card{padding:14px}
+  .team-card-actions .btn{flex:1 1 calc(50% - 8px);justify-content:center}
+}
 
 </style>
 </head>
@@ -1137,6 +1158,7 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     <div class="nav-item active" id="nav-dashboard"><span class="nav-icon">📊</span> דאשבורד</div>
     <div class="nav-item" id="nav-leads"><span class="nav-icon">👥</span> לקוחות <span class="nav-badge" id="nav-leads-count" style="display:none">0</span></div>
     <div class="nav-item" id="nav-employees"><span class="nav-icon">🧑‍💼</span> עובדים</div>
+    <div class="nav-item" id="nav-team" style="display:none"><span class="nav-icon">👤</span> צוות</div>
     <div class="nav-item" id="nav-products"><span class="nav-icon">📦</span> מוצרים</div>
     <div class="nav-item" id="nav-shopping"><span class="nav-icon">🛒</span> רשימות קניות</div>
     <div class="nav-item" id="nav-calendar"><span class="nav-icon">📅</span> יומן אירועים</div>
@@ -1277,6 +1299,32 @@ id="customers-search">
           </select>
         </div>
         <div id="employees-grid" style="padding:16px">
+          <div class="dash-empty">טוען...</div>
+        </div>
+      </div>
+    </div>
+    <div id="page-team" class="page">
+      <div class="page-header">
+        <div class="page-title">צוות <small>ניהול משתמשים והרשאות לעסק</small></div>
+        <button class="btn btn-primary" id="btn-new-team-member" style="display:none">+ הוסף משתמש</button>
+      </div>
+      <div class="table-card">
+        <div class="table-toolbar">
+          <input class="search-input" type="text" placeholder="חיפוש לפי שם / אימייל..." id="team-search">
+          <select class="filter-select" id="team-status-filter">
+            <option value="all">כל הסטטוסים</option>
+            <option value="active">פעילים בלבד</option>
+            <option value="inactive">לא פעילים</option>
+          </select>
+          <select class="filter-select" id="team-role-filter">
+            <option value="">כל התפקידים</option>
+            <option value="owner">Owner</option>
+            <option value="admin">Admin</option>
+            <option value="manager">Manager</option>
+            <option value="employee">Employee</option>
+          </select>
+        </div>
+        <div id="team-grid" style="padding:16px">
           <div class="dash-empty">טוען...</div>
         </div>
       </div>
@@ -1448,6 +1496,8 @@ var currentOperationalUnreceivedPurchases = [];
 var currentOperationalRecentMovements = [];
 var allLeadsCache = [];
 var calYear, calMonth;
+var currentTenantContext = null;
+var currentTeamMembers = [];
 var sessionTransitionInProgress = false;
 var sessionRevalidationInFlight = false;
 var lastSessionRevalidationAt = 0;
@@ -1522,6 +1572,55 @@ function isSuperAdmin() {
   return !!(currentUser && String(currentUser.role || '').trim().toLowerCase() === 'super_admin');
 }
 
+function getTenantRole() {
+  return currentTenantContext && currentTenantContext.membership ? String(currentTenantContext.membership.role || '').trim().toLowerCase() : '';
+}
+
+function isTeamManagerAllowed() {
+  var role = getTenantRole();
+  return role === 'owner' || role === 'admin';
+}
+
+function getTenantRoleLabel(role) {
+  var map = {
+    owner: 'Owner',
+    admin: 'Admin',
+    manager: 'Manager',
+    employee: 'Employee'
+  };
+  return map[role] || 'משתמש';
+}
+
+function canManageTeamMember(member) {
+  if (!member) return false;
+  var actorRole = getTenantRole();
+  var targetRole = String(member.role || '').trim().toLowerCase();
+  if (actorRole === 'owner') return Number(member.user_id) !== Number(currentTenantContext && currentTenantContext.user ? currentTenantContext.user.id : 0);
+  if (actorRole === 'admin') return targetRole === 'manager' || targetRole === 'employee';
+  return false;
+}
+
+function canAssignTeamRole(member, nextRole) {
+  if (!member) return false;
+  var actorRole = getTenantRole();
+  var targetRole = String(member.role || '').trim().toLowerCase();
+  nextRole = String(nextRole || '').trim().toLowerCase();
+  if (Number(member.user_id) === Number(currentTenantContext && currentTenantContext.user ? currentTenantContext.user.id : 0)) return false;
+  if (actorRole === 'owner') return ['owner', 'admin', 'manager', 'employee'].indexOf(nextRole) !== -1;
+  if (actorRole === 'admin') {
+    if (targetRole === 'owner' || targetRole === 'admin') return false;
+    return nextRole === 'manager' || nextRole === 'employee';
+  }
+  return false;
+}
+
+function getAssignableTeamRoles(member) {
+  var roles = ['owner', 'admin', 'manager', 'employee'];
+  return roles.filter(function(role) {
+    return canAssignTeamRole(member, role);
+  });
+}
+
 function isModuleEnabled(moduleKey) {
   var item = moduleStateCache && moduleStateCache.byKey ? moduleStateCache.byKey[moduleKey] : null;
   return !item || item.is_enabled !== false;
@@ -1553,6 +1652,8 @@ function applyModuleVisibility() {
   if (navLeads) navLeads.style.display = isModuleEnabled('contacts') ? 'flex' : 'none';
   var navEmployees = document.getElementById('nav-employees');
   if (navEmployees) navEmployees.style.display = isModuleEnabled('employees') ? 'flex' : 'none';
+  var navTeam = document.getElementById('nav-team');
+  if (navTeam) navTeam.style.display = isTeamManagerAllowed() ? 'flex' : 'none';
   var navProducts = document.getElementById('nav-products');
   if (navProducts) navProducts.style.display = isModuleEnabled('products') ? 'flex' : 'none';
   var navShopping = document.getElementById('nav-shopping');
@@ -1569,6 +1670,8 @@ function applyModuleVisibility() {
   if (btnNewCustomer) btnNewCustomer.style.display = isModuleEnabled('contacts') ? 'inline-flex' : 'none';
   var btnNewEmployee = document.getElementById('btn-new-employee');
   if (btnNewEmployee) btnNewEmployee.style.display = isModuleEnabled('employees') ? 'inline-flex' : 'none';
+  var btnNewTeamMember = document.getElementById('btn-new-team-member');
+  if (btnNewTeamMember) btnNewTeamMember.style.display = isTeamManagerAllowed() ? 'inline-flex' : 'none';
   var btnNewProduct = document.getElementById('btn-new-product');
   if (btnNewProduct) btnNewProduct.style.display = isModuleEnabled('products') ? 'inline-flex' : 'none';
   var btnNewShoppingList = document.getElementById('btn-new-shopping-list');
@@ -1611,7 +1714,7 @@ function applyShellVisibility() {
   var isAdminShell = shellMode === 'admin';
   var isCrmShell = shellMode === 'crm';
   var isAdminUser = isSuperAdmin();
-  var crmNavIds = ['nav-dashboard', 'nav-leads', 'nav-employees', 'nav-products', 'nav-shopping', 'nav-calendar', 'nav-archive'];
+  var crmNavIds = ['nav-dashboard', 'nav-leads', 'nav-employees', 'nav-team', 'nav-products', 'nav-shopping', 'nav-calendar', 'nav-archive'];
   var logoTitle = document.getElementById('shell-logo-title');
   var logoSub = document.getElementById('shell-logo-sub');
 
@@ -1671,7 +1774,9 @@ function loadModuleStates() {
 
 function applySuperAdminVisibility() {
   var roleEl = document.getElementById('user-role-text');
-  if (roleEl) roleEl.textContent = isSuperAdmin() ? 'Super Admin' : 'מנהל';
+  if (roleEl) {
+    roleEl.textContent = isSuperAdmin() ? 'Super Admin' : getTenantRoleLabel(getTenantRole());
+  }
   applyModuleVisibility();
   applyShellVisibility();
 }
@@ -1704,6 +1809,8 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   document.getElementById('nav-leads').addEventListener('click', function() { goTo('customers', this); });
   var navEmployees = document.getElementById('nav-employees');
   if (navEmployees) navEmployees.addEventListener('click', function() { goTo('employees', this); });
+  var navTeam = document.getElementById('nav-team');
+  if (navTeam) navTeam.addEventListener('click', function() { goTo('team', this); });
   var navProducts = document.getElementById('nav-products');
   if (navProducts) navProducts.addEventListener('click', function() { goTo('products', this); });
   var navShopping = document.getElementById('nav-shopping');
@@ -1744,6 +1851,15 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   });
   document.getElementById('dup-name').addEventListener('click', openDupLead);
   document.getElementById('dup-phone').addEventListener('click', openDupLead);
+  var teamSearch = document.getElementById('team-search');
+  if (teamSearch) teamSearch.addEventListener('input', function() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(loadTeamMembers, 300);
+  });
+  var teamStatusFilter = document.getElementById('team-status-filter');
+  if (teamStatusFilter) teamStatusFilter.addEventListener('change', loadTeamMembers);
+  var teamRoleFilter = document.getElementById('team-role-filter');
+  if (teamRoleFilter) teamRoleFilter.addEventListener('change', loadTeamMembers);
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') { closeLeadModal(); closeDrawer(); closeCustomerModal(); closeSuperAdminTenantModal(); }
   });
@@ -1783,6 +1899,10 @@ function goTo(page, el) {
     calendar: 'leads',
     archive: 'leads'
   };
+  if (page === 'team' && !isTeamManagerAllowed()) {
+    toast('Permission denied', 'error');
+    return;
+  }
   var requiredModule = pageModuleMap[page];
   if (requiredModule && !isModuleEnabled(requiredModule)) {
     document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
@@ -1807,6 +1927,7 @@ function goTo(page, el) {
   if (page === 'calendar') loadCalendar();
   if (page === 'customers') loadCustomers();
   if (page === 'employees') loadEmployees();
+  if (page === 'team') loadTeamMembers();
   if (page === 'products') loadProducts();
   if (page === 'archive') loadEventArchive();
   if (page === 'super-admin') loadSuperAdminTenants();
@@ -1866,6 +1987,18 @@ function handleExpiredSession(options) {
   }
 }
 
+function loadTenantContext() {
+  return apiCall('GET', '/api/auth/tenant-context').then(function(data) {
+    currentTenantContext = data || null;
+    applySuperAdminVisibility();
+    return data;
+  }).catch(function(err) {
+    currentTenantContext = null;
+    applySuperAdminVisibility();
+    throw err;
+  });
+}
+
 function scheduleSessionRevalidation() {
   if (!token || !currentUser) return;
   if (document.hidden) return;
@@ -1875,7 +2008,7 @@ function scheduleSessionRevalidation() {
   if (now - lastSessionRevalidationAt < 5000) return;
   sessionRevalidationInFlight = true;
   lastSessionRevalidationAt = now;
-  apiCall('GET', '/api/auth/tenant-context').catch(function() {
+  loadTenantContext().catch(function() {
   }).finally(function() {
     sessionRevalidationInFlight = false;
   });
@@ -1916,8 +2049,10 @@ function doLogin() {
     currentUser = res.user;
     localStorage.setItem('crm_token', token);
     localStorage.setItem('crm_user', JSON.stringify(currentUser));
+    return loadTenantContext().catch(function() { return null; });
+  }).then(function() {
     showApp();
-  
+
 setTimeout(function() {
 
   grid.querySelectorAll('[data-shopping-id]').forEach(function(card) {
@@ -1963,11 +2098,227 @@ function showApp() {
     preloadLeads();
     checkGoogleStatus();
   }
+  loadTenantContext().catch(function() {
+  });
   loadModuleStates();
 }
 
 function logout() {
+  currentTenantContext = null;
+  currentTeamMembers = [];
   showLoggedOutState();
+}
+
+function getTeamRoleBadge(role) {
+  role = String(role || '').trim().toLowerCase();
+  return '<span class="team-role-badge ' + role + '">' + escapeHtml(getTenantRoleLabel(role)) + '</span>';
+}
+
+function getTeamStatusBadge(status) {
+  status = String(status || '').trim().toLowerCase();
+  return '<span class="team-status-badge ' + status + '">' + escapeHtml(status === 'inactive' ? 'לא פעיל' : 'פעיל') + '</span>';
+}
+
+function getTeamMemberRoleOptions(member) {
+  return getAssignableTeamRoles(member).map(function(role) {
+    return '<option value="' + role + '"' + (String(member.role || '').trim().toLowerCase() === role ? ' selected' : '') + '>' + escapeHtml(getTenantRoleLabel(role)) + '</option>';
+  }).join('');
+}
+
+function loadTeamMembers() {
+  var grid = document.getElementById('team-grid');
+  if (!grid) return;
+  if (!isTeamManagerAllowed()) {
+    grid.innerHTML = '<div class="team-empty">אין הרשאה לצפייה בעמוד הזה</div>';
+    return;
+  }
+  var search = document.getElementById('team-search') ? document.getElementById('team-search').value.trim().toLowerCase() : '';
+  var statusFilter = document.getElementById('team-status-filter') ? document.getElementById('team-status-filter').value : 'all';
+  var roleFilter = document.getElementById('team-role-filter') ? document.getElementById('team-role-filter').value : '';
+  grid.innerHTML = '<div class="dash-empty">טוען...</div>';
+  apiCall('GET', '/api/tenant-members').then(function(data) {
+    var members = (data.members || []).slice();
+    currentTeamMembers = members;
+    members = members.filter(function(member) {
+      if (statusFilter === 'active' && String(member.status || '').toLowerCase() !== 'active') return false;
+      if (statusFilter === 'inactive' && String(member.status || '').toLowerCase() !== 'inactive') return false;
+      if (roleFilter && String(member.role || '').toLowerCase() !== roleFilter) return false;
+      if (search) {
+        var hay = ((member.name || '') + ' ' + (member.email || '')).toLowerCase();
+        if (hay.indexOf(search) === -1) return false;
+      }
+      return true;
+    });
+    if (!members.length) {
+      grid.innerHTML = '<div class="team-empty">אין משתמשים להצגה</div>';
+      return;
+    }
+    grid.innerHTML = '<div class="team-grid">' + members.map(function(member) {
+      var actions = [];
+      if (getAssignableTeamRoles(member).length > 0) {
+        actions.push('<button class="btn btn-secondary btn-sm team-role-btn" data-id="' + member.membership_id + '">שנה תפקיד</button>');
+      }
+      if (canManageTeamMember(member) && String(member.status || '').toLowerCase() === 'active') {
+        actions.push('<button class="btn btn-danger btn-sm team-deactivate-btn" data-id="' + member.membership_id + '">השבת</button>');
+      }
+      if (canManageTeamMember(member) && String(member.status || '').toLowerCase() === 'inactive') {
+        actions.push('<button class="btn btn-secondary btn-sm team-reactivate-btn" data-id="' + member.membership_id + '">הפעל מחדש</button>');
+      }
+      return '<div class="team-card">' +
+        '<div class="team-card-header">' +
+          '<div style="flex:1">' +
+            '<div class="team-card-name">' + escapeHtml(member.name || 'ללא שם') + '</div>' +
+            '<div class="team-card-meta">' + escapeHtml(member.email || '—') + '</div>' +
+          '</div>' +
+          getTeamStatusBadge(member.status) +
+        '</div>' +
+        '<div class="team-card-badges">' + getTeamRoleBadge(member.role) + '</div>' +
+        '<div class="team-card-meta">נוצר: ' + escapeHtml(formatDate(member.created_at) || '—') + '</div>' +
+        '<div class="team-inline-note">כניסה אחרונה: ' + escapeHtml(formatDate(member.last_login_at) || '—') + '</div>' +
+        '<div class="team-card-actions">' + (actions.join('') || '<span class="team-inline-note">אין פעולות זמינות</span>') + '</div>' +
+      '</div>';
+    }).join('') + '</div>';
+
+    grid.querySelectorAll('.team-role-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        openTeamRoleModal(parseInt(this.getAttribute('data-id')));
+      });
+    });
+    grid.querySelectorAll('.team-deactivate-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        deactivateTeamMember(parseInt(this.getAttribute('data-id')));
+      });
+    });
+    grid.querySelectorAll('.team-reactivate-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        reactivateTeamMember(parseInt(this.getAttribute('data-id')));
+      });
+    });
+  }).catch(function(e) {
+    grid.innerHTML = '<div class="team-empty">שגיאה בטעינת המשתמשים</div>';
+    toast(e.message, 'error');
+  });
+}
+
+function openTeamMemberModal() {
+  if (!isTeamManagerAllowed()) {
+    toast('Permission denied', 'error');
+    return;
+  }
+  var old = document.getElementById('team-member-modal');
+  if (old) old.remove();
+  var roleOptions = ['employee', 'manager'];
+  if (getTenantRole() === 'owner') roleOptions = ['employee', 'manager', 'admin', 'owner'];
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'team-member-modal';
+  overlay.innerHTML =
+    '<div class="modal" style="width:560px">' +
+      '<div class="modal-header"><h2>הוסף משתמש</h2><button class="modal-close" id="team-member-close">✕</button></div>' +
+      '<div class="modal-body">' +
+        '<div class="form-group"><label class="form-label">שם *</label><input class="form-input" id="team-member-name" placeholder="שם מלא"></div>' +
+        '<div class="form-group"><label class="form-label">אימייל *</label><input class="form-input" id="team-member-email" type="email" placeholder="user@example.com"></div>' +
+        '<div class="form-group"><label class="form-label">סיסמה זמנית *</label><input class="form-input" id="team-member-password" type="text" placeholder="סיסמה זמנית"></div>' +
+        '<div class="form-group"><label class="form-label">תפקיד *</label><select class="filter-select" id="team-member-role">' + roleOptions.map(function(role) {
+          return '<option value="' + role + '">' + escapeHtml(getTenantRoleLabel(role)) + '</option>';
+        }).join('') + '</select></div>' +
+      '</div>' +
+      '<div class="modal-footer"><button class="btn btn-secondary" id="team-member-cancel">ביטול</button><button class="btn btn-primary" id="team-member-save">שמור</button></div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  function close() { overlay.remove(); }
+  document.getElementById('team-member-close').onclick = close;
+  document.getElementById('team-member-cancel').onclick = close;
+  document.getElementById('team-member-save').onclick = function() {
+    var body = {
+      name: document.getElementById('team-member-name').value.trim(),
+      email: document.getElementById('team-member-email').value.trim(),
+      password: document.getElementById('team-member-password').value.trim(),
+      role: document.getElementById('team-member-role').value
+    };
+    if (!body.name || !body.email || !body.password || !body.role) {
+      toast('יש למלא את כל השדות החובה', 'error');
+      return;
+    }
+    document.getElementById('team-member-save').disabled = true;
+    apiCall('POST', '/api/tenant-members', body).then(function() {
+      close();
+      toast('המשתמש נוסף', 'success');
+      loadTeamMembers();
+    }).catch(function(e) {
+      document.getElementById('team-member-save').disabled = false;
+      toast(e.message, 'error');
+    });
+  };
+}
+
+function openTeamRoleModal(membershipId) {
+  var member = currentTeamMembers.find(function(item) { return Number(item.membership_id) === Number(membershipId); });
+  if (!member) {
+    toast('המשתמש לא נמצא', 'error');
+    return;
+  }
+  var options = getAssignableTeamRoles(member);
+  if (!options.length) {
+    toast('אין הרשאה לשנות את התפקיד של המשתמש הזה', 'error');
+    return;
+  }
+  var old = document.getElementById('team-role-modal');
+  if (old) old.remove();
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'team-role-modal';
+  overlay.innerHTML =
+    '<div class="modal" style="width:460px">' +
+      '<div class="modal-header"><h2>שנה תפקיד</h2><button class="modal-close" id="team-role-close">✕</button></div>' +
+      '<div class="modal-body">' +
+        '<div class="team-card-meta" style="margin-bottom:12px">' + escapeHtml(member.name || member.email || '') + '</div>' +
+        '<div class="form-group"><label class="form-label">תפקיד חדש</label><select class="filter-select" id="team-role-select">' + getTeamMemberRoleOptions(member) + '</select></div>' +
+      '</div>' +
+      '<div class="modal-footer"><button class="btn btn-secondary" id="team-role-cancel">ביטול</button><button class="btn btn-primary" id="team-role-save">שמור</button></div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  function close() { overlay.remove(); }
+  document.getElementById('team-role-close').onclick = close;
+  document.getElementById('team-role-cancel').onclick = close;
+  document.getElementById('team-role-save').onclick = function() {
+    var nextRole = document.getElementById('team-role-select').value;
+    if (!canAssignTeamRole(member, nextRole)) {
+      toast('אין הרשאה לשנות לתפקיד הזה', 'error');
+      return;
+    }
+    apiCall('PUT', '/api/tenant-members/' + membershipId + '/role', { role: nextRole }).then(function() {
+      close();
+      toast('התפקיד עודכן', 'success');
+      loadTeamMembers();
+    }).catch(function(e) { toast(e.message, 'error'); });
+  };
+}
+
+function deactivateTeamMember(membershipId) {
+  var member = currentTeamMembers.find(function(item) { return Number(item.membership_id) === Number(membershipId); });
+  if (!member) {
+    toast('המשתמש לא נמצא', 'error');
+    return;
+  }
+  if (!confirm('להשבית את המשתמש הזה? הוא לא יוכל להיכנס לעסק עד להפעלה מחדש.')) return;
+  apiCall('POST', '/api/tenant-members/' + membershipId + '/deactivate').then(function() {
+    toast('המשתמש הושבת', 'success');
+    loadTeamMembers();
+  }).catch(function(e) { toast(e.message, 'error'); });
+}
+
+function reactivateTeamMember(membershipId) {
+  var member = currentTeamMembers.find(function(item) { return Number(item.membership_id) === Number(membershipId); });
+  if (!member) {
+    toast('המשתמש לא נמצא', 'error');
+    return;
+  }
+  if (!confirm('להפעיל מחדש את המשתמש הזה?')) return;
+  apiCall('POST', '/api/tenant-members/' + membershipId + '/reactivate').then(function() {
+    toast('המשתמש הופעל מחדש', 'success');
+    loadTeamMembers();
+  }).catch(function(e) { toast(e.message, 'error'); });
 }
 
 function loadSuperAdminTenants() {
@@ -6793,6 +7144,11 @@ document.addEventListener('DOMContentLoaded', function() {
   var newEmployeeBtn = document.getElementById('btn-new-employee');
   if (newEmployeeBtn) newEmployeeBtn.addEventListener('click', function() {
     openEmployeeModal();
+  });
+
+  var newTeamMemberBtn = document.getElementById('btn-new-team-member');
+  if (newTeamMemberBtn) newTeamMemberBtn.addEventListener('click', function() {
+    openTeamMemberModal();
   });
 
   var employeesSearch = document.getElementById('employees-search');
