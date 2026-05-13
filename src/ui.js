@@ -1095,6 +1095,19 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .calendar-event-pill.lead{background:var(--blue-light);color:var(--blue)}
 .calendar-event-pill.quote{background:var(--orange-light);color:var(--orange)}
 .calendar-event-pill.cancelled{background:var(--bg);color:var(--text3)}
+.calendar-mobile-list{display:flex;flex-direction:column;gap:12px;padding:14px}
+.calendar-mobile-day{border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--white);overflow:hidden}
+.calendar-mobile-day-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;background:#fafbfc;border-bottom:1px solid var(--border)}
+.calendar-mobile-day-title{font-size:14px;font-weight:800;color:var(--text)}
+.calendar-mobile-day-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.calendar-mobile-add{flex-shrink:0}
+.calendar-mobile-events{padding:10px}
+.calendar-mobile-event{width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:6px;border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--white);margin-bottom:8px;text-align:right;font-family:var(--font);cursor:pointer}
+.calendar-mobile-event:last-child{margin-bottom:0}
+.calendar-mobile-event-top{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%}
+.calendar-mobile-event-name{font-size:13px;font-weight:800;color:var(--text)}
+.calendar-mobile-event-meta{font-size:12px;color:var(--text2);line-height:1.5}
+.calendar-mobile-empty{padding:20px 14px;text-align:center;color:var(--text3);font-size:13px}
 
 </style>
 </head>
@@ -2617,9 +2630,11 @@ function renderRealCalendar(leads) {
 
   var monthNames = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
   var dayNames = ['א','ב','ג','ד','ה','ו','ש'];
+  var mobileDayNames = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
 
   var year = window.calendarViewYear;
   var month = window.calendarViewMonth;
+  var isMobileCalendar = !!(window.matchMedia && window.matchMedia('(max-width: 768px)').matches);
 
   var today = new Date();
   var firstDay = new Date(year, month, 1).getDay();
@@ -2666,37 +2681,82 @@ function renderRealCalendar(leads) {
 
   html += '</div>';
 
-  html += '<div class="calendar-weekdays" style="display:grid;grid-template-columns:repeat(7,1fr);background:#fafbfc;border-bottom:1px solid var(--border)">';
-  dayNames.forEach(function(d) {
-    html += '<div style="padding:10px;text-align:center;font-size:12px;font-weight:800;color:var(--text3)">' + d + '</div>';
-  });
-  html += '</div>';
-
-  html += '<div class="calendar-grid-real" style="display:grid;grid-template-columns:repeat(7,1fr)">';
-
-  for (var empty = 0; empty < firstDay; empty++) {
-    html += '<div class="calendar-day-real" style="opacity:.35;background:#fafbfc"></div>';
-  }
-
-  for (var d = 1; d <= daysInMonth; d++) {
-    var ds = year + '-' + pad2(month + 1) + '-' + pad2(d);
-    var isToday = year === today.getFullYear() && month === today.getMonth() && d === today.getDate();
-    var events = eventMap[ds] || [];
-
-    html += '<div class="calendar-day-real ' + (isToday ? 'today' : '') + '" data-date="' + ds + '">';
-    html += '<button class="calendar-add-btn" data-date="' + ds + '">+</button>';
-    html += '<div class="calendar-day-num-real" style="font-size:12px;font-weight:900;margin-bottom:8px">' + d + '</div>';
-
-    events.forEach(function(l) {
-      html += '<button class="calendar-event-pill ' + (l.status || 'lead') + '" data-event-id="' + l.id + '">';
-      html += (l.event_time ? l.event_time + ' · ' : '') + (l.name || '') + (l.event_type ? ' · ' + l.event_type : '');
-      html += '</button>';
+  if (isMobileCalendar) {
+    var monthEvents = leads.filter(function(l) {
+      var parts = String(l.event_date || '').substring(0, 10).split('-');
+      return Number(parts[0]) === year && Number(parts[1]) === (month + 1);
+    }).sort(function(a, b) {
+      var ad = String(a.event_date || '') + ' ' + String(a.event_time || '');
+      var bd = String(b.event_date || '') + ' ' + String(b.event_time || '');
+      return ad.localeCompare(bd);
     });
+
+    if (!monthEvents.length) {
+      html += '<div class="calendar-mobile-empty">אין אירועים לחודש זה</div>';
+    } else {
+      var grouped = {};
+      monthEvents.forEach(function(item) {
+        var key = String(item.event_date || '').substring(0, 10);
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(item);
+      });
+
+      html += '<div class="calendar-mobile-list">';
+      Object.keys(grouped).sort().forEach(function(dateKey) {
+        var parts = dateKey.split('-');
+        var dateObj = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        html += '<div class="calendar-mobile-day">';
+        html += '<div class="calendar-mobile-day-header">';
+        html += '<div><div class="calendar-mobile-day-title">' + formatDate(dateKey) + '</div><div class="calendar-mobile-day-sub">' + mobileDayNames[dateObj.getDay()] + ' · ' + grouped[dateKey].length + ' אירועים</div></div>';
+        html += '<button class="btn btn-secondary btn-sm calendar-mobile-add" data-date="' + dateKey + '">+ אירוע</button>';
+        html += '</div>';
+        html += '<div class="calendar-mobile-events">';
+        grouped[dateKey].forEach(function(l) {
+          html += '<button class="calendar-mobile-event" data-event-id="' + l.id + '">';
+          html += '<div class="calendar-mobile-event-top"><div class="calendar-mobile-event-name">' + escapeHtml(l.name || 'ללא שם') + '</div>' + statusBadge(l.status) + '</div>';
+          html += '<div class="calendar-mobile-event-meta">' + escapeHtml((l.event_time || 'שעה לא צוינה') + (l.event_type ? ' · ' + l.event_type : '')) + '</div>';
+          if (l.venue) html += '<div class="calendar-mobile-event-meta">' + escapeHtml(l.venue) + '</div>';
+          html += '</button>';
+        });
+        html += '</div></div>';
+      });
+      html += '</div>';
+    }
+  } else {
+    html += '<div class="calendar-weekdays" style="display:grid;grid-template-columns:repeat(7,1fr);background:#fafbfc;border-bottom:1px solid var(--border)">';
+    dayNames.forEach(function(d) {
+      html += '<div style="padding:10px;text-align:center;font-size:12px;font-weight:800;color:var(--text3)">' + d + '</div>';
+    });
+    html += '</div>';
+
+    html += '<div class="calendar-grid-real" style="display:grid;grid-template-columns:repeat(7,1fr)">';
+
+    for (var empty = 0; empty < firstDay; empty++) {
+      html += '<div class="calendar-day-real" style="opacity:.35;background:#fafbfc"></div>';
+    }
+
+    for (var d = 1; d <= daysInMonth; d++) {
+      var ds = year + '-' + pad2(month + 1) + '-' + pad2(d);
+      var isToday = year === today.getFullYear() && month === today.getMonth() && d === today.getDate();
+      var events = eventMap[ds] || [];
+
+      html += '<div class="calendar-day-real ' + (isToday ? 'today' : '') + '" data-date="' + ds + '">';
+      html += '<button class="calendar-add-btn" data-date="' + ds + '">+</button>';
+      html += '<div class="calendar-day-num-real" style="font-size:12px;font-weight:900;margin-bottom:8px">' + d + '</div>';
+
+      events.forEach(function(l) {
+        html += '<button class="calendar-event-pill ' + (l.status || 'lead') + '" data-event-id="' + l.id + '">';
+        html += (l.event_time ? l.event_time + ' · ' : '') + (l.name || '') + (l.event_type ? ' · ' + l.event_type : '');
+        html += '</button>';
+      });
+
+      html += '</div>';
+    }
 
     html += '</div>';
   }
 
-  html += '</div></div>';
+  html += '</div>';
 
   tableCard.innerHTML = html;
 
@@ -2743,7 +2803,7 @@ function renderRealCalendar(leads) {
     loadCalendar();
   };
 
-  tableCard.querySelectorAll('.calendar-add-btn').forEach(function(btn) {
+  tableCard.querySelectorAll('.calendar-add-btn, .calendar-mobile-add').forEach(function(btn) {
     btn.onclick = function(e) {
       e.preventDefault();
       e.stopPropagation();
@@ -2768,7 +2828,7 @@ function renderRealCalendar(leads) {
     };
   });
 
-  tableCard.querySelectorAll('.calendar-event-pill[data-event-id]').forEach(function(btn) {
+  tableCard.querySelectorAll('.calendar-event-pill[data-event-id], .calendar-mobile-event[data-event-id]').forEach(function(btn) {
     btn.onclick = function(e) {
       e.preventDefault();
       e.stopPropagation();
