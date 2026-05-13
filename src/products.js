@@ -705,6 +705,9 @@ export async function handleProducts(request, env, path) {
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'products');
     if (moduleState instanceof Response) return moduleState;
 
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin']);
+    if (roleState instanceof Response) return roleState;
+
     const tenantId = tenantCtx.tenant.id;
     const b = await request.json();
     const name = normalizeText(b.name);
@@ -827,6 +830,9 @@ export async function handleProducts(request, env, path) {
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'products');
     if (moduleState instanceof Response) return moduleState;
 
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin']);
+    if (roleState instanceof Response) return roleState;
+
     const tenantId = tenantCtx.tenant.id;
     const id = idMatch[1];
     const b = await request.json();
@@ -884,6 +890,9 @@ export async function handleProducts(request, env, path) {
 
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'products');
     if (moduleState instanceof Response) return moduleState;
+
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin']);
+    if (roleState instanceof Response) return roleState;
 
     const tenantId = tenantCtx.tenant.id;
     const id = idMatch[1];
