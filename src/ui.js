@@ -133,7 +133,10 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .ac-item-name{font-weight:600;color:var(--text)}
 .ac-item-sub{font-size:11px;color:var(--text3);margin-top:2px}
 #login-page{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#ede9fe 0%,#f5f3ff 50%,#eff6ff 100%)}
-.login-card{background:var(--white);border:1px solid var(--border);border-radius:20px;padding:40px;width:390px;box-shadow:var(--shadow-md)}
+.login-card{background:var(--white);border:1px solid var(--border);border-radius:20px;padding:40px;width:min(390px,100%);max-width:100%;box-shadow:var(--shadow-md)}
+.mobile-shell-switcher{display:none}
+.mobile-shell-switcher-inner{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.mobile-shell-switcher .btn{width:100%;justify-content:center}
 .login-top{text-align:center;margin-bottom:28px}
 .login-icon{width:60px;height:60px;background:linear-gradient(135deg,var(--accent),var(--accent-dark));border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 14px}
 .login-title{font-size:20px;font-weight:800;color:var(--text)}
@@ -375,6 +378,10 @@ tr:hover td{background:#fafbfc;cursor:pointer}
   .sidebar-bottom,
   #gcal-status {
     display: none !important;
+  }
+
+  .mobile-shell-switcher {
+    display: block;
   }
 
   #sidebar .nav-item {
@@ -1061,6 +1068,12 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     </div>
   </div>
   <div id="main">
+    <div id="mobile-shell-switcher" class="mobile-shell-switcher" style="display:none">
+      <div class="mobile-shell-switcher-inner">
+        <button class="btn btn-secondary" id="btn-enter-crm-mobile" style="display:none">Enter CRM</button>
+        <button class="btn btn-secondary" id="btn-back-platform-mobile" style="display:none">Back to Platform Admin</button>
+      </div>
+    </div>
     <div id="page-dashboard" class="page active">
       <div class="page-header">
         <div class="page-title">שלום! 👋 <small id="dash-date"></small></div>
@@ -1525,9 +1538,15 @@ function applyShellVisibility() {
   var switcher = document.getElementById('shell-switcher');
   var enterCrm = document.getElementById('btn-enter-crm');
   var backPlatform = document.getElementById('btn-back-platform');
+  var mobileSwitcher = document.getElementById('mobile-shell-switcher');
+  var enterCrmMobile = document.getElementById('btn-enter-crm-mobile');
+  var backPlatformMobile = document.getElementById('btn-back-platform-mobile');
   if (switcher) switcher.style.display = isAdminUser ? 'flex' : 'none';
   if (enterCrm) enterCrm.style.display = isAdminUser && isAdminShell ? 'flex' : 'none';
   if (backPlatform) backPlatform.style.display = isAdminUser && isCrmShell ? 'flex' : 'none';
+  if (mobileSwitcher) mobileSwitcher.style.display = isAdminUser ? 'block' : 'none';
+  if (enterCrmMobile) enterCrmMobile.style.display = isAdminUser && isAdminShell ? 'inline-flex' : 'none';
+  if (backPlatformMobile) backPlatformMobile.style.display = isAdminUser && isCrmShell ? 'inline-flex' : 'none';
 }
 
 function loadModuleStates() {
@@ -1602,6 +1621,10 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   if (enterCrmBtn) enterCrmBtn.addEventListener('click', goToCrmShell);
   var backPlatformBtn = document.getElementById('btn-back-platform');
   if (backPlatformBtn) backPlatformBtn.addEventListener('click', goToAdminShell);
+  var enterCrmMobileBtn = document.getElementById('btn-enter-crm-mobile');
+  if (enterCrmMobileBtn) enterCrmMobileBtn.addEventListener('click', goToCrmShell);
+  var backPlatformMobileBtn = document.getElementById('btn-back-platform-mobile');
+  if (backPlatformMobileBtn) backPlatformMobileBtn.addEventListener('click', goToAdminShell);
   var navCustomers = document.getElementById('nav-customers');
   if (navCustomers) navCustomers.addEventListener('click', function() { goTo('customers', this); });
   document.getElementById('leads-search').addEventListener('input', function() {
