@@ -1,4 +1,4 @@
-import { requireTenantContext, assertTenantModuleEnabled } from './auth.js';
+import { requireTenantContext, assertTenantModuleEnabled, assertTenantRole } from './auth.js';
 
 function parseOptionalProductId(value) {
   if (value === null || value === undefined || value === '') return null;
@@ -279,6 +279,9 @@ export async function handleShopping(request, env, path) {
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'shopping');
     if (moduleState instanceof Response) return moduleState;
 
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
+
     const tenantId = tenantCtx.tenant.id;
     const b = await request.json();
     if (!b.name) throw new Error('שם חנות חובה');
@@ -375,6 +378,9 @@ export async function handleShopping(request, env, path) {
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'shopping');
     if (moduleState instanceof Response) return moduleState;
 
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
+
     const tenantId = tenantCtx.tenant.id;
     const id = listMatch[1];
     const b = await request.json();
@@ -419,6 +425,9 @@ export async function handleShopping(request, env, path) {
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'shopping');
     if (moduleState instanceof Response) return moduleState;
 
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
+
     const tenantId = tenantCtx.tenant.id;
     const id = listMatch[1];
 
@@ -441,6 +450,9 @@ export async function handleShopping(request, env, path) {
 
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'shopping');
     if (moduleState instanceof Response) return moduleState;
+
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
 
     const tenantId = tenantCtx.tenant.id;
     const listId = itemsMatch[1];
@@ -479,6 +491,9 @@ export async function handleShopping(request, env, path) {
 
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'shopping');
     if (moduleState instanceof Response) return moduleState;
+
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
 
     const tenantId = tenantCtx.tenant.id;
     const id = itemMatch[1];
@@ -522,6 +537,9 @@ export async function handleShopping(request, env, path) {
 
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'shopping');
     if (moduleState instanceof Response) return moduleState;
+
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
 
     const tenantId = tenantCtx.tenant.id;
     const id = itemMatch[1];
