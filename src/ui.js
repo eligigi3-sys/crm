@@ -793,6 +793,24 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     min-width: 640px !important;
   }
 
+  #page-super-admin .table-card {
+    max-width: 100%;
+    overflow-x: auto !important;
+  }
+
+  #page-super-admin table {
+    min-width: 0 !important;
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  #page-super-admin th,
+  #page-super-admin td {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
   .modal {
     width: min(96vw, 640px) !important;
     margin: 8px !important;
