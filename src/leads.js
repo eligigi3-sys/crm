@@ -791,6 +791,9 @@ export async function handleLeads(request, env, path) {
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'products');
     if (moduleState instanceof Response) return moduleState;
 
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
+
     const tenantId = tenantCtx.tenant.id;
     const leadId = Number(leadInventoryMatch[1]);
     const lead = await getLeadByIdForTenant(leadId, tenantId, env);
@@ -836,6 +839,9 @@ export async function handleLeads(request, env, path) {
 
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'products');
     if (moduleState instanceof Response) return moduleState;
+
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
 
     const tenantId = tenantCtx.tenant.id;
     const leadId = Number(leadInventoryAllocationMatch[1]);
@@ -890,6 +896,9 @@ export async function handleLeads(request, env, path) {
 
     const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'products');
     if (moduleState instanceof Response) return moduleState;
+
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
 
     const tenantId = tenantCtx.tenant.id;
     const leadId = Number(leadInventoryAllocationCancelMatch[1]);
