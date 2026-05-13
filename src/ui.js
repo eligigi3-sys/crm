@@ -795,6 +795,12 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     min-width: 640px !important;
   }
 
+  #main,
+  .page,
+  #page-calendar {
+    min-width: 0;
+  }
+
   #page-super-admin .table-card {
     max-width: 100%;
     overflow-x: auto !important;
