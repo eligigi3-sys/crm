@@ -1448,6 +1448,9 @@ var currentOperationalUnreceivedPurchases = [];
 var currentOperationalRecentMovements = [];
 var allLeadsCache = [];
 var calYear, calMonth;
+var sessionTransitionInProgress = false;
+var sessionRevalidationInFlight = false;
+var lastSessionRevalidationAt = 0;
 var predefinedCustomerTags = [
   'לקוח חוזר', 'לקוח VIP', 'מחיר רגיש', 'דורש מעקב', 'סגירה מהירה', 'פוטנציאל גבוה',
   'ספק', 'מפיק', 'לקוח עסקי', 'לקוח פרטי', 'בעייתי', 'לא לפנות',
@@ -1744,6 +1747,20 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') { closeLeadModal(); closeDrawer(); closeCustomerModal(); closeSuperAdminTenantModal(); }
   });
+  window.addEventListener('storage', function(e) {
+    if (e.key !== 'crm_token' && e.key !== 'crm_user') return;
+    if (!token || !currentUser) return;
+    var nextToken = localStorage.getItem('crm_token');
+    var nextUserRaw = localStorage.getItem('crm_user');
+    if (nextToken === token && nextUserRaw === JSON.stringify(currentUser)) return;
+    handleExpiredSession({ message: 'ההתחברות עודכנה בחלון אחר, נא להתחבר מחדש', skipToast: true });
+  });
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) scheduleSessionRevalidation();
+  });
+  window.addEventListener('focus', function() {
+    scheduleSessionRevalidation();
+  });
   var superAdminClose = document.getElementById('super-admin-tenant-close');
   if (superAdminClose) superAdminClose.addEventListener('click', closeSuperAdminTenantModal);
   var superAdminCloseFooter = document.getElementById('super-admin-tenant-close-footer');
@@ -1800,6 +1817,8 @@ function resetSessionState() {
   localStorage.removeItem('crm_user');
   token = null;
   currentUser = null;
+  sessionRevalidationInFlight = false;
+  lastSessionRevalidationAt = 0;
   moduleStateCache = {
     loaded: false,
     byKey: {
@@ -1813,17 +1832,53 @@ function resetSessionState() {
   };
 }
 
-function handleExpiredSession() {
+function showLoggedOutState(message, options) {
+  options = options || {};
   resetSessionState();
   applySuperAdminVisibility();
   document.getElementById('login-page').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
   var errEl = document.getElementById('login-error');
   if (errEl) {
-    errEl.textContent = 'פג תוקף ההתחברות, נא להתחבר מחדש';
-    errEl.style.display = 'block';
+    if (message) {
+      errEl.textContent = message;
+      errEl.style.display = 'block';
+    } else {
+      errEl.textContent = '';
+      errEl.style.display = 'none';
+    }
   }
-  toast('פג תוקף ההתחברות, נא להתחבר מחדש', 'error');
+  if (message && !options.skipToast) {
+    toast(message, 'error');
+  }
+}
+
+function handleExpiredSession(options) {
+  options = options || {};
+  if (sessionTransitionInProgress) return;
+  sessionTransitionInProgress = true;
+  try {
+    showLoggedOutState(options.message || 'פג תוקף ההתחברות, נא להתחבר מחדש', { skipToast: !!options.skipToast });
+  } finally {
+    setTimeout(function() {
+      sessionTransitionInProgress = false;
+    }, 0);
+  }
+}
+
+function scheduleSessionRevalidation() {
+  if (!token || !currentUser) return;
+  if (document.hidden) return;
+  if (document.getElementById('app').style.display === 'none') return;
+  var now = Date.now();
+  if (sessionRevalidationInFlight) return;
+  if (now - lastSessionRevalidationAt < 5000) return;
+  sessionRevalidationInFlight = true;
+  lastSessionRevalidationAt = now;
+  apiCall('GET', '/api/auth/tenant-context').catch(function() {
+  }).finally(function() {
+    sessionRevalidationInFlight = false;
+  });
 }
 
 function apiCall(method, path, body) {
@@ -1912,15 +1967,7 @@ function showApp() {
 }
 
 function logout() {
-  resetSessionState();
-  applySuperAdminVisibility();
-  document.getElementById('login-page').style.display = 'flex';
-  document.getElementById('app').style.display = 'none';
-  var errEl = document.getElementById('login-error');
-  if (errEl) {
-    errEl.textContent = '';
-    errEl.style.display = 'none';
-  }
+  showLoggedOutState();
 }
 
 function loadSuperAdminTenants() {
