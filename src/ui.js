@@ -1542,17 +1542,19 @@ function loadModuleStates() {
     moduleStateCache.byKey = next;
     moduleStateCache.loaded = true;
     applyModuleVisibility();
+    applyShellVisibility();
   }).catch(function() {
     moduleStateCache.loaded = true;
     applyModuleVisibility();
+    applyShellVisibility();
   });
 }
 
 function applySuperAdminVisibility() {
   var roleEl = document.getElementById('user-role-text');
   if (roleEl) roleEl.textContent = isSuperAdmin() ? 'Super Admin' : 'מנהל';
-  applyShellVisibility();
   applyModuleVisibility();
+  applyShellVisibility();
 }
 
 function init() {
