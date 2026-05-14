@@ -248,9 +248,10 @@ export async function handleAdmin(request, env, path) {
           email,
           password_hash,
           role,
+          must_change_password,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, 'user', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, 'user', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `).bind(contactName, contactEmail, passwordHash).run();
 
       ownerUser = await env.DB.prepare(`
@@ -259,6 +260,13 @@ export async function handleAdmin(request, env, path) {
         WHERE id = ?
         LIMIT 1
       `).bind(createUserResult.meta.last_row_id).first();
+    } else {
+      const passwordHash = await hashPassword(initialPassword);
+      await env.DB.prepare(`
+        UPDATE users
+        SET password_hash = ?, must_change_password = 1, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(passwordHash, ownerUser.id).run();
     }
 
     await env.DB.prepare(`

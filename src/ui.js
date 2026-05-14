@@ -134,6 +134,10 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .ac-item-sub{font-size:11px;color:var(--text3);margin-top:2px}
 #login-page{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#ede9fe 0%,#f5f3ff 50%,#eff6ff 100%)}
 .login-card{background:var(--white);border:1px solid var(--border);border-radius:20px;padding:40px;width:min(390px,100%);max-width:100%;box-shadow:var(--shadow-md)}
+.force-password-page{display:none;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#ede9fe 0%,#f5f3ff 50%,#eff6ff 100%)}
+.force-password-card{background:var(--white);border:1px solid var(--border);border-radius:20px;padding:40px;width:min(440px,100%);max-width:100%;box-shadow:var(--shadow-md)}
+.force-password-title{font-size:22px;font-weight:800;color:var(--text);margin-bottom:8px;text-align:center}
+.force-password-sub{font-size:14px;color:var(--text2);line-height:1.6;text-align:center;margin-bottom:18px}
 .mobile-shell-switcher{display:none}
 .mobile-shell-switcher-inner{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
 .mobile-shell-switcher .btn{width:100%;justify-content:center}
@@ -1146,6 +1150,19 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     <button class="btn btn-primary" style="width:100%;justify-content:center;padding:11px;margin-top:6px" id="login-btn">כניסה</button>
   </div>
 </div>
+<div id="force-password-page" class="force-password-page">
+  <div class="force-password-card">
+    <div class="login-top">
+      <div class="login-icon">🔐</div>
+      <div class="force-password-title">החלפת סיסמה ראשונית</div>
+      <div class="force-password-sub">הסיסמה הראשונית שלך זמנית. יש להחליף אותה לפני הכניסה למערכת.</div>
+    </div>
+    <div class="login-error" id="force-password-error"></div>
+    <div class="form-group"><label class="form-label">סיסמה חדשה</label><input class="form-input" type="password" id="force-password-new" placeholder=""></div>
+    <div class="form-group"><label class="form-label">אישור סיסמה חדשה</label><input class="form-input" type="password" id="force-password-confirm" placeholder=""></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:11px;margin-top:6px" id="force-password-btn">החלף סיסמה</button>
+  </div>
+</div>
 <div id="app" style="display:none">
   <div id="sidebar">
     <div class="sidebar-logo">
@@ -1515,6 +1532,7 @@ var allLeadsCache = [];
 var calYear, calMonth;
 var currentTenantContext = null;
 var currentTeamMembers = [];
+var forcePasswordChangeActive = false;
 var sessionTransitionInProgress = false;
 var sessionRevalidationInFlight = false;
 var lastSessionRevalidationAt = 0;
@@ -1587,6 +1605,10 @@ function getStatusLabel(status) {
 
 function isSuperAdmin() {
   return !!(currentUser && String(currentUser.role || '').trim().toLowerCase() === 'super_admin');
+}
+
+function isForcePasswordChangeRequired() {
+  return !!(currentUser && currentUser.must_change_password === true);
 }
 
 function getTenantRole() {
@@ -1806,6 +1828,7 @@ function init() {
   if (el) el.textContent = now.toLocaleDateString('he-IL', {weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
   document.getElementById('login-btn').addEventListener('click', doLogin);
+  document.getElementById('force-password-btn').addEventListener('click', submitForcedPasswordChange);
   document.getElementById('logout-btn').addEventListener('click', logout);
   document.getElementById('logout-btn-mobile').addEventListener('click', logout);
 document.getElementById('btn-new-lead').addEventListener('click', function() {
@@ -1955,6 +1978,7 @@ function resetSessionState() {
   localStorage.removeItem('crm_user');
   token = null;
   currentUser = null;
+  forcePasswordChangeActive = false;
   sessionRevalidationInFlight = false;
   lastSessionRevalidationAt = 0;
   moduleStateCache = {
@@ -1975,6 +1999,7 @@ function showLoggedOutState(message, options) {
   resetSessionState();
   applySuperAdminVisibility();
   document.getElementById('login-page').style.display = 'flex';
+  document.getElementById('force-password-page').style.display = 'none';
   document.getElementById('app').style.display = 'none';
   var errEl = document.getElementById('login-error');
   if (errEl) {
@@ -2066,32 +2091,83 @@ function doLogin() {
     currentUser = res.user;
     localStorage.setItem('crm_token', token);
     localStorage.setItem('crm_user', JSON.stringify(currentUser));
+    if (res.must_change_password || isForcePasswordChangeRequired()) {
+      showForcePasswordChange();
+      return null;
+    }
     return loadTenantContext().catch(function() { return null; });
-  }).then(function() {
+  }).then(function(result) {
+    if (result === null && isForcePasswordChangeRequired()) return;
     showApp();
-
-setTimeout(function() {
-
-  grid.querySelectorAll('[data-shopping-id]').forEach(function(card) {
-
-    card.addEventListener('click', function() {
-
-      openShoppingList(parseInt(this.getAttribute('data-shopping-id')));
-
-    });
-
-  });
-
-}, 50);
-
-}).catch(function(e) {
+  }).catch(function(e) {
     errEl.textContent = e.message || 'שגיאה בכניסה';
     errEl.style.display = 'block';
   });
 }
 
-function showApp() {
+function showForcePasswordChange() {
+  forcePasswordChangeActive = true;
   document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('force-password-page').style.display = 'flex';
+  var errEl = document.getElementById('force-password-error');
+  if (errEl) {
+    errEl.textContent = '';
+    errEl.style.display = 'none';
+  }
+  var newEl = document.getElementById('force-password-new');
+  var confirmEl = document.getElementById('force-password-confirm');
+  if (newEl) newEl.value = '';
+  if (confirmEl) confirmEl.value = '';
+}
+
+function submitForcedPasswordChange() {
+  var errEl = document.getElementById('force-password-error');
+  var newPassword = document.getElementById('force-password-new').value || '';
+  var confirmPassword = document.getElementById('force-password-confirm').value || '';
+  if (errEl) {
+    errEl.textContent = '';
+    errEl.style.display = 'none';
+  }
+  if (!newPassword) {
+    if (errEl) { errEl.textContent = 'סיסמה חדשה חובה'; errEl.style.display = 'block'; }
+    return;
+  }
+  if (newPassword.length < 4) {
+    if (errEl) { errEl.textContent = 'הסיסמה חייבת להכיל לפחות 4 תווים'; errEl.style.display = 'block'; }
+    return;
+  }
+  if (newPassword !== confirmPassword) {
+    if (errEl) { errEl.textContent = 'אישור הסיסמה אינו תואם'; errEl.style.display = 'block'; }
+    return;
+  }
+  apiCall('POST', '/api/auth/change-password', { new_password: newPassword }).then(function(res) {
+    if (res && res.user) {
+      currentUser = res.user;
+      localStorage.setItem('crm_user', JSON.stringify(currentUser));
+    }
+    forcePasswordChangeActive = false;
+    document.getElementById('force-password-page').style.display = 'none';
+    return loadTenantContext().catch(function() { return null; });
+  }).then(function() {
+    toast('הסיסמה הוחלפה בהצלחה', 'success');
+    showApp();
+  }).catch(function(e) {
+    if (errEl) {
+      errEl.textContent = e.message || 'שגיאה בהחלפת סיסמה';
+      errEl.style.display = 'block';
+    }
+  });
+}
+
+function showApp() {
+  if (isForcePasswordChangeRequired()) {
+    showForcePasswordChange();
+    return;
+  }
+  forcePasswordChangeActive = false;
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('force-password-page').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('user-name').textContent = currentUser ? currentUser.name : '';
   document.getElementById('user-avatar').textContent = currentUser ? currentUser.name[0] : 'מ';

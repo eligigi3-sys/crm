@@ -37,6 +37,27 @@ function getBearerToken(request) {
   return match ? match[1].trim() : '';
 }
 
+function normalizePasswordInput(value, label) {
+  const password = String(value || '');
+  if (!password) throw new Error(label + ' חובה');
+  if (password.length < 4) throw new Error('הסיסמה חייבת להכיל לפחות 4 תווים');
+  return password;
+}
+
+function shouldForcePasswordChange(user) {
+  return Number(user && user.must_change_password) === 1;
+}
+
+function mapAuthUser(user) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    must_change_password: shouldForcePasswordChange(user)
+  };
+}
+
 export async function getUserById(userId, env) {
   if (!userId) return null;
   return env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
@@ -84,6 +105,10 @@ export async function requireTenantContext(request, env) {
   const user = await requireAuthUser(request, env);
   if (user instanceof Response) {
     return user;
+  }
+
+  if (shouldForcePasswordChange(user)) {
+    return json({ error: 'יש להחליף סיסמה ראשונית לפני הכניסה למערכת', must_change_password: true }, 403);
   }
 
   const memberships = await env.DB.prepare(
@@ -244,11 +269,13 @@ async function loginWithUser(user, password, env) {
     await updateUserLoginSuccess(user.id, env);
   }
 
+  const refreshedUser = await getUserById(user.id, env);
   const token = await createToken(user.id, user.email, env.JWT_SECRET);
   return {
     success: true,
     token,
-    user: { id: user.id, name: user.name, email: user.email, role: user.role }
+    must_change_password: shouldForcePasswordChange(refreshedUser || user),
+    user: mapAuthUser(refreshedUser || user)
   };
 }
 
@@ -291,6 +318,44 @@ export async function handleAuth(request, env, path) {
     const loginResult = await loginWithUser(user, password, env);
     if (!loginResult) return json({ error: 'אימייל או סיסמה שגויים' }, 401);
     return loginResult;
+  }
+
+  if (path === '/api/auth/change-password' && method === 'POST') {
+    const user = await requireAuthUser(request, env);
+    if (user instanceof Response) return user;
+
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ error: 'בקשה לא תקינה' }, 400);
+    }
+
+    const newPassword = normalizePasswordInput(body && body.new_password, 'סיסמה חדשה');
+    const currentPassword = String(body && body.current_password || '');
+    const mustChangePassword = shouldForcePasswordChange(user);
+
+    if (!mustChangePassword) {
+      if (!currentPassword) {
+        return json({ error: 'סיסמה נוכחית חובה' }, 400);
+      }
+      const verification = await verifyPassword(currentPassword, user && user.password_hash);
+      if (!verification.ok) {
+        return json({ error: 'הסיסמה הנוכחית שגויה' }, 400);
+      }
+    }
+
+    const nextHash = await hashPassword(newPassword);
+    await env.DB.prepare(
+      'UPDATE users SET password_hash = ?, must_change_password = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+    ).bind(nextHash, user.id).run();
+
+    const updatedUser = await getUserById(user.id, env);
+    return {
+      success: true,
+      must_change_password: false,
+      user: mapAuthUser(updatedUser || user)
+    };
   }
 
   if (path === '/api/auth/verify' && method === 'POST') {
