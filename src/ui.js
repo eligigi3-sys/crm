@@ -1532,6 +1532,7 @@ var allLeadsCache = [];
 var calYear, calMonth;
 var currentTenantContext = null;
 var currentTeamMembers = [];
+var currentSuperAdminTenantDetail = null;
 var forcePasswordChangeActive = false;
 var sessionTransitionInProgress = false;
 var sessionRevalidationInFlight = false;
@@ -2509,7 +2510,75 @@ function updateTenantStatus(tenantId, action) {
 
 function closeSuperAdminTenantModal() {
   var modal = document.getElementById('super-admin-tenant-modal');
+  currentSuperAdminTenantDetail = null;
   if (modal) modal.classList.remove('open');
+}
+
+function getAdminModuleLabel(moduleKey) {
+  var map = {
+    leads: 'לידים / אירועים',
+    contacts: 'לקוחות / אנשי קשר',
+    employees: 'עובדים',
+    products: 'מוצרים ומלאי',
+    shopping: 'קניות / רכישות',
+    reports: 'דוחות'
+  };
+  return map[moduleKey] || moduleKey;
+}
+
+function saveSuperAdminTenantDetails(tenantId) {
+  var body = {
+    name: (document.getElementById('super-admin-edit-name').value || '').trim(),
+    contact_name: (document.getElementById('super-admin-edit-contact-name').value || '').trim(),
+    contact_phone: (document.getElementById('super-admin-edit-contact-phone').value || '').trim(),
+    contact_email: (document.getElementById('super-admin-edit-contact-email').value || '').trim(),
+    status: (document.getElementById('super-admin-edit-status').value || '').trim()
+  };
+  if (!body.name) { toast('שם עסק חובה', 'error'); return; }
+  if (!body.contact_name) { toast('שם איש קשר חובה', 'error'); return; }
+  if (!body.contact_phone) { toast('טלפון איש קשר חובה', 'error'); return; }
+  if (!body.contact_email) { toast('אימייל איש קשר חובה', 'error'); return; }
+  apiCall('PUT', '/api/admin/tenants/' + tenantId, body).then(function() {
+    toast('פרטי העסק עודכנו', 'success');
+    loadSuperAdminTenants();
+    openSuperAdminTenantModal(tenantId);
+  }).catch(function(err) {
+    toast(err.message || 'שגיאה בעדכון פרטי העסק', 'error');
+  });
+}
+
+function saveSuperAdminTenantModules(tenantId) {
+  var moduleInputs = Array.prototype.slice.call(document.querySelectorAll('#super-admin-tenant-modules-form input[data-module-key]'));
+  var body = {
+    modules: moduleInputs.map(function(input) {
+      return {
+        module_key: input.getAttribute('data-module-key'),
+        is_enabled: !!input.checked
+      };
+    })
+  };
+  apiCall('PUT', '/api/admin/tenants/' + tenantId + '/modules', body).then(function() {
+    toast('המודולים עודכנו', 'success');
+    openSuperAdminTenantModal(tenantId);
+  }).catch(function(err) {
+    toast(err.message || 'שגיאה בעדכון מודולים', 'error');
+  });
+}
+
+function resetSuperAdminTenantOwnerPassword(tenantId) {
+  var password = window.prompt('הכנס סיסמה זמנית חדשה לבעלים הראשי');
+  if (password === null) return;
+  password = String(password || '');
+  if (!password) {
+    toast('סיסמה זמנית חובה', 'error');
+    return;
+  }
+  apiCall('POST', '/api/admin/tenants/' + tenantId + '/owner/reset-password', { password: password }).then(function() {
+    toast('הסיסמה הזמנית של הבעלים אופסה', 'success');
+    openSuperAdminTenantModal(tenantId);
+  }).catch(function(err) {
+    toast(err.message || 'שגיאה באיפוס סיסמת בעלים', 'error');
+  });
 }
 
 function openSuperAdminTenantModal(tenantId) {
@@ -2525,29 +2594,59 @@ function openSuperAdminTenantModal(tenantId) {
     apiCall('GET', '/api/admin/tenants/' + tenantId + '/modules')
   ]).then(function(results) {
     var tenant = results[0].tenant || {};
+    var owner = results[0].owner || null;
     var modules = results[1].modules || [];
+    currentSuperAdminTenantDetail = { tenant: tenant, owner: owner, modules: modules };
     title.textContent = (tenant.name || 'Tenant') + ' · #' + tenant.id;
     body.innerHTML = '' +
-      '<div class="info-grid">' +
-        '<div class="info-row"><span class="info-label">ID</span><span class="info-value">' + escapeHtml(String(tenant.id || '—')) + '</span></div>' +
-        '<div class="info-row"><span class="info-label">Slug</span><span class="info-value">' + escapeHtml(tenant.slug || '—') + '</span></div>' +
-        '<div class="info-row"><span class="info-label">סטטוס</span><span class="info-value">' + escapeHtml(tenant.status || '—') + '</span></div>' +
+      '<div class="form-section">פרטי עסק</div>' +
+      '<div class="form-row-3">' +
+        '<div class="form-group"><label class="form-label">שם העסק</label><input class="form-input" id="super-admin-edit-name" value="' + escapeHtml(tenant.name || '') + '"></div>' +
+        '<div class="form-group"><label class="form-label">Slug</label><input class="form-input" value="' + escapeHtml(tenant.slug || '') + '" disabled></div>' +
+        '<div class="form-group"><label class="form-label">סטטוס</label><select class="form-select" id="super-admin-edit-status"><option value="active"' + (tenant.status === 'active' ? ' selected' : '') + '>פעיל</option><option value="suspended"' + (tenant.status === 'suspended' ? ' selected' : '') + '>מושהה</option></select></div>' +
+      '</div>' +
+      '<div class="form-row-3">' +
+        '<div class="form-group"><label class="form-label">שם איש קשר</label><input class="form-input" id="super-admin-edit-contact-name" value="' + escapeHtml(tenant.contact_name || '') + '"></div>' +
+        '<div class="form-group"><label class="form-label">טלפון איש קשר</label><input class="form-input" id="super-admin-edit-contact-phone" value="' + escapeHtml(tenant.contact_phone || '') + '"></div>' +
+        '<div class="form-group"><label class="form-label">אימייל איש קשר</label><input class="form-input" id="super-admin-edit-contact-email" value="' + escapeHtml(tenant.contact_email || '') + '"></div>' +
+      '</div>' +
+      '<div class="info-grid" style="margin-bottom:12px">' +
         '<div class="info-row"><span class="info-label">Timezone</span><span class="info-value">' + escapeHtml(tenant.timezone || '—') + '</span></div>' +
         '<div class="info-row"><span class="info-label">Currency</span><span class="info-value">' + escapeHtml(tenant.currency || '—') + '</span></div>' +
         '<div class="info-row"><span class="info-label">Locale</span><span class="info-value">' + escapeHtml(tenant.locale || '—') + '</span></div>' +
-        '<div class="info-row"><span class="info-label">איש קשר</span><span class="info-value">' + escapeHtml(tenant.contact_name || '—') + '</span></div>' +
-        '<div class="info-row"><span class="info-label">טלפון</span><span class="info-value">' + escapeHtml(tenant.contact_phone || '—') + '</span></div>' +
-        '<div class="info-row"><span class="info-label">אימייל</span><span class="info-value">' + escapeHtml(tenant.contact_email || '—') + '</span></div>' +
       '</div>' +
-      '<div class="form-section">Modules</div>' +
-      '<div class="admin-module-grid">' + modules.map(function(module) {
-        var enabled = module.is_enabled === true;
-        return '<div class="admin-module-card">' +
-          '<div class="admin-module-title">' + escapeHtml(module.module_key) + '</div>' +
-          '<div><span class="badge ' + (enabled ? 'badge-green' : 'badge-gray') + '">' + (enabled ? 'Enabled' : 'Disabled') + '</span></div>' +
-          '<div class="admin-module-sub">' + escapeHtml(module.source === 'default_enabled' ? 'default_enabled' : 'configured') + '</div>' +
-        '</div>';
-      }).join('') + '</div>';
+      '<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" id="super-admin-save-tenant">שמור פרטי עסק</button></div>' +
+      '<div class="form-section">בעלים ראשי</div>' +
+      (owner ?
+        '<div class="info-grid">' +
+          '<div class="info-row"><span class="info-label">שם</span><span class="info-value">' + escapeHtml(owner.name || '—') + '</span></div>' +
+          '<div class="info-row"><span class="info-label">אימייל</span><span class="info-value">' + escapeHtml(owner.email || '—') + '</span></div>' +
+          '<div class="info-row"><span class="info-label">סטטוס שיוך</span><span class="info-value">' + escapeHtml(owner.membership_status || '—') + '</span></div>' +
+          '<div class="info-row"><span class="info-label">כניסה אחרונה</span><span class="info-value">' + escapeHtml(formatDate(owner.last_login_at) || '—') + '</span></div>' +
+          '<div class="info-row"><span class="info-label">חובת החלפת סיסמה</span><span class="info-value">' + escapeHtml(owner.must_change_password ? 'כן' : 'לא') + '</span></div>' +
+        '</div>' +
+        '<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn btn-secondary" id="super-admin-reset-owner-password">איפוס סיסמה זמנית לבעלים</button></div>'
+      : '<div class="dash-empty">לא נמצא בעלים ראשי</div>') +
+      '<div class="form-section">מודולים</div>' +
+      '<div class="check-grid" id="super-admin-tenant-modules-form">' + modules.map(function(module) {
+        return '<label class="check-item' + (module.is_enabled ? ' checked' : '') + '"><input type="checkbox" data-module-key="' + escapeHtml(module.module_key) + '"' + (module.is_enabled ? ' checked' : '') + '> ' + escapeHtml(getAdminModuleLabel(module.module_key)) + '</label>';
+      }).join('') + '</div>' +
+      '<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn btn-primary" id="super-admin-save-modules">שמור מודולים</button></div>';
+
+    var saveTenantBtn = document.getElementById('super-admin-save-tenant');
+    if (saveTenantBtn) saveTenantBtn.onclick = function() { saveSuperAdminTenantDetails(tenantId); };
+    var saveModulesBtn = document.getElementById('super-admin-save-modules');
+    if (saveModulesBtn) saveModulesBtn.onclick = function() { saveSuperAdminTenantModules(tenantId); };
+    var resetOwnerPasswordBtn = document.getElementById('super-admin-reset-owner-password');
+    if (resetOwnerPasswordBtn) resetOwnerPasswordBtn.onclick = function() { resetSuperAdminTenantOwnerPassword(tenantId); };
+    body.querySelectorAll('#super-admin-tenant-modules-form .check-item').forEach(function(el) {
+      el.addEventListener('click', function(e) {
+        if (e.target && e.target.tagName === 'INPUT') return;
+        var cb = this.querySelector('input');
+        cb.checked = !cb.checked;
+        this.classList.toggle('checked', cb.checked);
+      });
+    });
   }).catch(function(err) {
     body.innerHTML = '<div class="dash-empty">' + escapeHtml(err.message || 'שגיאה בטעינת tenant') + '</div>';
   });

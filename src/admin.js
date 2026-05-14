@@ -52,6 +52,27 @@ function normalizeInitialPassword(value) {
   return password;
 }
 
+function normalizeTenantStatus(value) {
+  const status = String(value || '').trim().toLowerCase();
+  if (status !== 'active' && status !== 'suspended') {
+    throw new Error('סטטוס עסק לא תקין');
+  }
+  return status;
+}
+
+function mapOwnerRow(row) {
+  if (!row) return null;
+  return {
+    user_id: row.user_id,
+    membership_id: row.membership_id,
+    name: row.display_name || row.name || null,
+    email: row.email || null,
+    membership_status: row.membership_status || null,
+    last_login_at: row.last_login_at || null,
+    must_change_password: Number(row.must_change_password) === 1
+  };
+}
+
 function normalizeModuleKey(value) {
   const moduleKey = String(value || '').trim().toLowerCase();
   if (!MODULE_KEY_SET.has(moduleKey)) throw new Error('module_key לא תקין');
@@ -143,6 +164,28 @@ async function getActiveMembershipCountForUser(userId, env) {
       AND t.status = 'active'
   `).bind(userId).first();
   return Number(row && row.count ? row.count : 0);
+}
+
+async function getPrimaryOwner(tenantId, env) {
+  return env.DB.prepare(`
+    SELECT
+      tm.id AS membership_id,
+      tm.user_id,
+      tm.status AS membership_status,
+      u.name,
+      u.display_name,
+      u.email,
+      u.last_login_at,
+      u.must_change_password
+    FROM tenant_memberships tm
+    JOIN users u ON u.id = tm.user_id
+    WHERE tm.tenant_id = ?
+      AND tm.role = 'owner'
+    ORDER BY
+      CASE tm.status WHEN 'active' THEN 1 ELSE 2 END,
+      tm.id ASC
+    LIMIT 1
+  `).bind(tenantId).first();
 }
 
 async function getEffectiveTenantModules(tenantId, env) {
@@ -321,7 +364,47 @@ export async function handleAdmin(request, env, path) {
     const tenantId = Number(tenantMatch[1]);
     const tenant = await getTenantById(tenantId, env);
     if (!tenant) throw new Error('Tenant not found');
-    return { tenant: mapTenantRow(tenant) };
+    return {
+      tenant: mapTenantRow(tenant),
+      owner: mapOwnerRow(await getPrimaryOwner(tenantId, env))
+    };
+  }
+
+  if (tenantMatch && method === 'PUT') {
+    const tenantId = Number(tenantMatch[1]);
+    const tenant = await getTenantById(tenantId, env);
+    if (!tenant) throw new Error('Tenant not found');
+
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      throw new Error('בקשה לא תקינה');
+    }
+
+    const name = normalizeTenantName(body.name);
+    const contactName = normalizeRequiredText(body.contact_name, 'שם איש קשר');
+    const contactPhone = normalizeRequiredText(body.contact_phone, 'טלפון איש קשר');
+    const contactEmail = normalizeContactEmail(body.contact_email);
+    const status = normalizeTenantStatus(body.status || tenant.status);
+
+    await env.DB.prepare(`
+      UPDATE tenants
+      SET name = ?,
+          contact_name = ?,
+          contact_phone = ?,
+          contact_email = ?,
+          status = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(name, contactName, contactPhone, contactEmail, status, tenantId).run();
+
+    const updatedTenant = await getTenantById(tenantId, env);
+    return {
+      success: true,
+      tenant: mapTenantRow(updatedTenant),
+      owner: mapOwnerRow(await getPrimaryOwner(tenantId, env))
+    };
   }
 
   const tenantActivateMatch = path.match(/^\/api\/admin\/tenants\/(\d+)\/activate$/);
@@ -406,6 +489,38 @@ export async function handleAdmin(request, env, path) {
       success: true,
       tenant: mapTenantRow(tenant),
       modules: await getEffectiveTenantModules(tenantId, env)
+    };
+  }
+
+  const tenantOwnerResetMatch = path.match(/^\/api\/admin\/tenants\/(\d+)\/owner\/reset-password$/);
+  if (tenantOwnerResetMatch && method === 'POST') {
+    const tenantId = Number(tenantOwnerResetMatch[1]);
+    const tenant = await getTenantById(tenantId, env);
+    if (!tenant) throw new Error('Tenant not found');
+
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      throw new Error('בקשה לא תקינה');
+    }
+
+    const newPassword = normalizeInitialPassword(body && body.password);
+    const owner = await getPrimaryOwner(tenantId, env);
+    if (!owner || !owner.user_id) throw new Error('לא נמצא בעלים ראשי לעסק הזה');
+
+    const passwordHash = await hashPassword(newPassword);
+    await env.DB.prepare(`
+      UPDATE users
+      SET password_hash = ?,
+          must_change_password = 1,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(passwordHash, owner.user_id).run();
+
+    return {
+      success: true,
+      owner: mapOwnerRow(await getPrimaryOwner(tenantId, env))
     };
   }
 
