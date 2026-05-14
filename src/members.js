@@ -1,4 +1,5 @@
 import { requireTenantContext, assertTenantRole, normalizeTenantRole } from './auth.js';
+import { hashPassword } from './passwords.js';
 
 function json(body, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {
@@ -224,6 +225,7 @@ export async function handleMembers(request, env, path) {
         return json({ error: 'למשתמש כבר קיים שיוך לעסק הזה' }, 409);
       }
     } else {
+      const passwordHash = await hashPassword(parsed.password);
       const createUserResult = await env.DB.prepare(
         `INSERT INTO users (
            name,
@@ -233,7 +235,7 @@ export async function handleMembers(request, env, path) {
            created_at,
            updated_at
          ) VALUES (?, ?, ?, 'user', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
-      ).bind(parsed.name, parsed.email, parsed.password).run();
+      ).bind(parsed.name, parsed.email, passwordHash).run();
 
       user = await env.DB.prepare(
         `SELECT id, name, display_name, email, role, status

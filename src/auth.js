@@ -1,3 +1,5 @@
+import { hashPassword, verifyPassword } from './passwords.js';
+
 function json(body, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {
     status,
@@ -206,6 +208,50 @@ async function getEffectiveTenantModules(tenantId, env) {
   }));
 }
 
+async function updateUserLoginSuccess(userId, env, options = {}) {
+  const nextHash = options.passwordHash;
+  try {
+    if (nextHash) {
+      await env.DB.prepare(
+        'UPDATE users SET password_hash = ?, last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+      ).bind(nextHash, userId).run();
+      return;
+    }
+
+    await env.DB.prepare(
+      'UPDATE users SET last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+    ).bind(userId).run();
+  } catch {
+    try {
+      if (nextHash) {
+        await env.DB.prepare(
+          'UPDATE users SET password_hash = ? WHERE id = ?'
+        ).bind(nextHash, userId).run();
+      }
+    } catch {
+    }
+  }
+}
+
+async function loginWithUser(user, password, env) {
+  const verification = await verifyPassword(password, user && user.password_hash);
+  if (!verification.ok) return null;
+
+  if (verification.needsUpgrade) {
+    const nextHash = await hashPassword(password);
+    await updateUserLoginSuccess(user.id, env, { passwordHash: nextHash });
+  } else {
+    await updateUserLoginSuccess(user.id, env);
+  }
+
+  const token = await createToken(user.id, user.email, env.JWT_SECRET);
+  return {
+    success: true,
+    token,
+    user: { id: user.id, name: user.name, email: user.email, role: user.role }
+  };
+}
+
 export async function handleAuth(request, env, path) {
   const method = request.method;
 
@@ -237,24 +283,14 @@ export async function handleAuth(request, env, path) {
         'SELECT * FROM users WHERE email = ?'
       ).bind(email).first();
       if (!user2) return json({ error: 'אימייל או סיסמה שגויים' }, 401);
-      if (user2.password_hash !== password) return json({ error: 'אימייל או סיסמה שגויים' }, 401);
-      const token = await createToken(user2.id, user2.email, env.JWT_SECRET);
-      return {
-        success: true,
-        token,
-        user: { id: user2.id, name: user2.name, email: user2.email, role: user2.role }
-      };
+      const loginResult = await loginWithUser(user2, password, env);
+      if (!loginResult) return json({ error: 'אימייל או סיסמה שגויים' }, 401);
+      return loginResult;
     }
 
-    if (user.password_hash !== password) {
-      return json({ error: 'אימייל או סיסמה שגויים' }, 401);
-    }
-
-    const token = await createToken(user.id, user.email, env.JWT_SECRET);
-    return {
-      success: true, token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role }
-    };
+    const loginResult = await loginWithUser(user, password, env);
+    if (!loginResult) return json({ error: 'אימייל או סיסמה שגויים' }, 401);
+    return loginResult;
   }
 
   if (path === '/api/auth/verify' && method === 'POST') {
