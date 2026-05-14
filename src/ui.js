@@ -102,6 +102,30 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .admin-module-card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px}
 .admin-module-title{font-size:12px;font-weight:700;color:var(--text);margin-bottom:5px}
 .admin-module-sub{font-size:11px;color:var(--text3)}
+.super-admin-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,#faf8ff 0%,#fff 100%)}
+.super-admin-summary-title{font-size:14px;font-weight:800;color:var(--text)}
+.super-admin-summary-sub{font-size:12px;color:var(--text3);margin-top:4px}
+.super-admin-list-status{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:800}
+.super-admin-list-status.active{background:var(--green-light);color:var(--green)}
+.super-admin-list-status.suspended{background:var(--orange-light);color:var(--orange)}
+.super-admin-modal{width:760px;max-width:96vw}
+.super-admin-modal .modal-body{padding:20px 22px 22px}
+.super-admin-section{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:14px 14px 12px;margin-bottom:14px;box-shadow:0 1px 2px rgba(15,23,42,0.04)}
+.super-admin-section:last-child{margin-bottom:0}
+.super-admin-section-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.super-admin-section-title{font-size:13px;font-weight:800;color:var(--text)}
+.super-admin-section-sub{font-size:11px;color:var(--text3);margin-top:3px}
+.super-admin-action-row{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:12px}
+.super-admin-action-row .btn{min-height:38px}
+.super-admin-primary-action{min-width:128px}
+.super-admin-danger-soft{background:#fff7ed;border:1px solid rgba(234,88,12,0.25);color:#c2410c}
+.super-admin-danger-soft:hover{background:#ffedd5}
+.super-admin-owner-grid,.super-admin-meta-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.super-admin-info-card{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:10px 12px}
+.super-admin-info-label{font-size:11px;font-weight:700;color:var(--text3);margin-bottom:4px}
+.super-admin-info-value{font-size:13px;font-weight:700;color:var(--text);word-break:break-word}
+.super-admin-audit-empty{padding:18px 12px;text-align:center;border:1px dashed var(--border);border-radius:12px;color:var(--text3);font-size:12px;background:var(--bg)}
+.super-admin-loading{padding:30px 16px;text-align:center;color:var(--text3);font-size:13px}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
 .modal-overlay.open{display:flex}
 .modal{background:var(--white);border-radius:16px;width:620px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:var(--shadow-md)}
@@ -110,7 +134,7 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3);padding:4px;border-radius:6px}
 .modal-close:hover{background:var(--bg)}
 .modal-body{padding:18px 24px}
-.modal-footer{padding:14px 24px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;position:sticky;bottom:0;background:var(--white)}
+.modal-footer{padding:14px 24px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;position:sticky;bottom:0;background:var(--white);flex-wrap:wrap}
 .form-group{margin-bottom:13px}
 .form-label{display:block;font-size:11px;color:var(--text2);margin-bottom:4px;font-weight:700}
 .form-input,.form-select,.form-textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 13px;font-family:var(--font);font-size:13px;color:var(--text);outline:none;direction:rtl;transition:all 0.12s}
@@ -1142,6 +1166,12 @@ tr:hover td{background:#fafbfc;cursor:pointer}
   .team-grid{grid-template-columns:1fr}
   .team-card{padding:14px}
   .team-card-actions .btn{flex:1 1 calc(50% - 8px);justify-content:center}
+  .super-admin-summary{align-items:flex-start}
+  .super-admin-modal{width:96vw;max-height:94vh}
+  .super-admin-modal .modal-header,.super-admin-modal .modal-body,.super-admin-modal .modal-footer{padding-left:14px;padding-right:14px}
+  .super-admin-owner-grid,.super-admin-meta-grid,.check-grid{grid-template-columns:1fr}
+  .super-admin-action-row .btn,.super-admin-modal .modal-footer .btn{width:100%;justify-content:center}
+  .super-admin-section{padding:12px}
 }
 
 </style>
@@ -1391,6 +1421,12 @@ id="customers-search">
         <button class="btn btn-primary" id="super-admin-open-create-modal">פתיחת עסק חדש</button>
       </div>
       <div class="table-card">
+        <div class="super-admin-summary">
+          <div>
+            <div class="super-admin-summary-title">ניהול עסקים ומודולים</div>
+            <div class="super-admin-summary-sub">פתח עסק חדש, ערוך פרטי עסק, נהל מודולים ובצע פעולות בעלים מתוך מסך אחד.</div>
+          </div>
+        </div>
         <table>
           <thead><tr><th>ID</th><th>שם</th><th>Slug</th><th>סטטוס</th><th>נוצר</th><th></th></tr></thead>
           <tbody id="super-admin-tenants-body"><tr class="empty-row"><td colspan="6">טוען...</td></tr></tbody>
@@ -1400,20 +1436,33 @@ id="customers-search">
   </div>
 </div>
 <div class="modal-overlay" id="super-admin-create-modal">
-  <div class="modal" style="width:760px">
+  <div class="modal super-admin-modal">
     <div class="modal-header"><h2>פתיחת עסק חדש</h2><button class="modal-close" id="super-admin-create-close">✕</button></div>
     <div class="modal-body">
-      <div class="form-row" style="margin-bottom:10px">
-        <div class="form-group" style="margin-bottom:0"><label class="form-label">שם העסק *</label><input class="form-input" id="super-admin-create-name" placeholder="שם העסק"></div>
-        <div class="form-group" style="margin-bottom:0"><label class="form-label">שם איש קשר *</label><input class="form-input" id="super-admin-create-contact-name" placeholder="ישראל ישראלי"></div>
+      <div class="super-admin-section">
+        <div class="super-admin-section-header">
+          <div>
+            <div class="super-admin-section-title">פרטי העסק והבעלים</div>
+            <div class="super-admin-section-sub">מלא את הפרטים הבסיסיים בלבד. כתובת המערכת והגדרות ברירת המחדל ייווצרו אוטומטית.</div>
+          </div>
+        </div>
+        <div class="form-row" style="margin-bottom:10px">
+          <div class="form-group" style="margin-bottom:0"><label class="form-label">שם העסק *</label><input class="form-input" id="super-admin-create-name" placeholder="שם העסק"></div>
+          <div class="form-group" style="margin-bottom:0"><label class="form-label">שם איש קשר *</label><input class="form-input" id="super-admin-create-contact-name" placeholder="ישראל ישראלי"></div>
+        </div>
+        <div class="form-row" style="margin-bottom:10px">
+          <div class="form-group" style="margin-bottom:0"><label class="form-label">טלפון איש קשר *</label><input class="form-input" id="super-admin-create-contact-phone" placeholder="050-0000000" type="tel"></div>
+          <div class="form-group" style="margin-bottom:0"><label class="form-label">אימייל איש קשר *</label><input class="form-input" id="super-admin-create-contact-email" placeholder="owner@example.com" type="email"></div>
+        </div>
+        <div class="form-group" style="margin-bottom:0"><label class="form-label">סיסמה ראשונית *</label><input class="form-input" id="super-admin-create-password" placeholder="סיסמה ראשונית" type="password"></div>
       </div>
-      <div class="form-row" style="margin-bottom:10px">
-        <div class="form-group" style="margin-bottom:0"><label class="form-label">טלפון איש קשר *</label><input class="form-input" id="super-admin-create-contact-phone" placeholder="050-0000000" type="tel"></div>
-        <div class="form-group" style="margin-bottom:0"><label class="form-label">אימייל איש קשר *</label><input class="form-input" id="super-admin-create-contact-email" placeholder="owner@example.com" type="email"></div>
-      </div>
-      <div class="form-group" style="margin-bottom:10px"><label class="form-label">סיסמה ראשונית *</label><input class="form-input" id="super-admin-create-password" placeholder="סיסמה ראשונית" type="password"></div>
-      <div class="form-group" style="margin-bottom:0">
-        <label class="form-label">מודולים פעילים</label>
+      <div class="super-admin-section" style="margin-bottom:0">
+        <div class="super-admin-section-header">
+          <div>
+            <div class="super-admin-section-title">מודולים פעילים</div>
+            <div class="super-admin-section-sub">בחר אילו אזורים יהיו זמינים לבעל העסק מיד אחרי ההקמה.</div>
+          </div>
+        </div>
         <div class="check-grid" id="super-admin-create-modules">
           <label class="module-toggle checked"><input type="checkbox" data-module-key="leads" checked><span class="module-toggle-text"><span class="module-toggle-title">לידים / אירועים</span><span class="module-toggle-status">פעיל</span></span><span class="module-toggle-pill">ON</span></label>
           <label class="module-toggle checked"><input type="checkbox" data-module-key="contacts" checked><span class="module-toggle-text"><span class="module-toggle-title">לקוחות / אנשי קשר</span><span class="module-toggle-status">פעיל</span></span><span class="module-toggle-pill">ON</span></label>
@@ -1424,11 +1473,11 @@ id="customers-search">
         </div>
       </div>
     </div>
-    <div class="modal-footer"><button class="btn btn-secondary" id="super-admin-create-cancel">ביטול</button><button class="btn btn-primary" id="super-admin-create-btn">צור עסק</button></div>
+    <div class="modal-footer"><button class="btn btn-secondary" id="super-admin-create-cancel">ביטול</button><button class="btn btn-primary super-admin-primary-action" id="super-admin-create-btn">צור עסק</button></div>
   </div>
 </div>
 <div class="modal-overlay" id="super-admin-tenant-modal">
-  <div class="modal" style="width:700px">
+  <div class="modal super-admin-modal">
     <div class="modal-header"><h2 id="super-admin-tenant-title">Tenant Details</h2><button class="modal-close" id="super-admin-tenant-close">✕</button></div>
     <div class="modal-body" id="super-admin-tenant-body">טוען...</div>
     <div class="modal-footer"><button class="btn btn-secondary" id="super-admin-tenant-close-footer">סגור</button></div>
@@ -2435,7 +2484,7 @@ function reactivateTeamMember(membershipId) {
 function loadSuperAdminTenants() {
   var body = document.getElementById('super-admin-tenants-body');
   if (!body) return;
-  body.innerHTML = '<tr class="empty-row"><td colspan="6">טוען...</td></tr>';
+  body.innerHTML = '<tr class="empty-row"><td colspan="6">טוען עסקים...</td></tr>';
   apiCall('GET', '/api/admin/tenants').then(function(data) {
     var tenants = data.tenants || [];
     if (!tenants.length) {
@@ -2443,10 +2492,12 @@ function loadSuperAdminTenants() {
       return;
     }
     body.innerHTML = tenants.map(function(t) {
-      var actionBtn = t.status === 'suspended'
-        ? '<button class="btn btn-secondary btn-sm" data-tenant-activate="' + t.id + '">Activate</button>'
-        : '<button class="btn btn-danger btn-sm" data-tenant-suspend="' + t.id + '">Suspend</button>';
-      return '<tr data-tenant-id="' + t.id + '"><td>' + t.id + '</td><td class="bold">' + escapeHtml(t.name || '—') + '</td><td>' + escapeHtml(t.slug || '—') + '</td><td>' + escapeHtml(t.status || '—') + '</td><td>' + escapeHtml(formatDate(t.created_at) || '—') + '</td><td>' + actionBtn + '</td></tr>';
+      var isSuspended = t.status === 'suspended';
+      var actionBtn = isSuspended
+        ? '<button class="btn btn-secondary btn-sm" data-tenant-activate="' + t.id + '">הפעל</button>'
+        : '<button class="btn btn-danger btn-sm" data-tenant-suspend="' + t.id + '">השהה</button>';
+      var statusBadge = '<span class="super-admin-list-status ' + (isSuspended ? 'suspended' : 'active') + '">' + escapeHtml(isSuspended ? 'מושהה' : 'פעיל') + '</span>';
+      return '<tr data-tenant-id="' + t.id + '"><td>' + t.id + '</td><td class="bold">' + escapeHtml(t.name || '—') + '</td><td>' + escapeHtml(t.slug || '—') + '</td><td>' + statusBadge + '</td><td>' + escapeHtml(formatDate(t.created_at) || '—') + '</td><td>' + actionBtn + '</td></tr>';
     }).join('');
     body.querySelectorAll('tr[data-tenant-id]').forEach(function(row) {
       row.addEventListener('click', function() {
@@ -2649,7 +2700,7 @@ function openSuperAdminTenantModal(tenantId) {
   var body = document.getElementById('super-admin-tenant-body');
   if (!modal || !title || !body) return;
   title.textContent = 'Tenant #' + tenantId;
-  body.innerHTML = '<div class="dash-empty">טוען...</div>';
+  body.innerHTML = '<div class="super-admin-loading">טוען פרטי עסק...</div>';
   modal.classList.add('open');
   Promise.all([
     apiCall('GET', '/api/admin/tenants/' + tenantId),
@@ -2662,40 +2713,55 @@ function openSuperAdminTenantModal(tenantId) {
     currentSuperAdminTenantDetail = { tenant: tenant, owner: owner, modules: modules, audit_logs: auditLogs };
     title.textContent = (tenant.name || 'Tenant') + ' · #' + tenant.id;
     body.innerHTML = '' +
-      '<div class="form-section">פרטי עסק</div>' +
-      '<div class="form-row-3">' +
-        '<div class="form-group"><label class="form-label">שם העסק</label><input class="form-input" id="super-admin-edit-name" value="' + escapeHtml(tenant.name || '') + '"></div>' +
-        '<div class="form-group"><label class="form-label">Slug</label><input class="form-input" value="' + escapeHtml(tenant.slug || '') + '" disabled></div>' +
-        '<div class="form-group"><label class="form-label">סטטוס</label><select class="form-select" id="super-admin-edit-status"><option value="active"' + (tenant.status === 'active' ? ' selected' : '') + '>פעיל</option><option value="suspended"' + (tenant.status === 'suspended' ? ' selected' : '') + '>מושהה</option></select></div>' +
-      '</div>' +
-      '<div class="form-row-3">' +
-        '<div class="form-group"><label class="form-label">שם איש קשר</label><input class="form-input" id="super-admin-edit-contact-name" value="' + escapeHtml(tenant.contact_name || '') + '"></div>' +
-        '<div class="form-group"><label class="form-label">טלפון איש קשר</label><input class="form-input" id="super-admin-edit-contact-phone" value="' + escapeHtml(tenant.contact_phone || '') + '"></div>' +
-        '<div class="form-group"><label class="form-label">אימייל איש קשר</label><input class="form-input" id="super-admin-edit-contact-email" value="' + escapeHtml(tenant.contact_email || '') + '"></div>' +
-      '</div>' +
-      '<div class="info-grid" style="margin-bottom:12px">' +
-        '<div class="info-row"><span class="info-label">Timezone</span><span class="info-value">' + escapeHtml(tenant.timezone || '—') + '</span></div>' +
-        '<div class="info-row"><span class="info-label">Currency</span><span class="info-value">' + escapeHtml(tenant.currency || '—') + '</span></div>' +
-        '<div class="info-row"><span class="info-label">Locale</span><span class="info-value">' + escapeHtml(tenant.locale || '—') + '</span></div>' +
-      '</div>' +
-      '<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" id="super-admin-save-tenant">שמור פרטי עסק</button></div>' +
-      '<div class="form-section">בעלים ראשי</div>' +
-      (owner ?
-        '<div class="info-grid">' +
-          '<div class="info-row"><span class="info-label">שם</span><span class="info-value">' + escapeHtml(owner.name || '—') + '</span></div>' +
-          '<div class="info-row"><span class="info-label">אימייל</span><span class="info-value">' + escapeHtml(owner.email || '—') + '</span></div>' +
-          '<div class="info-row"><span class="info-label">סטטוס שיוך</span><span class="info-value">' + escapeHtml(owner.membership_status || '—') + '</span></div>' +
-          '<div class="info-row"><span class="info-label">כניסה אחרונה</span><span class="info-value">' + escapeHtml(formatDate(owner.last_login_at) || '—') + '</span></div>' +
-          '<div class="info-row"><span class="info-label">חובת החלפת סיסמה</span><span class="info-value">' + escapeHtml(owner.must_change_password ? 'כן' : 'לא') + '</span></div>' +
+      '<div class="super-admin-section">' +
+        '<div class="super-admin-section-header">' +
+          '<div><div class="super-admin-section-title">פרטי העסק</div><div class="super-admin-section-sub">ערוך את פרטי העסק, פרטי הקשר וסטטוס הפעילות.</div></div>' +
         '</div>' +
-        '<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn btn-secondary" id="super-admin-reset-owner-password">איפוס סיסמה זמנית לבעלים</button></div>'
-      : '<div class="dash-empty">לא נמצא בעלים ראשי</div>') +
-      '<div class="form-section">מודולים</div>' +
-      '<div class="check-grid" id="super-admin-tenant-modules-form">' + modules.map(function(module) {
+        '<div class="form-row-3">' +
+          '<div class="form-group"><label class="form-label">שם העסק</label><input class="form-input" id="super-admin-edit-name" value="' + escapeHtml(tenant.name || '') + '"></div>' +
+          '<div class="form-group"><label class="form-label">Slug</label><input class="form-input" value="' + escapeHtml(tenant.slug || '') + '" disabled></div>' +
+          '<div class="form-group"><label class="form-label">סטטוס</label><select class="form-select" id="super-admin-edit-status"><option value="active"' + (tenant.status === 'active' ? ' selected' : '') + '>פעיל</option><option value="suspended"' + (tenant.status === 'suspended' ? ' selected' : '') + '>מושהה</option></select></div>' +
+        '</div>' +
+        '<div class="form-row-3">' +
+          '<div class="form-group"><label class="form-label">שם איש קשר</label><input class="form-input" id="super-admin-edit-contact-name" value="' + escapeHtml(tenant.contact_name || '') + '"></div>' +
+          '<div class="form-group"><label class="form-label">טלפון איש קשר</label><input class="form-input" id="super-admin-edit-contact-phone" value="' + escapeHtml(tenant.contact_phone || '') + '"></div>' +
+          '<div class="form-group"><label class="form-label">אימייל איש קשר</label><input class="form-input" id="super-admin-edit-contact-email" value="' + escapeHtml(tenant.contact_email || '') + '"></div>' +
+        '</div>' +
+        '<div class="super-admin-meta-grid">' +
+          '<div class="super-admin-info-card"><div class="super-admin-info-label">Timezone</div><div class="super-admin-info-value">' + escapeHtml(tenant.timezone || '—') + '</div></div>' +
+          '<div class="super-admin-info-card"><div class="super-admin-info-label">Currency</div><div class="super-admin-info-value">' + escapeHtml(tenant.currency || '—') + '</div></div>' +
+          '<div class="super-admin-info-card"><div class="super-admin-info-label">Locale</div><div class="super-admin-info-value">' + escapeHtml(tenant.locale || '—') + '</div></div>' +
+        '</div>' +
+        '<div class="super-admin-action-row"><button class="btn btn-primary super-admin-primary-action" id="super-admin-save-tenant">שמור פרטי עסק</button></div>' +
+      '</div>' +
+      '<div class="super-admin-section">' +
+        '<div class="super-admin-section-header">' +
+          '<div><div class="super-admin-section-title">בעלים ראשי</div><div class="super-admin-section-sub">צפייה בפרטי הבעלים הראשי ואיפוס סיסמה זמנית במקרה הצורך.</div></div>' +
+        '</div>' +
+      (owner ?
+        '<div class="super-admin-owner-grid">' +
+          '<div class="super-admin-info-card"><div class="super-admin-info-label">שם</div><div class="super-admin-info-value">' + escapeHtml(owner.name || '—') + '</div></div>' +
+          '<div class="super-admin-info-card"><div class="super-admin-info-label">אימייל</div><div class="super-admin-info-value">' + escapeHtml(owner.email || '—') + '</div></div>' +
+          '<div class="super-admin-info-card"><div class="super-admin-info-label">סטטוס שיוך</div><div class="super-admin-info-value">' + escapeHtml(owner.membership_status || '—') + '</div></div>' +
+          '<div class="super-admin-info-card"><div class="super-admin-info-label">כניסה אחרונה</div><div class="super-admin-info-value">' + escapeHtml(formatDate(owner.last_login_at) || '—') + '</div></div>' +
+          '<div class="super-admin-info-card"><div class="super-admin-info-label">חובת החלפת סיסמה</div><div class="super-admin-info-value">' + escapeHtml(owner.must_change_password ? 'כן' : 'לא') + '</div></div>' +
+        '</div>' +
+        '<div class="super-admin-action-row"><button class="btn super-admin-danger-soft" id="super-admin-reset-owner-password">איפוס סיסמה זמנית לבעלים</button></div>'
+      : '<div class="super-admin-audit-empty">לא נמצא בעלים ראשי</div>') +
+      '</div>' +
+      '<div class="super-admin-section">' +
+        '<div class="super-admin-section-header">' +
+          '<div><div class="super-admin-section-title">מודולים</div><div class="super-admin-section-sub">הפעל או השבת מודולים באופן מיידי עבור העסק.</div></div>' +
+        '</div>' +
+        '<div class="check-grid" id="super-admin-tenant-modules-form">' + modules.map(function(module) {
         return '<label class="module-toggle' + (module.is_enabled ? ' checked' : '') + '"><input type="checkbox" data-module-key="' + escapeHtml(module.module_key) + '"' + (module.is_enabled ? ' checked' : '') + '><span class="module-toggle-text"><span class="module-toggle-title">' + escapeHtml(getAdminModuleLabel(module.module_key)) + '</span><span class="module-toggle-status">' + (module.is_enabled ? 'פעיל' : 'כבוי') + '</span></span><span class="module-toggle-pill">' + (module.is_enabled ? 'ON' : 'OFF') + '</span></label>';
       }).join('') + '</div>' +
-      '<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn btn-primary" id="super-admin-save-modules">שמור מודולים</button></div>' +
-      '<div class="form-section">Audit Log</div>' +
+        '<div class="super-admin-action-row"><button class="btn btn-primary super-admin-primary-action" id="super-admin-save-modules">שמור מודולים</button></div>' +
+      '</div>' +
+      '<div class="super-admin-section" style="margin-bottom:0">' +
+        '<div class="super-admin-section-header">' +
+          '<div><div class="super-admin-section-title">Audit Log</div><div class="super-admin-section-sub">רישום פעולות אחרונות עבור העסק הנבחר.</div></div>' +
+        '</div>' +
       (auditLogs.length ? '<div class="admin-module-grid">' + auditLogs.map(function(item) {
         var details = item.details_json || '';
         if (details && details.length > 180) details = details.slice(0, 177) + '...';
@@ -2705,7 +2771,8 @@ function openSuperAdminTenantModal(tenantId) {
           '<div class="admin-module-sub">' + escapeHtml(item.actor_email || '—') + '</div>' +
           '<div class="admin-module-sub" style="margin-top:6px;white-space:pre-wrap;word-break:break-word">' + escapeHtml(details || 'ללא פרטים') + '</div>' +
         '</div>';
-      }).join('') + '</div>' : '<div class="dash-empty">אין אירועי audit להצגה</div>');
+      }).join('') + '</div>' : '<div class="super-admin-audit-empty">אין אירועי audit להצגה</div>') +
+      '</div>';
 
     var saveTenantBtn = document.getElementById('super-admin-save-tenant');
     if (saveTenantBtn) saveTenantBtn.onclick = function() { saveSuperAdminTenantDetails(tenantId); };
@@ -2715,7 +2782,7 @@ function openSuperAdminTenantModal(tenantId) {
     if (resetOwnerPasswordBtn) resetOwnerPasswordBtn.onclick = function() { resetSuperAdminTenantOwnerPassword(tenantId); };
     bindModuleToggleGroup(document.getElementById('super-admin-tenant-modules-form'));
   }).catch(function(err) {
-    body.innerHTML = '<div class="dash-empty">' + escapeHtml(err.message || 'שגיאה בטעינת tenant') + '</div>';
+    body.innerHTML = '<div class="super-admin-audit-empty">' + escapeHtml(err.message || 'שגיאה בטעינת העסק') + '</div>';
   });
 }
 
