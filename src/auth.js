@@ -1,5 +1,17 @@
 import { hashPassword, verifyPassword } from './passwords.js';
 
+function normalizeOptionalText(value) {
+  if (value === undefined || value === null) return null;
+  const text = String(value).trim();
+  return text ? text : null;
+}
+
+function normalizeRequiredText(value, label) {
+  const text = normalizeOptionalText(value);
+  if (!text) throw new Error(label + ' חובה');
+  return text;
+}
+
 function json(body, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {
     status,
@@ -118,7 +130,10 @@ export async function requireTenantContext(request, env) {
        tm.role,
        tm.status,
        t.slug AS tenant_slug,
-       t.status AS tenant_status
+       t.status AS tenant_status,
+       t.name AS tenant_name,
+       t.contact_phone AS tenant_contact_phone,
+       t.contact_email AS tenant_contact_email
      FROM tenant_memberships tm
      JOIN tenants t ON t.id = tm.tenant_id
      WHERE tm.user_id = ?
@@ -147,7 +162,10 @@ export async function requireTenantContext(request, env) {
     tenant: {
       id: membership.tenant_id,
       slug: membership.tenant_slug,
-      status: membership.tenant_status
+      status: membership.tenant_status,
+      name: membership.tenant_name || null,
+      contact_phone: membership.tenant_contact_phone || null,
+      contact_email: membership.tenant_contact_email || null
     },
     membership: {
       id: membership.id,
@@ -379,6 +397,50 @@ export async function handleAuth(request, env, path) {
     if (ctx instanceof Response) return ctx;
     return {
       modules: await getEffectiveTenantModules(ctx.tenant.id, env)
+    };
+  }
+
+  if (path === '/api/auth/tenant-setup-profile' && method === 'PUT') {
+    const ctx = await requireTenantContext(request, env);
+    if (ctx instanceof Response) return ctx;
+    const roleState = await assertTenantRole(ctx, ['owner', 'admin']);
+    if (roleState instanceof Response) return roleState;
+
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ error: 'בקשה לא תקינה' }, 400);
+    }
+
+    const name = normalizeRequiredText(body && body.name, 'שם העסק');
+    const contactPhone = normalizeRequiredText(body && body.contact_phone, 'טלפון');
+
+    await env.DB.prepare(
+      `UPDATE tenants
+       SET name = ?,
+           contact_phone = ?,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`
+    ).bind(name, contactPhone, ctx.tenant.id).run();
+
+    const tenant = await env.DB.prepare(
+      `SELECT id, slug, status, name, contact_phone, contact_email
+       FROM tenants
+       WHERE id = ?
+       LIMIT 1`
+    ).bind(ctx.tenant.id).first();
+
+    return {
+      success: true,
+      tenant: tenant || {
+        id: ctx.tenant.id,
+        slug: ctx.tenant.slug,
+        status: ctx.tenant.status,
+        name,
+        contact_phone: contactPhone,
+        contact_email: ctx.tenant.contact_email || null
+      }
     };
   }
 

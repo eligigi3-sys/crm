@@ -126,6 +126,24 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .super-admin-info-value{font-size:13px;font-weight:700;color:var(--text);word-break:break-word}
 .super-admin-audit-empty{padding:18px 12px;text-align:center;border:1px dashed var(--border);border-radius:12px;color:var(--text3);font-size:12px;background:var(--bg)}
 .super-admin-loading{padding:30px 16px;text-align:center;color:var(--text3);font-size:13px}
+.owner-setup-hero{padding:16px;border:1px solid rgba(124,58,237,0.16);border-radius:14px;background:linear-gradient(135deg,#f7f3ff 0%,#eef6ff 100%);margin-bottom:14px}
+.owner-setup-title{font-size:20px;font-weight:800;color:var(--text);margin-bottom:8px}
+.owner-setup-sub{font-size:13px;line-height:1.6;color:var(--text2)}
+.owner-setup-steps{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.owner-setup-step{padding:6px 10px;border-radius:999px;background:var(--bg);border:1px solid var(--border);font-size:11px;font-weight:700;color:var(--text3)}
+.owner-setup-step.active{background:var(--accent-light);border-color:rgba(124,58,237,0.2);color:var(--accent)}
+.owner-setup-card{border:1px solid var(--border);border-radius:14px;background:var(--white);padding:14px}
+.owner-setup-card-title{font-size:14px;font-weight:800;color:var(--text);margin-bottom:6px}
+.owner-setup-card-sub{font-size:12px;color:var(--text3);line-height:1.6;margin-bottom:14px}
+.owner-setup-note{margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--bg);font-size:12px;color:var(--text2);line-height:1.6}
+.owner-setup-quick-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.owner-setup-quick{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--bg);cursor:pointer;transition:all 0.12s;text-align:right}
+.owner-setup-quick:hover{border-color:var(--accent);background:var(--accent-light)}
+.owner-setup-quick-title{font-size:13px;font-weight:800;color:var(--text)}
+.owner-setup-quick-sub{font-size:12px;color:var(--text3);line-height:1.5}
+.guided-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:26px 16px;text-align:center;border:1px dashed var(--border);border-radius:14px;background:linear-gradient(180deg,#faf8ff 0%,#fff 100%)}
+.guided-empty-title{font-size:14px;font-weight:800;color:var(--text)}
+.guided-empty-sub{font-size:12px;line-height:1.6;color:var(--text3);max-width:420px}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
 .modal-overlay.open{display:flex}
 .modal{background:var(--white);border-radius:16px;width:620px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:var(--shadow-md)}
@@ -1169,7 +1187,7 @@ tr:hover td{background:#fafbfc;cursor:pointer}
   .super-admin-summary{align-items:flex-start}
   .super-admin-modal{width:96vw;max-height:94vh}
   .super-admin-modal .modal-header,.super-admin-modal .modal-body,.super-admin-modal .modal-footer{padding-left:14px;padding-right:14px}
-  .super-admin-owner-grid,.super-admin-meta-grid,.check-grid{grid-template-columns:1fr}
+  .super-admin-owner-grid,.super-admin-meta-grid,.check-grid,.owner-setup-quick-grid{grid-template-columns:1fr}
   .super-admin-action-row .btn,.super-admin-modal .modal-footer .btn{width:100%;justify-content:center}
   .super-admin-section{padding:12px}
 }
@@ -1483,6 +1501,13 @@ id="customers-search">
     <div class="modal-footer"><button class="btn btn-secondary" id="super-admin-tenant-close-footer">סגור</button></div>
   </div>
 </div>
+<div class="modal-overlay" id="tenant-owner-setup-modal">
+  <div class="modal" style="width:720px;max-width:96vw">
+    <div class="modal-header"><h2>הקמה ראשונית לעסק</h2><button class="modal-close" id="tenant-owner-setup-close">✕</button></div>
+    <div class="modal-body" id="tenant-owner-setup-body">טוען...</div>
+    <div class="modal-footer" id="tenant-owner-setup-footer"></div>
+  </div>
+</div>
 <div class="modal-overlay" id="modal-lead">
   <div class="modal">
     <div class="modal-header"><h2 id="modal-lead-title">ליד חדש</h2><button class="modal-close" id="modal-close-btn">✕</button></div>
@@ -1589,6 +1614,7 @@ var calYear, calMonth;
 var currentTenantContext = null;
 var currentTeamMembers = [];
 var currentSuperAdminTenantDetail = null;
+var tenantOwnerSetupStep = 0;
 var forcePasswordChangeActive = false;
 var sessionTransitionInProgress = false;
 var sessionRevalidationInFlight = false;
@@ -1958,7 +1984,7 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   var teamRoleFilter = document.getElementById('team-role-filter');
   if (teamRoleFilter) teamRoleFilter.addEventListener('change', loadTeamMembers);
   document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') { closeLeadModal(); closeDrawer(); closeCustomerModal(); closeSuperAdminCreateModal(); closeSuperAdminTenantModal(); }
+    if (e.key === 'Escape') { closeLeadModal(); closeDrawer(); closeCustomerModal(); skipTenantOwnerSetup(); closeSuperAdminCreateModal(); closeSuperAdminTenantModal(); }
   });
   window.addEventListener('storage', function(e) {
     if (e.key !== 'crm_token' && e.key !== 'crm_user') return;
@@ -1974,6 +2000,10 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   window.addEventListener('focus', function() {
     scheduleSessionRevalidation();
   });
+  var ownerSetupClose = document.getElementById('tenant-owner-setup-close');
+  if (ownerSetupClose) ownerSetupClose.addEventListener('click', skipTenantOwnerSetup);
+  var ownerSetupModal = document.getElementById('tenant-owner-setup-modal');
+  if (ownerSetupModal) ownerSetupModal.addEventListener('click', function(e) { if (e.target === this) skipTenantOwnerSetup(); });
   var superAdminCreateOpen = document.getElementById('super-admin-open-create-modal');
   if (superAdminCreateOpen) superAdminCreateOpen.addEventListener('click', openSuperAdminCreateModal);
   var superAdminCreateClose = document.getElementById('super-admin-create-close');
@@ -2064,6 +2094,7 @@ function resetSessionState() {
 function showLoggedOutState(message, options) {
   options = options || {};
   resetSessionState();
+  closeTenantOwnerSetupModal();
   applySuperAdminVisibility();
   document.getElementById('login-page').style.display = 'flex';
   document.getElementById('force-password-page').style.display = 'none';
@@ -2100,12 +2131,65 @@ function loadTenantContext() {
   return apiCall('GET', '/api/auth/tenant-context').then(function(data) {
     currentTenantContext = data || null;
     applySuperAdminVisibility();
+    maybeShowTenantOwnerSetup();
     return data;
   }).catch(function(err) {
     currentTenantContext = null;
     applySuperAdminVisibility();
     throw err;
   });
+}
+
+function getTenantOwnerSetupStorageKey(kind) {
+  if (!currentUser || !currentTenantContext || !currentTenantContext.tenant) return null;
+  return 'crm_owner_setup_' + kind + '_' + currentUser.id + '_' + currentTenantContext.tenant.id;
+}
+
+function shouldOfferTenantOwnerSetup() {
+  if (!currentUser || !currentTenantContext || !currentTenantContext.tenant || !currentTenantContext.membership) return false;
+  if (isSuperAdmin()) return false;
+  if (String(currentTenantContext.membership.role || '').trim().toLowerCase() !== 'owner') return false;
+  var pendingKey = getTenantOwnerSetupStorageKey('pending');
+  var doneKey = getTenantOwnerSetupStorageKey('done');
+  if (!pendingKey || !doneKey) return false;
+  return localStorage.getItem(pendingKey) === '1' && localStorage.getItem(doneKey) !== '1';
+}
+
+function markTenantOwnerSetupPending() {
+  var pendingKey = getTenantOwnerSetupStorageKey('pending');
+  var doneKey = getTenantOwnerSetupStorageKey('done');
+  if (!pendingKey || !doneKey) return;
+  if (localStorage.getItem(doneKey) === '1') return;
+  localStorage.setItem(pendingKey, '1');
+}
+
+function completeTenantOwnerSetup() {
+  var pendingKey = getTenantOwnerSetupStorageKey('pending');
+  var doneKey = getTenantOwnerSetupStorageKey('done');
+  var draftKey = getTenantOwnerSetupStorageKey('draft');
+  if (pendingKey) localStorage.removeItem(pendingKey);
+  if (doneKey) localStorage.setItem(doneKey, '1');
+  if (draftKey) localStorage.removeItem(draftKey);
+}
+
+function getTenantOwnerSetupDraft() {
+  var draftKey = getTenantOwnerSetupStorageKey('draft');
+  if (!draftKey) return {};
+  try {
+    return JSON.parse(localStorage.getItem(draftKey) || '{}') || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveTenantOwnerSetupDraft(draft) {
+  var draftKey = getTenantOwnerSetupStorageKey('draft');
+  if (!draftKey) return;
+  localStorage.setItem(draftKey, JSON.stringify(draft || {}));
+}
+
+function renderGuidedEmptyState(title, description, buttonLabel, action) {
+  return '<div class="guided-empty"><div class="guided-empty-title">' + escapeHtml(title || '') + '</div><div class="guided-empty-sub">' + escapeHtml(description || '') + '</div>' + (buttonLabel && action ? '<button class="btn btn-primary btn-sm" onclick="' + action + '">' + escapeHtml(buttonLabel) + '</button>' : '') + '</div>';
 }
 
 function scheduleSessionRevalidation() {
@@ -2172,6 +2256,108 @@ function doLogin() {
   });
 }
 
+function closeTenantOwnerSetupModal() {
+  var modal = document.getElementById('tenant-owner-setup-modal');
+  if (modal) modal.classList.remove('open');
+}
+
+function skipTenantOwnerSetup() {
+  var modal = document.getElementById('tenant-owner-setup-modal');
+  if (!modal || !modal.classList.contains('open')) return;
+  completeTenantOwnerSetup();
+  closeTenantOwnerSetupModal();
+  toast('אפשר להשלים את ההקמה גם בהמשך', 'success');
+}
+
+function collectTenantOwnerSetupForm() {
+  return {
+    name: (document.getElementById('tenant-owner-setup-name') ? document.getElementById('tenant-owner-setup-name').value : '') || '',
+    contact_phone: (document.getElementById('tenant-owner-setup-phone') ? document.getElementById('tenant-owner-setup-phone').value : '') || '',
+    address: (document.getElementById('tenant-owner-setup-address') ? document.getElementById('tenant-owner-setup-address').value : '') || ''
+  };
+}
+
+function renderTenantOwnerSetup() {
+  var modal = document.getElementById('tenant-owner-setup-modal');
+  var body = document.getElementById('tenant-owner-setup-body');
+  var footer = document.getElementById('tenant-owner-setup-footer');
+  if (!modal || !body || !footer || !currentTenantContext || !currentTenantContext.tenant) return;
+  var draft = getTenantOwnerSetupDraft();
+  var tenantName = draft.name || currentTenantContext.tenant.name || '';
+  var tenantPhone = draft.contact_phone || currentTenantContext.tenant.contact_phone || '';
+  var tenantAddress = draft.address || '';
+  var steps = ['ברוכים הבאים', 'פרטי העסק', 'התחלה מהירה'];
+  body.innerHTML = '<div class="owner-setup-steps">' + steps.map(function(step, index) {
+    return '<div class="owner-setup-step' + (index === tenantOwnerSetupStep ? ' active' : '') + '">' + escapeHtml(step) + '</div>';
+  }).join('') + '</div>';
+  if (tenantOwnerSetupStep === 0) {
+    body.innerHTML += '<div class="owner-setup-hero"><div class="owner-setup-title">ברוכים הבאים ל-CRM 🎉</div><div class="owner-setup-sub">סיימת להגדיר סיסמה ראשונית. עכשיו נעשה הקמה קצרה כדי שהמערכת תרגיש מוכנה לעבודה כבר מהכניסה הראשונה.</div></div>' +
+      '<div class="owner-setup-card"><div class="owner-setup-card-title">מה נגדיר עכשיו?</div><div class="owner-setup-card-sub">נעדכן את פרטי העסק הבסיסיים ונראה לך את הצעדים הראשונים שכדאי לעשות.</div>' +
+      '<div class="owner-setup-note">ההקמה קלה, ניתנת לדילוג, ולא תחסום אותך מלהשתמש במערכת.</div></div>';
+    footer.innerHTML = '<button class="btn btn-secondary" id="tenant-owner-setup-skip">דלג לעכשיו</button><button class="btn btn-primary" id="tenant-owner-setup-next">המשך</button>';
+  } else if (tenantOwnerSetupStep === 1) {
+    body.innerHTML += '<div class="owner-setup-card"><div class="owner-setup-card-title">פרטי העסק</div><div class="owner-setup-card-sub">אפשר לעדכן עכשיו את שם העסק והטלפון הראשי. הכתובת היא שדה אופציונלי לשלב הבא ונשמרת מקומית בדפדפן הזה בלבד.</div>' +
+      '<div class="form-row"><div class="form-group"><label class="form-label">שם העסק</label><input class="form-input" id="tenant-owner-setup-name" value="' + escapeHtml(tenantName) + '" placeholder="שם העסק"></div><div class="form-group"><label class="form-label">טלפון</label><input class="form-input" id="tenant-owner-setup-phone" value="' + escapeHtml(tenantPhone) + '" placeholder="050-0000000"></div></div>' +
+      '<div class="form-group" style="margin-bottom:0"><label class="form-label">כתובת (אופציונלי)</label><input class="form-input" id="tenant-owner-setup-address" value="' + escapeHtml(tenantAddress) + '" placeholder="עיר / כתובת מלאה"></div>' +
+      '<div class="owner-setup-note">לוגו יתווסף בהמשך. כרגע שמרנו על ההקמה מהירה ופשוטה.</div></div>';
+    footer.innerHTML = '<button class="btn btn-secondary" id="tenant-owner-setup-back">חזרה</button><button class="btn btn-secondary" id="tenant-owner-setup-skip">דלג לעכשיו</button><button class="btn btn-primary" id="tenant-owner-setup-save">שמור והמשך</button>';
+  } else {
+    body.innerHTML += '<div class="owner-setup-card"><div class="owner-setup-card-title">התחלה מהירה</div><div class="owner-setup-card-sub">הנה שלוש פעולות שיעזרו לך להתחיל לעבוד מיד.</div><div class="owner-setup-quick-grid">' +
+      '<button class="owner-setup-quick" id="owner-setup-action-lead"><div class="owner-setup-quick-title">צור ליד ראשון</div><div class="owner-setup-quick-sub">פתח ליד חדש והתחל למלא פרטי לקוח ואירוע.</div></button>' +
+      '<button class="owner-setup-quick" id="owner-setup-action-customer"><div class="owner-setup-quick-title">הוסף לקוח ראשון</div><div class="owner-setup-quick-sub">עבור למסך הלקוחות ופתח כרטיס ראשון.</div></button>' +
+      '<button class="owner-setup-quick" id="owner-setup-action-event"><div class="owner-setup-quick-title">פתח אירוע ראשון</div><div class="owner-setup-quick-sub">התחל אירוע חדש והוסף תאריך, אולם ופרטים חשובים.</div></button>' +
+      '</div></div>';
+    footer.innerHTML = '<button class="btn btn-secondary" id="tenant-owner-setup-back">חזרה</button><button class="btn btn-secondary" id="tenant-owner-setup-skip">דלג לעכשיו</button><button class="btn btn-primary" id="tenant-owner-setup-finish">סיום</button>';
+  }
+  var skipBtn = document.getElementById('tenant-owner-setup-skip');
+  if (skipBtn) skipBtn.onclick = skipTenantOwnerSetup;
+  var nextBtn = document.getElementById('tenant-owner-setup-next');
+  if (nextBtn) nextBtn.onclick = function() { tenantOwnerSetupStep = 1; renderTenantOwnerSetup(); };
+  var backBtn = document.getElementById('tenant-owner-setup-back');
+  if (backBtn) backBtn.onclick = function() { tenantOwnerSetupStep = Math.max(0, tenantOwnerSetupStep - 1); renderTenantOwnerSetup(); };
+  var saveBtn = document.getElementById('tenant-owner-setup-save');
+  if (saveBtn) saveBtn.onclick = saveTenantOwnerSetupProfile;
+  var finishBtn = document.getElementById('tenant-owner-setup-finish');
+  if (finishBtn) finishBtn.onclick = function() { completeTenantOwnerSetup(); closeTenantOwnerSetupModal(); toast('ההקמה הראשונית הושלמה', 'success'); };
+  var leadBtn = document.getElementById('owner-setup-action-lead');
+  if (leadBtn) leadBtn.onclick = function() { completeTenantOwnerSetup(); closeTenantOwnerSetupModal(); goTo('leads', document.getElementById('nav-leads')); openLeadModal(); };
+  var customerBtn = document.getElementById('owner-setup-action-customer');
+  if (customerBtn) customerBtn.onclick = function() { completeTenantOwnerSetup(); closeTenantOwnerSetupModal(); goTo('customers', document.getElementById('nav-customers')); openLeadModal(); };
+  var eventBtn = document.getElementById('owner-setup-action-event');
+  if (eventBtn) eventBtn.onclick = function() { completeTenantOwnerSetup(); closeTenantOwnerSetupModal(); goTo('leads', document.getElementById('nav-leads')); openLeadModal(); setTimeout(function() { var eventDate = document.getElementById('l-event-date'); if (eventDate) eventDate.focus(); }, 30); };
+}
+
+function saveTenantOwnerSetupProfile() {
+  var body = collectTenantOwnerSetupForm();
+  saveTenantOwnerSetupDraft(body);
+  if (!body.name.trim()) { toast('שם העסק חובה', 'error'); return; }
+  if (!body.contact_phone.trim()) { toast('טלפון חובה', 'error'); return; }
+  apiCall('PUT', '/api/auth/tenant-setup-profile', {
+    name: body.name.trim(),
+    contact_phone: body.contact_phone.trim()
+  }).then(function(res) {
+    if (currentTenantContext && currentTenantContext.tenant && res && res.tenant) {
+      currentTenantContext.tenant.name = res.tenant.name || currentTenantContext.tenant.name;
+      currentTenantContext.tenant.contact_phone = res.tenant.contact_phone || currentTenantContext.tenant.contact_phone;
+      currentTenantContext.tenant.contact_email = res.tenant.contact_email || currentTenantContext.tenant.contact_email;
+    }
+    tenantOwnerSetupStep = 2;
+    renderTenantOwnerSetup();
+  }).catch(function(err) {
+    toast(err.message || 'שגיאה בשמירת פרטי העסק', 'error');
+  });
+}
+
+function maybeShowTenantOwnerSetup() {
+  var modal = document.getElementById('tenant-owner-setup-modal');
+  if (!modal) return;
+  if (!shouldOfferTenantOwnerSetup()) return;
+  if (modal.classList.contains('open')) return;
+  tenantOwnerSetupStep = 0;
+  renderTenantOwnerSetup();
+  modal.classList.add('open');
+}
+
 function showForcePasswordChange() {
   forcePasswordChangeActive = true;
   document.getElementById('login-page').style.display = 'none';
@@ -2215,7 +2401,12 @@ function submitForcedPasswordChange() {
     }
     forcePasswordChangeActive = false;
     document.getElementById('force-password-page').style.display = 'none';
-    return loadTenantContext().catch(function() { return null; });
+    return loadTenantContext().then(function(ctx) {
+      if (ctx && ctx.membership && String(ctx.membership.role || '').trim().toLowerCase() === 'owner') {
+        markTenantOwnerSetupPending();
+      }
+      return ctx;
+    }).catch(function() { return null; });
   }).then(function() {
     toast('הסיסמה הוחלפה בהצלחה', 'success');
     showApp();
@@ -2257,6 +2448,11 @@ function showApp() {
     loadDashboard();
     preloadLeads();
     checkGoogleStatus();
+  }
+  if (shouldOfferTenantOwnerSetup()) {
+    setTimeout(function() {
+      maybeShowTenantOwnerSetup();
+    }, 120);
   }
   loadTenantContext().catch(function() {
   });
@@ -2860,7 +3056,7 @@ function loadDashboard() {
     var fuEl = document.getElementById('dash-followups');
     fuEl.innerHTML = d.followUps.length ? d.followUps.map(function(l) {
       return '<div class="dash-item" data-id="' + l.id + '"><div><div class="dash-item-name">' + l.name + '</div><div class="dash-item-sub">' + (l.event_type||'') + (l.event_date ? ' - ' + formatDate(l.event_date) : '') + '</div></div>' + statusBadge(l.status) + '</div>';
-    }).join('') : '<div class="dash-empty">אין מעקבים להיום</div>';
+    }).join('') : renderGuidedEmptyState('אין מעקבים להיום', 'כשתוסיף לידים ואירועים, המשימות הקרובות יופיעו כאן.', 'צור ליד ראשון', 'openLeadModal()');
     var upEl = document.getElementById('dash-upcoming');
     var today = getTodayYMD();
     var todayEvents = [];
@@ -2880,7 +3076,7 @@ function loadDashboard() {
     var recEl = document.getElementById('dash-recent');
     recEl.innerHTML = d.recentLeads.length ? d.recentLeads.map(function(l) {
       return '<div class="dash-item" data-id="' + l.id + '"><div><div class="dash-item-name">' + l.name + '</div><div class="dash-item-sub">' + (l.phone||'') + (l.event_type ? ' - ' + l.event_type : '') + '</div></div>' + statusBadge(l.status) + '</div>';
-    }).join('') : '<div class="dash-empty">אין לידים עדיין</div>';
+    }).join('') : renderGuidedEmptyState('אין לידים עדיין', 'זה מקום טוב להתחיל ממנו. הוסף ליד ראשון ותראה כאן את הפעילות האחרונה שלך.', 'צור ליד ראשון', 'openLeadModal()');
     document.querySelectorAll('.dash-item[data-id]').forEach(function(el) {
       el.addEventListener('click', function() { openEventDetailsModal(parseInt(this.getAttribute('data-id'))); });
     });
@@ -2943,7 +3139,7 @@ function loadLeads() {
     var leads = data.leads;
     if (eventType) leads = leads.filter(function(l) { return l.event_type === eventType; });
     var tbody = document.getElementById('leads-body');
-    if (!leads.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="10">לא נמצאו לידים</td></tr>'; return; }
+    if (!leads.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="10"><div class="guided-empty"><div class="guided-empty-title">אין לידים עדיין</div><div class="guided-empty-sub">אפשר להתחיל בקלות עם ליד ראשון ולהוסיף ממנו גם אירוע ופרטי לקוח.</div><button class="btn btn-primary btn-sm" onclick="openLeadModal()">צור ליד ראשון</button></div></td></tr>'; return; }
 
     var today = new Date().toISOString().split('T')[0];
     var futureLeads = [];
@@ -4050,7 +4246,9 @@ function loadCustomers() {
       if (statusFilter) msg = 'אין כרגע לקוחות בסטטוס שנבחר';
       if (typeFilter) msg = 'אין כרגע לקוחות מסוג הלקוח שנבחר';
       if (statusFilter && typeFilter) msg = 'אין כרגע לקוחות שמתאימים לסינון שבחרת';
-      grid.innerHTML = '<div class="dash-empty">' + msg + '</div>';
+      grid.innerHTML = (search || statusFilter || typeFilter || sortBy)
+        ? '<div class="dash-empty">' + msg + '</div>'
+        : renderGuidedEmptyState('אין לקוחות עדיין', 'כדאי להתחיל מכרטיס לקוח ראשון. אפשר לפתוח אותו מיד ולהמשיך משם לליד או לאירוע.', 'הוסף לקוח ראשון', 'openLeadModal()');
       return;
     }
 
