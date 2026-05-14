@@ -2526,6 +2526,18 @@ function getAdminModuleLabel(moduleKey) {
   return map[moduleKey] || moduleKey;
 }
 
+function getAdminAuditActionLabel(action) {
+  var map = {
+    tenant_create: 'יצירת עסק',
+    tenant_update: 'עדכון פרטי עסק',
+    tenant_activate: 'הפעלת עסק',
+    tenant_suspend: 'השהיית עסק',
+    tenant_modules_update: 'עדכון מודולים',
+    tenant_owner_password_reset: 'איפוס סיסמת בעלים'
+  };
+  return map[action] || action;
+}
+
 function saveSuperAdminTenantDetails(tenantId) {
   var body = {
     name: (document.getElementById('super-admin-edit-name').value || '').trim(),
@@ -2595,8 +2607,9 @@ function openSuperAdminTenantModal(tenantId) {
   ]).then(function(results) {
     var tenant = results[0].tenant || {};
     var owner = results[0].owner || null;
+    var auditLogs = results[0].audit_logs || [];
     var modules = results[1].modules || [];
-    currentSuperAdminTenantDetail = { tenant: tenant, owner: owner, modules: modules };
+    currentSuperAdminTenantDetail = { tenant: tenant, owner: owner, modules: modules, audit_logs: auditLogs };
     title.textContent = (tenant.name || 'Tenant') + ' · #' + tenant.id;
     body.innerHTML = '' +
       '<div class="form-section">פרטי עסק</div>' +
@@ -2631,7 +2644,18 @@ function openSuperAdminTenantModal(tenantId) {
       '<div class="check-grid" id="super-admin-tenant-modules-form">' + modules.map(function(module) {
         return '<label class="check-item' + (module.is_enabled ? ' checked' : '') + '"><input type="checkbox" data-module-key="' + escapeHtml(module.module_key) + '"' + (module.is_enabled ? ' checked' : '') + '> ' + escapeHtml(getAdminModuleLabel(module.module_key)) + '</label>';
       }).join('') + '</div>' +
-      '<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn btn-primary" id="super-admin-save-modules">שמור מודולים</button></div>';
+      '<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn btn-primary" id="super-admin-save-modules">שמור מודולים</button></div>' +
+      '<div class="form-section">Audit Log</div>' +
+      (auditLogs.length ? '<div class="admin-module-grid">' + auditLogs.map(function(item) {
+        var details = item.details_json || '';
+        if (details && details.length > 180) details = details.slice(0, 177) + '...';
+        return '<div class="admin-module-card">' +
+          '<div class="admin-module-title">' + escapeHtml(getAdminAuditActionLabel(item.action)) + '</div>' +
+          '<div class="admin-module-sub">' + escapeHtml(formatDate(item.created_at) || '—') + '</div>' +
+          '<div class="admin-module-sub">' + escapeHtml(item.actor_email || '—') + '</div>' +
+          '<div class="admin-module-sub" style="margin-top:6px;white-space:pre-wrap;word-break:break-word">' + escapeHtml(details || 'ללא פרטים') + '</div>' +
+        '</div>';
+      }).join('') + '</div>' : '<div class="dash-empty">אין אירועי audit להצגה</div>');
 
     var saveTenantBtn = document.getElementById('super-admin-save-tenant');
     if (saveTenantBtn) saveTenantBtn.onclick = function() { saveSuperAdminTenantDetails(tenantId); };

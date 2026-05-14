@@ -10,6 +10,14 @@ const MODULE_KEYS = [
   'reports'
 ];
 const MODULE_KEY_SET = new Set(MODULE_KEYS);
+const AUDIT_ACTIONS = new Set([
+  'tenant_create',
+  'tenant_update',
+  'tenant_activate',
+  'tenant_suspend',
+  'tenant_modules_update',
+  'tenant_owner_password_reset'
+]);
 
 function normalizeOptionalText(value) {
   if (value === undefined || value === null) return null;
@@ -129,6 +137,28 @@ function mapTenantRow(row) {
   };
 }
 
+function mapAuditRow(row) {
+  return {
+    id: row.id,
+    actor_user_id: row.actor_user_id || null,
+    actor_email: row.actor_email || null,
+    action: row.action,
+    target_type: row.target_type,
+    target_id: row.target_id || null,
+    target_slug: row.target_slug || null,
+    details_json: row.details_json || null,
+    created_at: row.created_at || null
+  };
+}
+
+function safeJsonStringify(value) {
+  try {
+    return JSON.stringify(value || {});
+  } catch {
+    return JSON.stringify({ error: 'details_json_serialize_failed' });
+  }
+}
+
 async function getTenantById(tenantId, env) {
   return env.DB.prepare(`
     SELECT id, name, slug, status, timezone, currency, locale, contact_name, contact_phone, contact_email, created_at, updated_at
@@ -207,6 +237,47 @@ async function getEffectiveTenantModules(tenantId, env) {
       source: row ? 'row' : 'default_enabled'
     };
   });
+}
+
+async function getAdminAuditLogsForTenant(tenantId, env, limit = 10) {
+  const result = await env.DB.prepare(`
+    SELECT id, actor_user_id, actor_email, action, target_type, target_id, target_slug, details_json, created_at
+    FROM admin_audit_logs
+    WHERE target_type = 'tenant'
+      AND target_id = ?
+    ORDER BY id DESC
+    LIMIT ?
+  `).bind(tenantId, limit).all();
+
+  return (result.results || []).map(mapAuditRow);
+}
+
+async function logAdminAudit(env, actor, action, target, details) {
+  if (!AUDIT_ACTIONS.has(action)) return;
+  try {
+    await env.DB.prepare(`
+      INSERT INTO admin_audit_logs (
+        actor_user_id,
+        actor_email,
+        action,
+        target_type,
+        target_id,
+        target_slug,
+        details_json,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).bind(
+      actor && actor.id ? actor.id : null,
+      actor && actor.email ? actor.email : null,
+      action,
+      target && target.type ? target.type : 'unknown',
+      target && target.id ? target.id : null,
+      target && target.slug ? target.slug : null,
+      safeJsonStringify(details)
+    ).run();
+  } catch (err) {
+    console.error('admin audit log failed', action, err && err.message ? err.message : err);
+  }
 }
 
 export async function handleAdmin(request, env, path) {
@@ -346,6 +417,21 @@ export async function handleAdmin(request, env, path) {
     }
 
     const tenant = await getTenantById(tenantId, env);
+    await logAdminAudit(env, superAdminCtx.user, 'tenant_create', {
+      type: 'tenant',
+      id: tenantId,
+      slug: tenant.slug
+    }, {
+      tenant: mapTenantRow(tenant),
+      owner: {
+        id: ownerUser.id,
+        email: ownerUser.email,
+        role: ownerUser.role
+      },
+      modules: normalizedModules.map(function(item) {
+        return { module_key: item.module_key, is_enabled: item.is_enabled };
+      })
+    });
     return {
       success: true,
       tenant: mapTenantRow(tenant),
@@ -366,7 +452,8 @@ export async function handleAdmin(request, env, path) {
     if (!tenant) throw new Error('Tenant not found');
     return {
       tenant: mapTenantRow(tenant),
-      owner: mapOwnerRow(await getPrimaryOwner(tenantId, env))
+      owner: mapOwnerRow(await getPrimaryOwner(tenantId, env)),
+      audit_logs: await getAdminAuditLogsForTenant(tenantId, env)
     };
   }
 
@@ -387,6 +474,7 @@ export async function handleAdmin(request, env, path) {
     const contactPhone = normalizeRequiredText(body.contact_phone, 'טלפון איש קשר');
     const contactEmail = normalizeContactEmail(body.contact_email);
     const status = normalizeTenantStatus(body.status || tenant.status);
+    const beforeTenant = mapTenantRow(tenant);
 
     await env.DB.prepare(`
       UPDATE tenants
@@ -400,6 +488,14 @@ export async function handleAdmin(request, env, path) {
     `).bind(name, contactName, contactPhone, contactEmail, status, tenantId).run();
 
     const updatedTenant = await getTenantById(tenantId, env);
+    await logAdminAudit(env, superAdminCtx.user, 'tenant_update', {
+      type: 'tenant',
+      id: tenantId,
+      slug: updatedTenant.slug
+    }, {
+      before: beforeTenant,
+      after: mapTenantRow(updatedTenant)
+    });
     return {
       success: true,
       tenant: mapTenantRow(updatedTenant),
@@ -420,6 +516,14 @@ export async function handleAdmin(request, env, path) {
     `).bind(tenantId).run();
 
     const updatedTenant = await getTenantById(tenantId, env);
+    await logAdminAudit(env, superAdminCtx.user, 'tenant_activate', {
+      type: 'tenant',
+      id: tenantId,
+      slug: updatedTenant.slug
+    }, {
+      before: { status: tenant.status },
+      after: { status: updatedTenant.status }
+    });
     return { success: true, tenant: mapTenantRow(updatedTenant) };
   }
 
@@ -436,6 +540,14 @@ export async function handleAdmin(request, env, path) {
     `).bind(tenantId).run();
 
     const updatedTenant = await getTenantById(tenantId, env);
+    await logAdminAudit(env, superAdminCtx.user, 'tenant_suspend', {
+      type: 'tenant',
+      id: tenantId,
+      slug: updatedTenant.slug
+    }, {
+      before: { status: tenant.status },
+      after: { status: updatedTenant.status }
+    });
     return { success: true, tenant: mapTenantRow(updatedTenant) };
   }
 
@@ -463,6 +575,7 @@ export async function handleAdmin(request, env, path) {
       throw new Error('בקשה לא תקינה');
     }
 
+    const beforeModules = await getEffectiveTenantModules(tenantId, env);
     const normalizedModules = normalizeModulesPayload(body.modules);
 
     for (const item of normalizedModules) {
@@ -485,10 +598,19 @@ export async function handleAdmin(request, env, path) {
       ).run();
     }
 
+    const updatedModules = await getEffectiveTenantModules(tenantId, env);
+    await logAdminAudit(env, superAdminCtx.user, 'tenant_modules_update', {
+      type: 'tenant',
+      id: tenantId,
+      slug: tenant.slug
+    }, {
+      before: beforeModules.map(function(item) { return { module_key: item.module_key, is_enabled: item.is_enabled }; }),
+      after: updatedModules.map(function(item) { return { module_key: item.module_key, is_enabled: item.is_enabled }; })
+    });
     return {
       success: true,
       tenant: mapTenantRow(tenant),
-      modules: await getEffectiveTenantModules(tenantId, env)
+      modules: updatedModules
     };
   }
 
@@ -508,6 +630,7 @@ export async function handleAdmin(request, env, path) {
     const newPassword = normalizeInitialPassword(body && body.password);
     const owner = await getPrimaryOwner(tenantId, env);
     if (!owner || !owner.user_id) throw new Error('לא נמצא בעלים ראשי לעסק הזה');
+    const ownerBefore = mapOwnerRow(owner);
 
     const passwordHash = await hashPassword(newPassword);
     await env.DB.prepare(`
@@ -518,9 +641,19 @@ export async function handleAdmin(request, env, path) {
       WHERE id = ?
     `).bind(passwordHash, owner.user_id).run();
 
+    const updatedOwner = mapOwnerRow(await getPrimaryOwner(tenantId, env));
+    await logAdminAudit(env, superAdminCtx.user, 'tenant_owner_password_reset', {
+      type: 'tenant',
+      id: tenantId,
+      slug: tenant.slug
+    }, {
+      owner_before: ownerBefore,
+      owner_after: updatedOwner,
+      password_reset: true
+    });
     return {
       success: true,
-      owner: mapOwnerRow(await getPrimaryOwner(tenantId, env))
+      owner: updatedOwner
     };
   }
 
