@@ -33,11 +33,33 @@ function normalizeTenantName(value) {
 
 function normalizeTenantSlug(value) {
   const slug = String(value || '').trim().toLowerCase();
-  if (!slug) throw new Error('כתובת מערכת / slug חובה');
+  if (!slug) throw new Error('כתובת המערכת לא תקינה');
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
-    throw new Error('slug לא תקין');
+    throw new Error('כתובת המערכת לא תקינה');
   }
   return slug;
+}
+
+function slugifyTenantName(value) {
+  const base = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return base || 'tenant';
+}
+
+async function generateUniqueTenantSlug(name, env) {
+  const baseSlug = normalizeTenantSlug(slugifyTenantName(name));
+  let candidate = baseSlug;
+  let suffix = 2;
+  while (await getTenantBySlug(candidate, env)) {
+    candidate = normalizeTenantSlug(baseSlug + '-' + suffix);
+    suffix += 1;
+  }
+  return candidate;
 }
 
 function normalizeRequiredText(value, label) {
@@ -306,18 +328,15 @@ export async function handleAdmin(request, env, path) {
     }
 
     const name = normalizeTenantName(body.name);
-    const slug = normalizeTenantSlug(body.slug);
     const contactName = normalizeRequiredText(body.contact_name, 'שם איש קשר');
     const contactPhone = normalizeRequiredText(body.contact_phone, 'טלפון איש קשר');
     const contactEmail = normalizeContactEmail(body.contact_email);
     const initialPassword = normalizeInitialPassword(body.initial_password);
-    const timezone = normalizeOptionalText(body.timezone) || 'Asia/Jerusalem';
-    const currency = normalizeOptionalText(body.currency) || 'ILS';
-    const locale = normalizeOptionalText(body.locale) || 'he-IL';
+    const timezone = 'Asia/Jerusalem';
+    const currency = 'ILS';
+    const locale = 'he-IL';
     const normalizedModules = normalizeModulesPayload(body.modules);
-
-    const existingTenant = await getTenantBySlug(slug, env);
-    if (existingTenant) throw new Error('כתובת המערכת כבר קיימת');
+    const slug = await generateUniqueTenantSlug(name, env);
 
     let ownerUser = await getUserByEmail(contactEmail, env);
     if (ownerUser) {

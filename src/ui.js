@@ -1393,21 +1393,15 @@ id="customers-search">
   <div class="modal" style="width:760px">
     <div class="modal-header"><h2>פתיחת עסק חדש</h2><button class="modal-close" id="super-admin-create-close">✕</button></div>
     <div class="modal-body">
-      <div class="form-row-3" style="margin-bottom:10px">
+      <div class="form-row" style="margin-bottom:10px">
         <div class="form-group" style="margin-bottom:0"><label class="form-label">שם העסק *</label><input class="form-input" id="super-admin-create-name" placeholder="שם העסק"></div>
-        <div class="form-group" style="margin-bottom:0"><label class="form-label">כתובת מערכת / slug *</label><input class="form-input" id="super-admin-create-slug" placeholder="business-slug"></div>
         <div class="form-group" style="margin-bottom:0"><label class="form-label">שם איש קשר *</label><input class="form-input" id="super-admin-create-contact-name" placeholder="ישראל ישראלי"></div>
       </div>
-      <div class="form-row-3" style="margin-bottom:10px">
+      <div class="form-row" style="margin-bottom:10px">
         <div class="form-group" style="margin-bottom:0"><label class="form-label">טלפון איש קשר *</label><input class="form-input" id="super-admin-create-contact-phone" placeholder="050-0000000" type="tel"></div>
         <div class="form-group" style="margin-bottom:0"><label class="form-label">אימייל איש קשר *</label><input class="form-input" id="super-admin-create-contact-email" placeholder="owner@example.com" type="email"></div>
-        <div class="form-group" style="margin-bottom:0"><label class="form-label">סיסמה ראשונית *</label><input class="form-input" id="super-admin-create-password" placeholder="סיסמה ראשונית" type="password"></div>
       </div>
-      <div class="form-row-3" style="margin-bottom:10px">
-        <div class="form-group" style="margin-bottom:0"><label class="form-label">Timezone</label><input class="form-input" id="super-admin-create-timezone" placeholder="Asia/Jerusalem"></div>
-        <div class="form-group" style="margin-bottom:0"><label class="form-label">Currency</label><input class="form-input" id="super-admin-create-currency" placeholder="ILS"></div>
-        <div class="form-group" style="margin-bottom:0"><label class="form-label">Locale</label><input class="form-input" id="super-admin-create-locale" placeholder="he-IL"></div>
-      </div>
+      <div class="form-group" style="margin-bottom:10px"><label class="form-label">סיסמה ראשונית *</label><input class="form-input" id="super-admin-create-password" placeholder="סיסמה ראשונית" type="password"></div>
       <div class="form-group" style="margin-bottom:0">
         <label class="form-label">מודולים פעילים</label>
         <div class="check-grid" id="super-admin-create-modules">
@@ -2476,14 +2470,10 @@ function closeSuperAdminCreateModal() {
 
 function resetSuperAdminCreateForm() {
   document.getElementById('super-admin-create-name').value = '';
-  document.getElementById('super-admin-create-slug').value = '';
   document.getElementById('super-admin-create-contact-name').value = '';
   document.getElementById('super-admin-create-contact-phone').value = '';
   document.getElementById('super-admin-create-contact-email').value = '';
   document.getElementById('super-admin-create-password').value = '';
-  document.getElementById('super-admin-create-timezone').value = '';
-  document.getElementById('super-admin-create-currency').value = '';
-  document.getElementById('super-admin-create-locale').value = '';
   Array.prototype.slice.call(document.querySelectorAll('#super-admin-create-modules input[data-module-key]')).forEach(function(input) {
     input.checked = true;
   });
@@ -2493,14 +2483,10 @@ function createTenantFromSuperAdmin() {
   var moduleInputs = Array.prototype.slice.call(document.querySelectorAll('#super-admin-create-modules input[data-module-key]'));
   var body = {
     name: (document.getElementById('super-admin-create-name').value || '').trim(),
-    slug: (document.getElementById('super-admin-create-slug').value || '').trim(),
     contact_name: (document.getElementById('super-admin-create-contact-name').value || '').trim(),
     contact_phone: (document.getElementById('super-admin-create-contact-phone').value || '').trim(),
     contact_email: (document.getElementById('super-admin-create-contact-email').value || '').trim(),
     initial_password: document.getElementById('super-admin-create-password').value || '',
-    timezone: (document.getElementById('super-admin-create-timezone').value || '').trim(),
-    currency: (document.getElementById('super-admin-create-currency').value || '').trim(),
-    locale: (document.getElementById('super-admin-create-locale').value || '').trim(),
     modules: moduleInputs.map(function(input) {
       return {
         module_key: input.getAttribute('data-module-key'),
@@ -2509,7 +2495,6 @@ function createTenantFromSuperAdmin() {
     })
   };
   if (!body.name) { toast('שם עסק חובה', 'error'); return; }
-  if (!body.slug) { toast('כתובת מערכת / slug חובה', 'error'); return; }
   if (!body.contact_name) { toast('שם איש קשר חובה', 'error'); return; }
   if (!body.contact_phone) { toast('טלפון איש קשר חובה', 'error'); return; }
   if (!body.contact_email) { toast('אימייל איש קשר חובה', 'error'); return; }
