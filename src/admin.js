@@ -1,4 +1,5 @@
 import { requireSuperAdmin } from './auth.js';
+import { hashPassword } from './passwords.js';
 
 const MODULE_KEYS = [
   'leads',
@@ -24,11 +25,31 @@ function normalizeTenantName(value) {
 
 function normalizeTenantSlug(value) {
   const slug = String(value || '').trim().toLowerCase();
-  if (!slug) throw new Error('slug חובה');
+  if (!slug) throw new Error('כתובת מערכת / slug חובה');
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
     throw new Error('slug לא תקין');
   }
   return slug;
+}
+
+function normalizeRequiredText(value, label) {
+  const text = normalizeOptionalText(value);
+  if (!text) throw new Error(label + ' חובה');
+  return text;
+}
+
+function normalizeContactEmail(value) {
+  const email = String(value || '').trim().toLowerCase();
+  if (!email) throw new Error('אימייל איש קשר חובה');
+  if (!email.includes('@')) throw new Error('אימייל איש קשר לא תקין');
+  return email;
+}
+
+function normalizeInitialPassword(value) {
+  const password = String(value || '');
+  if (!password) throw new Error('סיסמה ראשונית חובה');
+  if (password.length < 4) throw new Error('הסיסמה הראשונית חייבת להכיל לפחות 4 תווים');
+  return password;
 }
 
 function normalizeModuleKey(value) {
@@ -44,6 +65,32 @@ function normalizeModuleEnabled(value) {
   throw new Error('is_enabled לא תקין');
 }
 
+function normalizeModulesPayload(modules) {
+  if (!Array.isArray(modules) || modules.length !== MODULE_KEYS.length) {
+    throw new Error('בחירת מודולים לא תקינה');
+  }
+
+  const seen = new Set();
+  const normalized = modules.map(function(item) {
+    if (!item || typeof item !== 'object') throw new Error('בחירת מודולים לא תקינה');
+    const moduleKey = normalizeModuleKey(item.module_key);
+    if (seen.has(moduleKey)) throw new Error('module_key כפול בבקשה');
+    seen.add(moduleKey);
+    return {
+      module_key: moduleKey,
+      is_enabled: normalizeModuleEnabled(item.is_enabled)
+    };
+  });
+
+  if (seen.size !== MODULE_KEYS.length) {
+    throw new Error('חסרים מודולים בבקשה');
+  }
+
+  return MODULE_KEYS.map(function(moduleKey) {
+    return normalized.find(function(item) { return item.module_key === moduleKey; });
+  });
+}
+
 function mapTenantRow(row) {
   return {
     id: row.id,
@@ -53,6 +100,9 @@ function mapTenantRow(row) {
     timezone: row.timezone,
     currency: row.currency,
     locale: row.locale,
+    contact_name: row.contact_name || null,
+    contact_phone: row.contact_phone || null,
+    contact_email: row.contact_email || null,
     created_at: row.created_at,
     updated_at: row.updated_at
   };
@@ -60,7 +110,7 @@ function mapTenantRow(row) {
 
 async function getTenantById(tenantId, env) {
   return env.DB.prepare(`
-    SELECT id, name, slug, status, timezone, currency, locale, created_at, updated_at
+    SELECT id, name, slug, status, timezone, currency, locale, contact_name, contact_phone, contact_email, created_at, updated_at
     FROM tenants
     WHERE id = ?
   `).bind(tenantId).first();
@@ -68,10 +118,31 @@ async function getTenantById(tenantId, env) {
 
 async function getTenantBySlug(slug, env) {
   return env.DB.prepare(`
-    SELECT id, name, slug, status, timezone, currency, locale, created_at, updated_at
+    SELECT id, name, slug, status, timezone, currency, locale, contact_name, contact_phone, contact_email, created_at, updated_at
     FROM tenants
     WHERE slug = ?
   `).bind(slug).first();
+}
+
+async function getUserByEmail(email, env) {
+  return env.DB.prepare(`
+    SELECT id, name, email, role, status
+    FROM users
+    WHERE lower(email) = ?
+    LIMIT 1
+  `).bind(email).first();
+}
+
+async function getActiveMembershipCountForUser(userId, env) {
+  const row = await env.DB.prepare(`
+    SELECT COUNT(*) AS count
+    FROM tenant_memberships tm
+    JOIN tenants t ON t.id = tm.tenant_id
+    WHERE tm.user_id = ?
+      AND tm.status = 'active'
+      AND t.status = 'active'
+  `).bind(userId).first();
+  return Number(row && row.count ? row.count : 0);
 }
 
 async function getEffectiveTenantModules(tenantId, env) {
@@ -102,7 +173,7 @@ export async function handleAdmin(request, env, path) {
 
   if (path === '/api/admin/tenants' && method === 'GET') {
     const result = await env.DB.prepare(`
-      SELECT id, name, slug, status, timezone, currency, locale, created_at, updated_at
+      SELECT id, name, slug, status, timezone, currency, locale, contact_name, contact_phone, contact_email, created_at, updated_at
       FROM tenants
       ORDER BY created_at DESC, id DESC
     `).all();
@@ -122,14 +193,27 @@ export async function handleAdmin(request, env, path) {
 
     const name = normalizeTenantName(body.name);
     const slug = normalizeTenantSlug(body.slug);
-    const timezone = normalizeOptionalText(body.timezone);
-    const currency = normalizeOptionalText(body.currency);
-    const locale = normalizeOptionalText(body.locale);
+    const contactName = normalizeRequiredText(body.contact_name, 'שם איש קשר');
+    const contactPhone = normalizeRequiredText(body.contact_phone, 'טלפון איש קשר');
+    const contactEmail = normalizeContactEmail(body.contact_email);
+    const initialPassword = normalizeInitialPassword(body.initial_password);
+    const timezone = normalizeOptionalText(body.timezone) || 'Asia/Jerusalem';
+    const currency = normalizeOptionalText(body.currency) || 'ILS';
+    const locale = normalizeOptionalText(body.locale) || 'he-IL';
+    const normalizedModules = normalizeModulesPayload(body.modules);
 
     const existingTenant = await getTenantBySlug(slug, env);
-    if (existingTenant) throw new Error('slug כבר קיים');
+    if (existingTenant) throw new Error('כתובת המערכת כבר קיימת');
 
-    const result = await env.DB.prepare(`
+    let ownerUser = await getUserByEmail(contactEmail, env);
+    if (ownerUser) {
+      const activeMembershipCount = await getActiveMembershipCountForUser(ownerUser.id, env);
+      if (activeMembershipCount > 0) {
+        throw new Error('האימייל כבר משויך לעסק פעיל אחר, לא ניתן להשתמש בו כבעלים חדש');
+      }
+    }
+
+    const tenantResult = await env.DB.prepare(`
       INSERT INTO tenants (
         name,
         slug,
@@ -137,19 +221,91 @@ export async function handleAdmin(request, env, path) {
         timezone,
         currency,
         locale,
+        contact_name,
+        contact_phone,
+        contact_email,
         created_at,
         updated_at
-      ) VALUES (?, ?, 'active', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ) VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `).bind(
       name,
       slug,
       timezone,
       currency,
-      locale
+      locale,
+      contactName,
+      contactPhone,
+      contactEmail
     ).run();
 
-    const tenant = await getTenantById(result.meta.last_row_id, env);
-    return { success: true, tenant: mapTenantRow(tenant) };
+    const tenantId = tenantResult.meta.last_row_id;
+
+    if (!ownerUser) {
+      const passwordHash = await hashPassword(initialPassword);
+      const createUserResult = await env.DB.prepare(`
+        INSERT INTO users (
+          name,
+          email,
+          password_hash,
+          role,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, 'user', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `).bind(contactName, contactEmail, passwordHash).run();
+
+      ownerUser = await env.DB.prepare(`
+        SELECT id, name, email, role, status
+        FROM users
+        WHERE id = ?
+        LIMIT 1
+      `).bind(createUserResult.meta.last_row_id).first();
+    }
+
+    await env.DB.prepare(`
+      INSERT INTO tenant_memberships (
+        tenant_id,
+        user_id,
+        role,
+        status,
+        invited_by_user_id,
+        accepted_at,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, 'owner', 'active', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `).bind(
+      tenantId,
+      ownerUser.id,
+      superAdminCtx && superAdminCtx.user ? superAdminCtx.user.id : null
+    ).run();
+
+    for (const item of normalizedModules) {
+      await env.DB.prepare(`
+        INSERT INTO tenant_modules (
+          tenant_id,
+          module_key,
+          is_enabled,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `).bind(
+        tenantId,
+        item.module_key,
+        item.is_enabled ? 1 : 0
+      ).run();
+    }
+
+    const tenant = await getTenantById(tenantId, env);
+    return {
+      success: true,
+      tenant: mapTenantRow(tenant),
+      owner: {
+        id: ownerUser.id,
+        name: ownerUser.name,
+        email: ownerUser.email,
+        role: ownerUser.role
+      },
+      modules: normalizedModules
+    };
   }
 
   const tenantMatch = path.match(/^\/api\/admin\/tenants\/(\d+)$/);
@@ -216,21 +372,7 @@ export async function handleAdmin(request, env, path) {
       throw new Error('בקשה לא תקינה');
     }
 
-    if (!body || !Array.isArray(body.modules) || body.modules.length === 0) {
-      throw new Error('modules payload לא תקין');
-    }
-
-    const seen = new Set();
-    const normalizedModules = body.modules.map(function(item) {
-      if (!item || typeof item !== 'object') throw new Error('modules payload לא תקין');
-      const moduleKey = normalizeModuleKey(item.module_key);
-      if (seen.has(moduleKey)) throw new Error('module_key כפול בבקשה');
-      seen.add(moduleKey);
-      return {
-        module_key: moduleKey,
-        is_enabled: normalizeModuleEnabled(item.is_enabled)
-      };
-    });
+    const normalizedModules = normalizeModulesPayload(body.modules);
 
     for (const item of normalizedModules) {
       await env.DB.prepare(`
