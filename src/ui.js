@@ -124,6 +124,16 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .check-item:hover{border-color:var(--accent);background:var(--accent-light)}
 .check-item.checked{border-color:var(--accent);background:var(--accent-light);color:var(--accent);font-weight:600}
 .check-item input{display:none}
+.module-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);cursor:pointer;transition:all 0.12s}
+.module-toggle:hover{border-color:var(--accent);background:var(--accent-light)}
+.module-toggle.checked{border-color:var(--accent);background:var(--accent-light);box-shadow:0 0 0 2px rgba(124,58,237,0.08)}
+.module-toggle input{display:none}
+.module-toggle-text{display:flex;flex-direction:column;gap:4px;min-width:0}
+.module-toggle-title{font-size:13px;font-weight:700;color:var(--text)}
+.module-toggle-status{font-size:11px;font-weight:700;color:var(--text3)}
+.module-toggle.checked .module-toggle-title,.module-toggle.checked .module-toggle-status{color:var(--accent)}
+.module-toggle-pill{display:inline-flex;align-items:center;justify-content:center;min-width:54px;padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:var(--white);font-size:11px;font-weight:800;color:var(--text3)}
+.module-toggle.checked .module-toggle-pill{border-color:rgba(124,58,237,0.25);background:var(--accent);color:#fff}
 .dup-warning{background:var(--orange-light);border:1px solid rgba(234,88,12,0.3);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--orange);margin-top:5px;display:none;cursor:pointer}
 .dup-warning:hover{background:#fed7aa}
 .ac-dropdown{position:absolute;top:100%;right:0;left:0;background:var(--white);border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:var(--shadow-md);z-index:99;display:none;max-height:200px;overflow-y:auto}
@@ -1405,12 +1415,12 @@ id="customers-search">
       <div class="form-group" style="margin-bottom:0">
         <label class="form-label">מודולים פעילים</label>
         <div class="check-grid" id="super-admin-create-modules">
-          <label class="check-item"><input type="checkbox" data-module-key="leads" checked> לידים / אירועים</label>
-          <label class="check-item"><input type="checkbox" data-module-key="contacts" checked> לקוחות / אנשי קשר</label>
-          <label class="check-item"><input type="checkbox" data-module-key="employees" checked> עובדים</label>
-          <label class="check-item"><input type="checkbox" data-module-key="products" checked> מוצרים ומלאי</label>
-          <label class="check-item"><input type="checkbox" data-module-key="shopping" checked> קניות / רכישות</label>
-          <label class="check-item"><input type="checkbox" data-module-key="reports" checked> דוחות</label>
+          <label class="module-toggle checked"><input type="checkbox" data-module-key="leads" checked><span class="module-toggle-text"><span class="module-toggle-title">לידים / אירועים</span><span class="module-toggle-status">פעיל</span></span><span class="module-toggle-pill">ON</span></label>
+          <label class="module-toggle checked"><input type="checkbox" data-module-key="contacts" checked><span class="module-toggle-text"><span class="module-toggle-title">לקוחות / אנשי קשר</span><span class="module-toggle-status">פעיל</span></span><span class="module-toggle-pill">ON</span></label>
+          <label class="module-toggle checked"><input type="checkbox" data-module-key="employees" checked><span class="module-toggle-text"><span class="module-toggle-title">עובדים</span><span class="module-toggle-status">פעיל</span></span><span class="module-toggle-pill">ON</span></label>
+          <label class="module-toggle checked"><input type="checkbox" data-module-key="products" checked><span class="module-toggle-text"><span class="module-toggle-title">מוצרים ומלאי</span><span class="module-toggle-status">פעיל</span></span><span class="module-toggle-pill">ON</span></label>
+          <label class="module-toggle checked"><input type="checkbox" data-module-key="shopping" checked><span class="module-toggle-text"><span class="module-toggle-title">קניות / רכישות</span><span class="module-toggle-status">פעיל</span></span><span class="module-toggle-pill">ON</span></label>
+          <label class="module-toggle checked"><input type="checkbox" data-module-key="reports" checked><span class="module-toggle-text"><span class="module-toggle-title">דוחות</span><span class="module-toggle-status">פעיל</span></span><span class="module-toggle-pill">ON</span></label>
         </div>
       </div>
     </div>
@@ -1923,6 +1933,8 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   if (superAdminCreateCancel) superAdminCreateCancel.addEventListener('click', closeSuperAdminCreateModal);
   var superAdminCreateModal = document.getElementById('super-admin-create-modal');
   if (superAdminCreateModal) superAdminCreateModal.addEventListener('click', function(e) { if (e.target === this) closeSuperAdminCreateModal(); });
+  var superAdminCreateModules = document.getElementById('super-admin-create-modules');
+  if (superAdminCreateModules) bindModuleToggleGroup(superAdminCreateModules);
   var superAdminClose = document.getElementById('super-admin-tenant-close');
   if (superAdminClose) superAdminClose.addEventListener('click', closeSuperAdminTenantModal);
   var superAdminCloseFooter = document.getElementById('super-admin-tenant-close-footer');
@@ -2468,6 +2480,31 @@ function closeSuperAdminCreateModal() {
   if (modal) modal.classList.remove('open');
 }
 
+function syncModuleToggleLabel(label, checked) {
+  if (!label) return;
+  label.classList.toggle('checked', !!checked);
+  var status = label.querySelector('.module-toggle-status');
+  if (status) status.textContent = checked ? 'פעיל' : 'כבוי';
+  var pill = label.querySelector('.module-toggle-pill');
+  if (pill) pill.textContent = checked ? 'ON' : 'OFF';
+}
+
+function bindModuleToggleGroup(container) {
+  if (!container) return;
+  container.querySelectorAll('label.module-toggle').forEach(function(label) {
+    var input = label.querySelector('input[data-module-key]');
+    if (!input) return;
+    syncModuleToggleLabel(label, !!input.checked);
+    if (label.getAttribute('data-module-bound') === '1') return;
+    label.setAttribute('data-module-bound', '1');
+    label.addEventListener('click', function(e) {
+      e.preventDefault();
+      input.checked = !input.checked;
+      syncModuleToggleLabel(label, !!input.checked);
+    });
+  });
+}
+
 function resetSuperAdminCreateForm() {
   document.getElementById('super-admin-create-name').value = '';
   document.getElementById('super-admin-create-contact-name').value = '';
@@ -2476,6 +2513,7 @@ function resetSuperAdminCreateForm() {
   document.getElementById('super-admin-create-password').value = '';
   Array.prototype.slice.call(document.querySelectorAll('#super-admin-create-modules input[data-module-key]')).forEach(function(input) {
     input.checked = true;
+    syncModuleToggleLabel(input.closest('label'), true);
   });
 }
 
@@ -2654,7 +2692,7 @@ function openSuperAdminTenantModal(tenantId) {
       : '<div class="dash-empty">לא נמצא בעלים ראשי</div>') +
       '<div class="form-section">מודולים</div>' +
       '<div class="check-grid" id="super-admin-tenant-modules-form">' + modules.map(function(module) {
-        return '<label class="check-item' + (module.is_enabled ? ' checked' : '') + '"><input type="checkbox" data-module-key="' + escapeHtml(module.module_key) + '"' + (module.is_enabled ? ' checked' : '') + '> ' + escapeHtml(getAdminModuleLabel(module.module_key)) + '</label>';
+        return '<label class="module-toggle' + (module.is_enabled ? ' checked' : '') + '"><input type="checkbox" data-module-key="' + escapeHtml(module.module_key) + '"' + (module.is_enabled ? ' checked' : '') + '><span class="module-toggle-text"><span class="module-toggle-title">' + escapeHtml(getAdminModuleLabel(module.module_key)) + '</span><span class="module-toggle-status">' + (module.is_enabled ? 'פעיל' : 'כבוי') + '</span></span><span class="module-toggle-pill">' + (module.is_enabled ? 'ON' : 'OFF') + '</span></label>';
       }).join('') + '</div>' +
       '<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn btn-primary" id="super-admin-save-modules">שמור מודולים</button></div>' +
       '<div class="form-section">Audit Log</div>' +
@@ -2675,14 +2713,7 @@ function openSuperAdminTenantModal(tenantId) {
     if (saveModulesBtn) saveModulesBtn.onclick = function() { saveSuperAdminTenantModules(tenantId); };
     var resetOwnerPasswordBtn = document.getElementById('super-admin-reset-owner-password');
     if (resetOwnerPasswordBtn) resetOwnerPasswordBtn.onclick = function() { resetSuperAdminTenantOwnerPassword(tenantId); };
-    body.querySelectorAll('#super-admin-tenant-modules-form .check-item').forEach(function(el) {
-      el.addEventListener('click', function(e) {
-        if (e.target && e.target.tagName === 'INPUT') return;
-        var cb = this.querySelector('input');
-        cb.checked = !cb.checked;
-        this.classList.toggle('checked', cb.checked);
-      });
-    });
+    bindModuleToggleGroup(document.getElementById('super-admin-tenant-modules-form'));
   }).catch(function(err) {
     body.innerHTML = '<div class="dash-empty">' + escapeHtml(err.message || 'שגיאה בטעינת tenant') + '</div>';
   });
