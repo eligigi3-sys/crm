@@ -1378,38 +1378,7 @@ id="customers-search">
     <div id="page-super-admin" class="page">
       <div class="page-header">
         <div class="page-title">Super Admin <small>צפייה וניהול בסיסי של עסקים</small></div>
-      </div>
-      <div class="table-card" style="margin-bottom:16px">
-        <div class="table-toolbar" style="display:block">
-          <div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:14px">פתיחת עסק חדש</div>
-          <div class="form-row-3" style="margin-bottom:10px">
-            <div class="form-group" style="margin-bottom:0"><label class="form-label">שם העסק *</label><input class="form-input" id="super-admin-create-name" placeholder="שם העסק"></div>
-            <div class="form-group" style="margin-bottom:0"><label class="form-label">כתובת מערכת / slug *</label><input class="form-input" id="super-admin-create-slug" placeholder="business-slug"></div>
-            <div class="form-group" style="margin-bottom:0"><label class="form-label">שם איש קשר *</label><input class="form-input" id="super-admin-create-contact-name" placeholder="ישראל ישראלי"></div>
-          </div>
-          <div class="form-row-3" style="margin-bottom:10px">
-            <div class="form-group" style="margin-bottom:0"><label class="form-label">טלפון איש קשר *</label><input class="form-input" id="super-admin-create-contact-phone" placeholder="050-0000000" type="tel"></div>
-            <div class="form-group" style="margin-bottom:0"><label class="form-label">אימייל איש קשר *</label><input class="form-input" id="super-admin-create-contact-email" placeholder="owner@example.com" type="email"></div>
-            <div class="form-group" style="margin-bottom:0"><label class="form-label">סיסמה ראשונית *</label><input class="form-input" id="super-admin-create-password" placeholder="סיסמה ראשונית" type="password"></div>
-          </div>
-          <div class="form-row-3" style="margin-bottom:10px">
-            <div class="form-group" style="margin-bottom:0"><label class="form-label">Timezone</label><input class="form-input" id="super-admin-create-timezone" placeholder="Asia/Jerusalem"></div>
-            <div class="form-group" style="margin-bottom:0"><label class="form-label">Currency</label><input class="form-input" id="super-admin-create-currency" placeholder="ILS"></div>
-            <div class="form-group" style="margin-bottom:0"><label class="form-label">Locale</label><input class="form-input" id="super-admin-create-locale" placeholder="he-IL"></div>
-          </div>
-          <div class="form-group" style="margin-bottom:10px">
-            <label class="form-label">מודולים פעילים</label>
-            <div class="check-grid" id="super-admin-create-modules">
-              <label class="check-item"><input type="checkbox" data-module-key="leads" checked> לידים / אירועים</label>
-              <label class="check-item"><input type="checkbox" data-module-key="contacts" checked> לקוחות / אנשי קשר</label>
-              <label class="check-item"><input type="checkbox" data-module-key="employees" checked> עובדים</label>
-              <label class="check-item"><input type="checkbox" data-module-key="products" checked> מוצרים ומלאי</label>
-              <label class="check-item"><input type="checkbox" data-module-key="shopping" checked> קניות / רכישות</label>
-              <label class="check-item"><input type="checkbox" data-module-key="reports" checked> דוחות</label>
-            </div>
-          </div>
-          <div class="form-group" style="margin-bottom:0;display:flex;align-items:end;justify-content:flex-start"><button class="btn btn-primary" id="super-admin-create-btn">+ פתיחת עסק</button></div>
-        </div>
+        <button class="btn btn-primary" id="super-admin-open-create-modal">פתיחת עסק חדש</button>
       </div>
       <div class="table-card">
         <table>
@@ -1418,6 +1387,40 @@ id="customers-search">
         </table>
       </div>
     </div>
+  </div>
+</div>
+<div class="modal-overlay" id="super-admin-create-modal">
+  <div class="modal" style="width:760px">
+    <div class="modal-header"><h2>פתיחת עסק חדש</h2><button class="modal-close" id="super-admin-create-close">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row-3" style="margin-bottom:10px">
+        <div class="form-group" style="margin-bottom:0"><label class="form-label">שם העסק *</label><input class="form-input" id="super-admin-create-name" placeholder="שם העסק"></div>
+        <div class="form-group" style="margin-bottom:0"><label class="form-label">כתובת מערכת / slug *</label><input class="form-input" id="super-admin-create-slug" placeholder="business-slug"></div>
+        <div class="form-group" style="margin-bottom:0"><label class="form-label">שם איש קשר *</label><input class="form-input" id="super-admin-create-contact-name" placeholder="ישראל ישראלי"></div>
+      </div>
+      <div class="form-row-3" style="margin-bottom:10px">
+        <div class="form-group" style="margin-bottom:0"><label class="form-label">טלפון איש קשר *</label><input class="form-input" id="super-admin-create-contact-phone" placeholder="050-0000000" type="tel"></div>
+        <div class="form-group" style="margin-bottom:0"><label class="form-label">אימייל איש קשר *</label><input class="form-input" id="super-admin-create-contact-email" placeholder="owner@example.com" type="email"></div>
+        <div class="form-group" style="margin-bottom:0"><label class="form-label">סיסמה ראשונית *</label><input class="form-input" id="super-admin-create-password" placeholder="סיסמה ראשונית" type="password"></div>
+      </div>
+      <div class="form-row-3" style="margin-bottom:10px">
+        <div class="form-group" style="margin-bottom:0"><label class="form-label">Timezone</label><input class="form-input" id="super-admin-create-timezone" placeholder="Asia/Jerusalem"></div>
+        <div class="form-group" style="margin-bottom:0"><label class="form-label">Currency</label><input class="form-input" id="super-admin-create-currency" placeholder="ILS"></div>
+        <div class="form-group" style="margin-bottom:0"><label class="form-label">Locale</label><input class="form-input" id="super-admin-create-locale" placeholder="he-IL"></div>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">מודולים פעילים</label>
+        <div class="check-grid" id="super-admin-create-modules">
+          <label class="check-item"><input type="checkbox" data-module-key="leads" checked> לידים / אירועים</label>
+          <label class="check-item"><input type="checkbox" data-module-key="contacts" checked> לקוחות / אנשי קשר</label>
+          <label class="check-item"><input type="checkbox" data-module-key="employees" checked> עובדים</label>
+          <label class="check-item"><input type="checkbox" data-module-key="products" checked> מוצרים ומלאי</label>
+          <label class="check-item"><input type="checkbox" data-module-key="shopping" checked> קניות / רכישות</label>
+          <label class="check-item"><input type="checkbox" data-module-key="reports" checked> דוחות</label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" id="super-admin-create-cancel">ביטול</button><button class="btn btn-primary" id="super-admin-create-btn">צור עסק</button></div>
   </div>
 </div>
 <div class="modal-overlay" id="super-admin-tenant-modal">
@@ -1902,7 +1905,7 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   var teamRoleFilter = document.getElementById('team-role-filter');
   if (teamRoleFilter) teamRoleFilter.addEventListener('change', loadTeamMembers);
   document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') { closeLeadModal(); closeDrawer(); closeCustomerModal(); closeSuperAdminTenantModal(); }
+    if (e.key === 'Escape') { closeLeadModal(); closeDrawer(); closeCustomerModal(); closeSuperAdminCreateModal(); closeSuperAdminTenantModal(); }
   });
   window.addEventListener('storage', function(e) {
     if (e.key !== 'crm_token' && e.key !== 'crm_user') return;
@@ -1918,6 +1921,14 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   window.addEventListener('focus', function() {
     scheduleSessionRevalidation();
   });
+  var superAdminCreateOpen = document.getElementById('super-admin-open-create-modal');
+  if (superAdminCreateOpen) superAdminCreateOpen.addEventListener('click', openSuperAdminCreateModal);
+  var superAdminCreateClose = document.getElementById('super-admin-create-close');
+  if (superAdminCreateClose) superAdminCreateClose.addEventListener('click', closeSuperAdminCreateModal);
+  var superAdminCreateCancel = document.getElementById('super-admin-create-cancel');
+  if (superAdminCreateCancel) superAdminCreateCancel.addEventListener('click', closeSuperAdminCreateModal);
+  var superAdminCreateModal = document.getElementById('super-admin-create-modal');
+  if (superAdminCreateModal) superAdminCreateModal.addEventListener('click', function(e) { if (e.target === this) closeSuperAdminCreateModal(); });
   var superAdminClose = document.getElementById('super-admin-tenant-close');
   if (superAdminClose) superAdminClose.addEventListener('click', closeSuperAdminTenantModal);
   var superAdminCloseFooter = document.getElementById('super-admin-tenant-close-footer');
@@ -2453,6 +2464,31 @@ function loadSuperAdminTenants() {
   });
 }
 
+function openSuperAdminCreateModal() {
+  var modal = document.getElementById('super-admin-create-modal');
+  if (modal) modal.classList.add('open');
+}
+
+function closeSuperAdminCreateModal() {
+  var modal = document.getElementById('super-admin-create-modal');
+  if (modal) modal.classList.remove('open');
+}
+
+function resetSuperAdminCreateForm() {
+  document.getElementById('super-admin-create-name').value = '';
+  document.getElementById('super-admin-create-slug').value = '';
+  document.getElementById('super-admin-create-contact-name').value = '';
+  document.getElementById('super-admin-create-contact-phone').value = '';
+  document.getElementById('super-admin-create-contact-email').value = '';
+  document.getElementById('super-admin-create-password').value = '';
+  document.getElementById('super-admin-create-timezone').value = '';
+  document.getElementById('super-admin-create-currency').value = '';
+  document.getElementById('super-admin-create-locale').value = '';
+  Array.prototype.slice.call(document.querySelectorAll('#super-admin-create-modules input[data-module-key]')).forEach(function(input) {
+    input.checked = true;
+  });
+}
+
 function createTenantFromSuperAdmin() {
   var moduleInputs = Array.prototype.slice.call(document.querySelectorAll('#super-admin-create-modules input[data-module-key]'));
   var body = {
@@ -2478,20 +2514,11 @@ function createTenantFromSuperAdmin() {
   if (!body.contact_phone) { toast('טלפון איש קשר חובה', 'error'); return; }
   if (!body.contact_email) { toast('אימייל איש קשר חובה', 'error'); return; }
   if (!body.initial_password) { toast('סיסמה ראשונית חובה', 'error'); return; }
-  apiCall('POST', '/api/admin/tenants', body).then(function(res) {
-    document.getElementById('super-admin-create-name').value = '';
-    document.getElementById('super-admin-create-slug').value = '';
-    document.getElementById('super-admin-create-contact-name').value = '';
-    document.getElementById('super-admin-create-contact-phone').value = '';
-    document.getElementById('super-admin-create-contact-email').value = '';
-    document.getElementById('super-admin-create-password').value = '';
-    document.getElementById('super-admin-create-timezone').value = '';
-    document.getElementById('super-admin-create-currency').value = '';
-    document.getElementById('super-admin-create-locale').value = '';
-    moduleInputs.forEach(function(input) { input.checked = true; });
+  apiCall('POST', '/api/admin/tenants', body).then(function() {
+    resetSuperAdminCreateForm();
+    closeSuperAdminCreateModal();
     loadSuperAdminTenants();
     toast('העסק נפתח בהצלחה', 'success');
-    if (res && res.tenant && res.tenant.id) openSuperAdminTenantModal(res.tenant.id);
   }).catch(function(err) {
     toast(err.message || 'שגיאה בפתיחת עסק', 'error');
   });
