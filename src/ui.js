@@ -506,6 +506,35 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .customer-tag-pill{display:inline-flex;align-items:center;gap:6px;background:var(--accent-light);color:var(--accent);border-radius:999px;padding:6px 10px;font-size:12px;font-weight:700}
 .customer-tag-remove{border:none;background:transparent;color:var(--accent);cursor:pointer;font-size:13px;font-weight:800;line-height:1;padding:0}
 .customer-tag-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+.customer-billing-panel{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
+.customer-billing-header{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#fafbfc}
+.customer-billing-title{font-size:16px;font-weight:900;color:var(--text)}
+.customer-billing-subtitle{font-size:12px;color:var(--text3);line-height:1.5;margin-top:4px}
+.customer-billing-tabs{display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--white);overflow-x:auto}
+.customer-billing-tab{border:1px solid var(--border);background:#fff;color:var(--text2);border-radius:999px;padding:8px 12px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap}
+.customer-billing-tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.customer-billing-content{padding:16px;display:flex;flex-direction:column;gap:14px}
+.customer-billing-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.customer-billing-grid.single{grid-template-columns:1fr}
+.customer-billing-section{border:1px solid var(--border);border-radius:12px;background:#fff;padding:14px;display:flex;flex-direction:column;gap:12px}
+.customer-billing-section-title{font-size:14px;font-weight:900;color:var(--text)}
+.customer-billing-section-sub{font-size:12px;color:var(--text3);line-height:1.5}
+.customer-billing-actions{position:sticky;bottom:0;background:rgba(255,255,255,.96);border-top:1px solid var(--border);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;z-index:2}
+.customer-billing-status{font-size:12px;color:var(--text3);line-height:1.5}
+.customer-billing-permission{border:1px solid #fde68a;background:#fffbeb;color:#92400e;border-radius:10px;padding:10px 12px;font-size:12px;font-weight:700;line-height:1.6}
+.customer-billing-list{display:flex;flex-direction:column;gap:10px}
+.customer-billing-card{border:1px solid var(--border);border-radius:12px;background:#fafbfc;padding:12px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.customer-billing-card-main{flex:1;display:flex;flex-direction:column;gap:7px;min-width:0}
+.customer-billing-card-title{font-size:14px;font-weight:900;color:var(--text)}
+.customer-billing-card-meta{font-size:12px;color:var(--text2);line-height:1.5;display:flex;gap:8px;flex-wrap:wrap}
+.customer-billing-card-actions{display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+.customer-billing-inline-form{border:1px solid var(--accent);border-radius:12px;background:#fbf8ff;padding:14px;display:flex;flex-direction:column;gap:12px}
+.customer-billing-empty{padding:18px;border:1px dashed var(--border);border-radius:12px;background:#f8fafc;color:var(--text3);text-align:center;font-size:13px;line-height:1.6}
+.customer-billing-chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;background:#eef2ff;color:#4338ca;padding:4px 8px;font-size:11px;font-weight:800}
+.customer-billing-chip.muted{background:#f3f4f6;color:var(--text3)}
+.customer-billing-chip.green{background:#dcfce7;color:#166534}
+.customer-billing-chip.orange{background:#ffedd5;color:#c2410c}
 .autocomplete-list{position:absolute;top:100%;right:0;left:0;background:var(--white);border:1px solid var(--accent);border-radius:var(--radius-sm);box-shadow:var(--shadow-md);z-index:300;max-height:200px;overflow-y:auto}
 .autocomplete-item{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)}
 .autocomplete-item:last-child{border-bottom:none}
@@ -675,6 +704,37 @@ tr:hover td{background:#fafbfc;cursor:pointer}
   #customers-grid div[style*="grid-template-columns:360px 1fr"] {
     display: grid !important;
     grid-template-columns: 1fr !important;
+  }
+
+  .customer-billing-header,
+  .customer-billing-actions,
+  .customer-billing-card {
+    align-items: stretch;
+  }
+
+  .customer-billing-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .customer-billing-tabs {
+    padding: 10px 12px;
+  }
+
+  .customer-billing-content {
+    padding: 12px;
+  }
+
+  .customer-billing-card {
+    flex-direction: column;
+  }
+
+  .customer-billing-card-actions,
+  .customer-billing-actions .btn {
+    width: 100%;
+  }
+
+  .customer-billing-card-actions .btn {
+    flex: 1;
   }
 }
 
@@ -1783,6 +1843,7 @@ var salesDocumentSaving = false;
 var currentBusinessSettings = null;
 var businessSettingsLoading = false;
 var businessSettingsSaving = false;
+var currentCustomerBillingState = null;
 var allLeadsCache = [];
 var calYear, calMonth;
 var currentTenantContext = null;
@@ -8231,6 +8292,438 @@ function openEventDetailsModal(id) {
 }
 
 
+function canEditCustomerBilling() {
+  var role = getTenantRole();
+  return role === 'owner' || role === 'admin' || role === 'manager';
+}
+
+function customerBillingEmptyState(text) {
+  return '<div class="customer-billing-empty">' + escapeHtml(text) + '</div>';
+}
+
+function getCustomerBillingVatLabel(value) {
+  var map = { standard: 'רגיל', exempt: 'פטור', reverse_charge: 'חיוב הפוך', foreign: 'חו״ל', custom: 'מותאם' };
+  return map[value] || value || '—';
+}
+
+function getCustomerBillingCreditLabel(value) {
+  var map = { normal: 'רגיל', watch: 'במעקב', blocked: 'חסום' };
+  return map[value] || value || '—';
+}
+
+function getCustomerAddressTypeLabel(value) {
+  var map = { billing: 'חיוב', shipping: 'משלוח', service: 'שירות', event: 'אירוע', other: 'אחר' };
+  return map[value] || value || '—';
+}
+
+function getCustomerContactRoleLabel(value) {
+  var map = { main: 'ראשי', finance: 'כספים', assistant: 'עוזר/ת', onsite: 'בשטח', producer: 'מפיק/ה', other: 'אחר' };
+  return map[value] || value || '—';
+}
+
+function customerBillingValue(value) {
+  return value === undefined || value === null ? '' : String(value);
+}
+
+function customerBillingInput(field, label, value, disabled, type, attrs) {
+  return '<div class="form-group" style="margin-bottom:0"><label class="form-label">' + escapeHtml(label) + '</label><input class="form-input customer-billing-field" data-billing-field="' + escapeHtml(field) + '" type="' + escapeHtml(type || 'text') + '" value="' + escapeHtml(customerBillingValue(value)) + '"' + (attrs || '') + (disabled ? ' disabled' : '') + '></div>';
+}
+
+function customerBillingTextarea(field, label, value, disabled) {
+  return '<div class="form-group" style="margin-bottom:0"><label class="form-label">' + escapeHtml(label) + '</label><textarea class="form-textarea customer-billing-field" data-billing-field="' + escapeHtml(field) + '"' + (disabled ? ' disabled' : '') + '>' + escapeHtml(customerBillingValue(value)) + '</textarea></div>';
+}
+
+function customerBillingSelect(field, label, value, options, disabled) {
+  return '<div class="form-group" style="margin-bottom:0"><label class="form-label">' + escapeHtml(label) + '</label><select class="form-input customer-billing-field" data-billing-field="' + escapeHtml(field) + '"' + (disabled ? ' disabled' : '') + '>' +
+    options.map(function(option) { return '<option value="' + escapeHtml(option[0]) + '"' + (String(value || '') === String(option[0]) ? ' selected' : '') + '>' + escapeHtml(option[1]) + '</option>'; }).join('') +
+  '</select></div>';
+}
+
+function customerBillingCheckbox(field, label, checked, disabled) {
+  return '<label style="display:flex;gap:8px;align-items:center;font-size:13px;font-weight:700;color:var(--text2)"><input type="checkbox" class="customer-billing-check" data-billing-field="' + escapeHtml(field) + '"' + (Number(checked) === 1 || checked === true ? ' checked' : '') + (disabled ? ' disabled' : '') + '> ' + escapeHtml(label) + '</label>';
+}
+
+function getCustomerBillingShell(customerId) {
+  return '<div class="customer-billing-panel" id="customer-billing-root" data-contact-id="' + customerId + '">' +
+    '<div class="customer-billing-header">' +
+      '<div><div class="customer-billing-title">חיוב וחשבונאות</div><div class="customer-billing-subtitle">פרטי חיוב, כתובות ואנשי קשר למסמכים עתידיים. לא משנה מסמכים קיימים.</div></div>' +
+      '<span class="badge badge-gray" id="customer-billing-role-badge">' + escapeHtml(getTenantRoleLabel(getTenantRole())) + '</span>' +
+    '</div>' +
+    '<div class="customer-billing-tabs">' +
+      '<button class="customer-billing-tab active" data-billing-tab="profile">פרופיל חיוב</button>' +
+      '<button class="customer-billing-tab" data-billing-tab="addresses">כתובות</button>' +
+      '<button class="customer-billing-tab" data-billing-tab="people">אנשי קשר</button>' +
+    '</div>' +
+    '<div class="customer-billing-content" id="customer-billing-content">טוען...</div>' +
+  '</div>';
+}
+
+function initCustomerBillingUI(customerId) {
+  currentCustomerBillingState = {
+    contactId: customerId,
+    activeTab: 'profile',
+    loading: true,
+    saving: false,
+    profile: null,
+    addresses: [],
+    people: [],
+    editingAddressId: null,
+    creatingAddress: false,
+    editingPersonId: null,
+    creatingPerson: false,
+    error: null
+  };
+  renderCustomerBillingUI();
+  return loadCustomerBillingData(customerId);
+}
+
+function loadCustomerBillingData(customerId) {
+  if (!currentCustomerBillingState || Number(currentCustomerBillingState.contactId) !== Number(customerId)) return Promise.resolve();
+  currentCustomerBillingState.loading = true;
+  currentCustomerBillingState.error = null;
+  renderCustomerBillingUI();
+  return Promise.all([
+    apiCall('GET', '/api/contacts/' + customerId + '/billing-profile'),
+    apiCall('GET', '/api/contacts/' + customerId + '/addresses'),
+    apiCall('GET', '/api/contacts/' + customerId + '/contact-people')
+  ]).then(function(results) {
+    currentCustomerBillingState.profile = results[0].profile || {};
+    currentCustomerBillingState.addresses = results[1].addresses || [];
+    currentCustomerBillingState.people = results[2].contact_people || [];
+    currentCustomerBillingState.loading = false;
+    renderCustomerBillingUI();
+  }).catch(function(e) {
+    currentCustomerBillingState.loading = false;
+    currentCustomerBillingState.error = e.message || 'שגיאה בטעינת נתוני חיוב';
+    renderCustomerBillingUI();
+  });
+}
+
+function renderCustomerBillingUI() {
+  var root = document.getElementById('customer-billing-root');
+  var content = document.getElementById('customer-billing-content');
+  if (!root || !content || !currentCustomerBillingState) return;
+  var state = currentCustomerBillingState;
+  root.querySelectorAll('.customer-billing-tab').forEach(function(tab) {
+    tab.classList.toggle('active', tab.getAttribute('data-billing-tab') === state.activeTab);
+    tab.onclick = function() {
+      state.activeTab = this.getAttribute('data-billing-tab');
+      state.editingAddressId = null;
+      state.creatingAddress = false;
+      state.editingPersonId = null;
+      state.creatingPerson = false;
+      renderCustomerBillingUI();
+    };
+  });
+  if (state.loading) {
+    content.innerHTML = customerBillingEmptyState('טוען נתוני חיוב...');
+    return;
+  }
+  if (state.error) {
+    content.innerHTML = '<div class="customer-billing-empty">שגיאה: ' + escapeHtml(state.error) + '</div>';
+    return;
+  }
+  if (state.activeTab === 'addresses') content.innerHTML = renderCustomerAddressesUI();
+  else if (state.activeTab === 'people') content.innerHTML = renderCustomerPeopleUI();
+  else content.innerHTML = renderCustomerBillingProfileUI();
+  bindCustomerBillingUI();
+}
+
+function renderCustomerBillingProfileUI() {
+  var state = currentCustomerBillingState;
+  var profile = state.profile || {};
+  var canEdit = canEditCustomerBilling();
+  var disabled = !canEdit || state.saving;
+  var html = '';
+  if (!canEdit) html += '<div class="customer-billing-permission">מצב צפייה בלבד — Owner/Admin/Manager יכולים לערוך פרטי חיוב. Employee יכול לצפות בלבד.</div>';
+  html += '<div class="customer-billing-section"><div class="customer-billing-section-title">פרטי חיוב</div><div class="customer-billing-section-sub">נתונים לשימוש עתידי במסמכים חדשים בלבד. אין עדכון אוטומטי למסמכים קיימים.</div><div class="customer-billing-grid">' +
+    customerBillingInput('billing_name', 'שם לחיוב', profile.billing_name, disabled) +
+    customerBillingInput('tax_id', 'ח.פ / עוסק / ת.ז', profile.tax_id, disabled) +
+    customerBillingInput('invoice_recipient_name', 'שם נמען חשבונית', profile.invoice_recipient_name, disabled) +
+    customerBillingInput('invoice_recipient_email', 'אימייל נמען חשבונית', profile.invoice_recipient_email, disabled, 'email') +
+    customerBillingInput('invoice_recipient_phone', 'טלפון נמען חשבונית', profile.invoice_recipient_phone, disabled, 'tel') +
+    customerBillingInput('preferred_currency', 'מטבע מועדף', profile.preferred_currency || 'ILS', disabled, 'text', ' maxlength="3"') +
+    customerBillingInput('payment_terms', 'תנאי תשלום', profile.payment_terms, disabled) +
+    customerBillingSelect('vat_treatment', 'טיפול מע״מ', profile.vat_treatment || 'standard', [['standard','רגיל'],['exempt','פטור'],['reverse_charge','חיוב הפוך'],['foreign','חו״ל'],['custom','מותאם']], disabled) +
+    customerBillingInput('default_vat_rate', 'אחוז מע״מ ברירת מחדל', profile.default_vat_rate, disabled, 'number', ' min="0" max="100" step="0.01" inputmode="decimal"') +
+    customerBillingInput('credit_limit', 'מסגרת אשראי', profile.credit_limit, disabled, 'number', ' min="0" step="0.01" inputmode="decimal"') +
+    customerBillingSelect('credit_status', 'סטטוס אשראי', profile.credit_status || 'normal', [['normal','רגיל'],['watch','במעקב'],['blocked','חסום']], disabled) +
+    customerBillingInput('default_discount_percent', 'הנחת ברירת מחדל %', profile.default_discount_percent, disabled, 'number', ' min="0" max="100" step="0.01" inputmode="decimal"') +
+    customerBillingInput('default_discount_amount', 'הנחת ברירת מחדל סכום', profile.default_discount_amount, disabled, 'number', ' min="0" step="0.01" inputmode="decimal"') +
+  '</div></div>';
+  html += '<div class="customer-billing-section"><div class="customer-billing-section-title">הערות וטקסטים</div><div class="customer-billing-grid single">' +
+    customerBillingTextarea('default_notes', 'הערות ברירת מחדל', profile.default_notes, disabled) +
+    customerBillingTextarea('default_document_footer', 'Footer ברירת מחדל', profile.default_document_footer, disabled) +
+    customerBillingTextarea('credit_notes', 'הערות אשראי', profile.credit_notes, disabled) +
+    customerBillingTextarea('pricing_notes', 'הערות מחיר / הנחות', profile.pricing_notes, disabled) +
+  '</div></div>';
+  html += '<div class="customer-billing-actions"><div class="customer-billing-status">' + (canEdit ? 'השמירה מעדכנת רק את פרופיל הלקוח. מסמכי מכירה קיימים לא משתנים.' : 'אין הרשאת עריכה') + '</div>' +
+    (canEdit ? '<button class="btn btn-primary" id="customer-billing-save-profile"' + (state.saving ? ' disabled' : '') + '>' + (state.saving ? 'שומר...' : 'שמור פרופיל חיוב') + '</button>' : '<button class="btn btn-secondary" disabled>צפייה בלבד</button>') + '</div>';
+  return html;
+}
+
+function bindCustomerBillingProfileForm() {
+  document.querySelectorAll('.customer-billing-field').forEach(function(field) {
+    field.addEventListener('input', function() {
+      if (!currentCustomerBillingState || !currentCustomerBillingState.profile) return;
+      currentCustomerBillingState.profile[this.getAttribute('data-billing-field')] = this.value;
+    });
+    field.addEventListener('change', function() {
+      if (!currentCustomerBillingState || !currentCustomerBillingState.profile) return;
+      currentCustomerBillingState.profile[this.getAttribute('data-billing-field')] = this.value;
+    });
+  });
+  var saveBtn = document.getElementById('customer-billing-save-profile');
+  if (saveBtn) saveBtn.onclick = saveCustomerBillingProfile;
+}
+
+function buildCustomerBillingProfilePayload() {
+  var p = currentCustomerBillingState.profile || {};
+  function nullable(field) { return p[field] === undefined || p[field] === null || p[field] === '' ? null : p[field]; }
+  function numberOrZero(field) { var n = Number(p[field] || 0); return Number.isFinite(n) ? n : 0; }
+  function numberOrNull(field) { if (p[field] === undefined || p[field] === null || p[field] === '') return null; var n = Number(p[field]); return Number.isFinite(n) ? n : null; }
+  return {
+    billing_name: nullable('billing_name'),
+    tax_id: nullable('tax_id'),
+    invoice_recipient_name: nullable('invoice_recipient_name'),
+    invoice_recipient_email: nullable('invoice_recipient_email'),
+    invoice_recipient_phone: nullable('invoice_recipient_phone'),
+    preferred_currency: (p.preferred_currency || 'ILS').toUpperCase(),
+    payment_terms: nullable('payment_terms'),
+    default_notes: nullable('default_notes'),
+    default_document_footer: nullable('default_document_footer'),
+    vat_treatment: p.vat_treatment || 'standard',
+    default_vat_rate: numberOrNull('default_vat_rate'),
+    credit_limit: numberOrZero('credit_limit'),
+    credit_status: p.credit_status || 'normal',
+    credit_notes: nullable('credit_notes'),
+    default_discount_percent: numberOrZero('default_discount_percent'),
+    default_discount_amount: numberOrZero('default_discount_amount'),
+    pricing_notes: nullable('pricing_notes'),
+    default_billing_address_id: p.default_billing_address_id || null,
+    default_service_address_id: p.default_service_address_id || null,
+    default_finance_contact_id: p.default_finance_contact_id || null
+  };
+}
+
+function saveCustomerBillingProfile() {
+  var state = currentCustomerBillingState;
+  if (!state || state.saving || !canEditCustomerBilling()) return;
+  state.saving = true;
+  renderCustomerBillingUI();
+  apiCall('PUT', '/api/contacts/' + state.contactId + '/billing-profile', buildCustomerBillingProfilePayload()).then(function(data) {
+    state.profile = data.profile || state.profile;
+    toast('פרופיל החיוב נשמר', 'success');
+  }).catch(function(e) {
+    toast(e.message || 'שגיאה בשמירת פרופיל חיוב', 'error');
+  }).finally(function() {
+    state.saving = false;
+    renderCustomerBillingUI();
+  });
+}
+
+function renderCustomerAddressesUI() {
+  var state = currentCustomerBillingState;
+  var canEdit = canEditCustomerBilling();
+  var html = '';
+  if (!canEdit) html += '<div class="customer-billing-permission">מצב צפייה בלבד — רק Owner/Admin/Manager יכולים להוסיף או לערוך כתובות.</div>';
+  html += '<div class="customer-billing-section"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><div><div class="customer-billing-section-title">כתובות לקוח</div><div class="customer-billing-section-sub">ניתן לשמור כמה כתובות ולסמן ברירות מחדל לחיוב, שירות או משלוח.</div></div>' +
+    (canEdit ? '<button class="btn btn-primary btn-sm" id="customer-address-add">+ הוסף כתובת</button>' : '') + '</div>';
+  if (state.creatingAddress) html += renderCustomerAddressForm(null);
+  html += '<div class="customer-billing-list">';
+  if (!state.addresses.length) html += customerBillingEmptyState('אין כתובות עדיין. הוסף כתובת חיוב או שירות ראשונה.');
+  state.addresses.forEach(function(address) {
+    html += Number(state.editingAddressId) === Number(address.id) ? renderCustomerAddressForm(address) : renderCustomerAddressCard(address, canEdit);
+  });
+  html += '</div></div>';
+  return html;
+}
+
+function renderCustomerAddressCard(address, canEdit) {
+  var chips = [];
+  if (Number(address.is_default_billing) === 1) chips.push('<span class="customer-billing-chip green">ברירת מחדל לחיוב</span>');
+  if (Number(address.is_default_service) === 1) chips.push('<span class="customer-billing-chip">ברירת מחדל לשירות</span>');
+  if (Number(address.is_default_shipping) === 1) chips.push('<span class="customer-billing-chip">ברירת מחדל למשלוח</span>');
+  if (Number(address.active) !== 1) chips.push('<span class="customer-billing-chip muted">לא פעיל</span>');
+  return '<div class="customer-billing-card">' +
+    '<div class="customer-billing-card-main"><div class="customer-billing-card-title">' + escapeHtml(address.label || getCustomerAddressTypeLabel(address.address_type)) + '</div>' +
+      '<div class="customer-billing-card-meta"><span>' + escapeHtml(getCustomerAddressTypeLabel(address.address_type)) + '</span><span>' + escapeHtml(address.full_address || [address.street, address.city, address.region, address.postal_code, address.country].filter(Boolean).join(', ') || 'אין כתובת מלאה') + '</span></div>' +
+      (chips.length ? '<div class="customer-billing-card-meta">' + chips.join('') + '</div>' : '') +
+      (address.notes ? '<div class="customer-billing-card-meta">' + escapeHtml(address.notes) + '</div>' : '') +
+    '</div>' +
+    '<div class="customer-billing-card-actions">' + (canEdit ? '<button class="btn btn-secondary btn-sm customer-address-edit" data-address-id="' + address.id + '">עריכה</button>' : '') + '</div>' +
+  '</div>';
+}
+
+function renderCustomerAddressForm(address) {
+  var a = address || { address_type: 'billing', country: 'IL', active: 1 };
+  var isEdit = !!address;
+  return '<div class="customer-billing-inline-form" data-address-form-id="' + (isEdit ? a.id : 'new') + '">' +
+    '<div class="customer-billing-section-title">' + (isEdit ? 'עריכת כתובת' : 'כתובת חדשה') + '</div>' +
+    '<div class="customer-billing-grid">' +
+      customerBillingInput('label', 'שם/תווית', a.label, false) +
+      customerBillingSelect('address_type', 'סוג כתובת', a.address_type || 'billing', [['billing','חיוב'],['shipping','משלוח'],['service','שירות'],['event','אירוע'],['other','אחר']], false) +
+      customerBillingInput('full_address', 'כתובת מלאה', a.full_address, false) +
+      customerBillingInput('street', 'רחוב', a.street, false) +
+      customerBillingInput('city', 'עיר', a.city, false) +
+      customerBillingInput('region', 'אזור/מחוז', a.region, false) +
+      customerBillingInput('postal_code', 'מיקוד', a.postal_code, false) +
+      customerBillingInput('country', 'מדינה', a.country || 'IL', false) +
+    '</div>' +
+    '<div style="display:flex;gap:12px;flex-wrap:wrap">' +
+      customerBillingCheckbox('is_default_billing', 'ברירת מחדל לחיוב', a.is_default_billing, false) +
+      customerBillingCheckbox('is_default_service', 'ברירת מחדל לשירות', a.is_default_service, false) +
+      customerBillingCheckbox('is_default_shipping', 'ברירת מחדל למשלוח', a.is_default_shipping, false) +
+      customerBillingCheckbox('active', 'פעיל', a.active === undefined ? 1 : a.active, false) +
+    '</div>' +
+    customerBillingTextarea('notes', 'הערות כתובת', a.notes, false) +
+    '<div class="customer-billing-actions" style="position:static;padding:0;border:0;background:transparent"><span class="customer-billing-status">' + (isEdit ? 'עדכון כתובת קיימת' : 'יצירת כתובת חדשה') + '</span><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-secondary btn-sm customer-address-cancel">ביטול</button><button class="btn btn-primary btn-sm customer-address-save" data-address-id="' + (isEdit ? a.id : '') + '">שמור כתובת</button></div></div>' +
+  '</div>';
+}
+
+function collectCustomerBillingFormPayload(container) {
+  var payload = {};
+  container.querySelectorAll('.customer-billing-field').forEach(function(field) {
+    payload[field.getAttribute('data-billing-field')] = field.value;
+  });
+  container.querySelectorAll('.customer-billing-check').forEach(function(field) {
+    payload[field.getAttribute('data-billing-field')] = field.checked;
+  });
+  return payload;
+}
+
+function saveCustomerAddress(addressId) {
+  var state = currentCustomerBillingState;
+  var form = document.querySelector('[data-address-form-id="' + (addressId ? addressId : 'new') + '"]');
+  if (!state || !form) return;
+  var payload = collectCustomerBillingFormPayload(form);
+  state.saving = true;
+  var method = addressId ? 'PUT' : 'POST';
+  var path = '/api/contacts/' + state.contactId + '/addresses' + (addressId ? '/' + addressId : '');
+  apiCall(method, path, payload).then(function() {
+    toast(addressId ? 'הכתובת עודכנה' : 'הכתובת נוספה', 'success');
+    state.creatingAddress = false;
+    state.editingAddressId = null;
+    return apiCall('GET', '/api/contacts/' + state.contactId + '/addresses');
+  }).then(function(data) {
+    state.addresses = data.addresses || [];
+  }).catch(function(e) {
+    toast(e.message || 'שגיאה בשמירת כתובת', 'error');
+  }).finally(function() {
+    state.saving = false;
+    renderCustomerBillingUI();
+  });
+}
+
+function renderCustomerPeopleUI() {
+  var state = currentCustomerBillingState;
+  var canEdit = canEditCustomerBilling();
+  var html = '';
+  if (!canEdit) html += '<div class="customer-billing-permission">מצב צפייה בלבד — רק Owner/Admin/Manager יכולים להוסיף או לערוך אנשי קשר.</div>';
+  html += '<div class="customer-billing-section"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><div><div class="customer-billing-section-title">אנשי קשר לחיוב ומסמכים</div><div class="customer-billing-section-sub">אנשי כספים, נמעני מסמכים ואנשי קשר ראשיים ללקוח.</div></div>' +
+    (canEdit ? '<button class="btn btn-primary btn-sm" id="customer-person-add">+ הוסף איש קשר</button>' : '') + '</div>';
+  if (state.creatingPerson) html += renderCustomerPersonForm(null);
+  html += '<div class="customer-billing-list">';
+  if (!state.people.length) html += customerBillingEmptyState('אין אנשי קשר ייעודיים עדיין. אפשר להוסיף איש קשר פיננסי או נמען מסמכים.');
+  state.people.forEach(function(person) {
+    html += Number(state.editingPersonId) === Number(person.id) ? renderCustomerPersonForm(person) : renderCustomerPersonCard(person, canEdit);
+  });
+  html += '</div></div>';
+  return html;
+}
+
+function renderCustomerPersonCard(person, canEdit) {
+  var chips = [];
+  if (Number(person.is_primary) === 1) chips.push('<span class="customer-billing-chip green">ראשי</span>');
+  if (Number(person.is_finance) === 1) chips.push('<span class="customer-billing-chip">כספים</span>');
+  if (Number(person.is_document_recipient) === 1) chips.push('<span class="customer-billing-chip orange">נמען מסמכים</span>');
+  if (Number(person.active) !== 1) chips.push('<span class="customer-billing-chip muted">לא פעיל</span>');
+  return '<div class="customer-billing-card">' +
+    '<div class="customer-billing-card-main"><div class="customer-billing-card-title">' + escapeHtml(person.name || 'איש קשר') + '</div>' +
+      '<div class="customer-billing-card-meta"><span>' + escapeHtml(getCustomerContactRoleLabel(person.role_type)) + '</span>' + (person.title ? '<span>' + escapeHtml(person.title) + '</span>' : '') + (person.phone ? '<span>' + escapeHtml(person.phone) + '</span>' : '') + (person.email ? '<span>' + escapeHtml(person.email) + '</span>' : '') + '</div>' +
+      (chips.length ? '<div class="customer-billing-card-meta">' + chips.join('') + '</div>' : '') +
+      (person.notes ? '<div class="customer-billing-card-meta">' + escapeHtml(person.notes) + '</div>' : '') +
+    '</div>' +
+    '<div class="customer-billing-card-actions">' + (canEdit ? '<button class="btn btn-secondary btn-sm customer-person-edit" data-person-id="' + person.id + '">עריכה</button>' : '') + '</div>' +
+  '</div>';
+}
+
+function renderCustomerPersonForm(person) {
+  var p = person || { role_type: 'main', active: 1, display_order: 0 };
+  var isEdit = !!person;
+  return '<div class="customer-billing-inline-form" data-person-form-id="' + (isEdit ? p.id : 'new') + '">' +
+    '<div class="customer-billing-section-title">' + (isEdit ? 'עריכת איש קשר' : 'איש קשר חדש') + '</div>' +
+    '<div class="customer-billing-grid">' +
+      customerBillingInput('name', 'שם', p.name, false) +
+      customerBillingSelect('role_type', 'תפקיד', p.role_type || 'main', [['main','ראשי'],['finance','כספים'],['assistant','עוזר/ת'],['onsite','בשטח'],['producer','מפיק/ה'],['other','אחר']], false) +
+      customerBillingInput('title', 'טייטל / תפקיד בארגון', p.title, false) +
+      customerBillingInput('phone', 'טלפון', p.phone, false, 'tel') +
+      customerBillingInput('email', 'אימייל', p.email, false, 'email') +
+      customerBillingInput('display_order', 'סדר תצוגה', p.display_order || 0, false, 'number', ' step="1"') +
+    '</div>' +
+    '<div style="display:flex;gap:12px;flex-wrap:wrap">' +
+      customerBillingCheckbox('is_primary', 'איש קשר ראשי', p.is_primary, false) +
+      customerBillingCheckbox('is_finance', 'איש קשר פיננסי', p.is_finance, false) +
+      customerBillingCheckbox('is_document_recipient', 'נמען מסמכים', p.is_document_recipient, false) +
+      customerBillingCheckbox('active', 'פעיל', p.active === undefined ? 1 : p.active, false) +
+    '</div>' +
+    customerBillingTextarea('notes', 'הערות איש קשר', p.notes, false) +
+    '<div class="customer-billing-actions" style="position:static;padding:0;border:0;background:transparent"><span class="customer-billing-status">' + (isEdit ? 'עדכון איש קשר קיים' : 'יצירת איש קשר חדש') + '</span><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-secondary btn-sm customer-person-cancel">ביטול</button><button class="btn btn-primary btn-sm customer-person-save" data-person-id="' + (isEdit ? p.id : '') + '">שמור איש קשר</button></div></div>' +
+  '</div>';
+}
+
+function saveCustomerPerson(personId) {
+  var state = currentCustomerBillingState;
+  var form = document.querySelector('[data-person-form-id="' + (personId ? personId : 'new') + '"]');
+  if (!state || !form) return;
+  var payload = collectCustomerBillingFormPayload(form);
+  payload.display_order = Number(payload.display_order || 0);
+  state.saving = true;
+  var method = personId ? 'PUT' : 'POST';
+  var path = '/api/contacts/' + state.contactId + '/contact-people' + (personId ? '/' + personId : '');
+  apiCall(method, path, payload).then(function() {
+    toast(personId ? 'איש הקשר עודכן' : 'איש הקשר נוסף', 'success');
+    state.creatingPerson = false;
+    state.editingPersonId = null;
+    return apiCall('GET', '/api/contacts/' + state.contactId + '/contact-people');
+  }).then(function(data) {
+    state.people = data.contact_people || [];
+  }).catch(function(e) {
+    toast(e.message || 'שגיאה בשמירת איש קשר', 'error');
+  }).finally(function() {
+    state.saving = false;
+    renderCustomerBillingUI();
+  });
+}
+
+function bindCustomerBillingUI() {
+  var state = currentCustomerBillingState;
+  if (!state) return;
+  if (state.activeTab === 'profile') bindCustomerBillingProfileForm();
+  var addAddress = document.getElementById('customer-address-add');
+  if (addAddress) addAddress.onclick = function() { state.creatingAddress = true; state.editingAddressId = null; renderCustomerBillingUI(); };
+  document.querySelectorAll('.customer-address-edit').forEach(function(btn) {
+    btn.onclick = function() { state.editingAddressId = Number(this.getAttribute('data-address-id')); state.creatingAddress = false; renderCustomerBillingUI(); };
+  });
+  document.querySelectorAll('.customer-address-cancel').forEach(function(btn) {
+    btn.onclick = function() { state.creatingAddress = false; state.editingAddressId = null; renderCustomerBillingUI(); };
+  });
+  document.querySelectorAll('.customer-address-save').forEach(function(btn) {
+    btn.onclick = function() { saveCustomerAddress(this.getAttribute('data-address-id') || null); };
+  });
+  var addPerson = document.getElementById('customer-person-add');
+  if (addPerson) addPerson.onclick = function() { state.creatingPerson = true; state.editingPersonId = null; renderCustomerBillingUI(); };
+  document.querySelectorAll('.customer-person-edit').forEach(function(btn) {
+    btn.onclick = function() { state.editingPersonId = Number(this.getAttribute('data-person-id')); state.creatingPerson = false; renderCustomerBillingUI(); };
+  });
+  document.querySelectorAll('.customer-person-cancel').forEach(function(btn) {
+    btn.onclick = function() { state.creatingPerson = false; state.editingPersonId = null; renderCustomerBillingUI(); };
+  });
+  document.querySelectorAll('.customer-person-save').forEach(function(btn) {
+    btn.onclick = function() { saveCustomerPerson(this.getAttribute('data-person-id') || null); };
+  });
+}
+
 function openCustomerCard(id) {
   Promise.all([
     apiCall('GET', '/api/contacts/' + id),
@@ -8324,6 +8817,9 @@ function openCustomerCard(id) {
     html += '</div>';
     html += '</div>';
 
+    html += '<div>';
+    html += getCustomerBillingShell(c.id);
+
     html += '<div class="table-card"><div class="table-toolbar" style="justify-content:space-between"><strong>אירועים של הלקוח</strong><span class="badge badge-gray">' + leads.length + ' אירועים</span></div>';
     if (!leads.length) { html += '<div class="dash-empty">אין אירועים ללקוח הזה</div>'; }
     else {
@@ -8355,6 +8851,7 @@ function openCustomerCard(id) {
     html += '</div></div>';
 
     grid.innerHTML = html;
+    initCustomerBillingUI(c.id);
 
     // force-event-modal-from-customer-card
     setTimeout(function() {
