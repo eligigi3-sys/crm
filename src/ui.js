@@ -193,6 +193,12 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .sales-doc-editor-body{padding:16px}
 .sales-doc-section{padding:13px;border:1px solid var(--border);border-radius:12px;background:#fff;margin-bottom:12px}
 .sales-doc-section-title{font-size:13px;font-weight:800;color:var(--text);margin-bottom:10px}
+.sales-doc-section-sub{font-size:12px;color:var(--text3);line-height:1.5;margin:-4px 0 10px}
+.sales-doc-billing-warning{padding:10px 12px;border-radius:12px;background:var(--yellow-light);color:var(--yellow);font-size:12px;font-weight:800;line-height:1.5;margin-bottom:10px}
+.sales-doc-billing-warning.blocked{background:var(--red-light);color:var(--red)}
+.sales-doc-billing-selector{border:1px solid var(--border);border-radius:12px;background:var(--bg);padding:10px;margin-top:8px}
+.sales-doc-billing-selector-title{font-size:12px;font-weight:900;color:var(--text2);margin-bottom:7px}
+.sales-doc-billing-hint{font-size:11px;color:var(--text3);line-height:1.5;margin-top:6px}
 .sales-doc-grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .sales-doc-line-list{display:flex;flex-direction:column;gap:10px}
 .sales-doc-line-card{border:1px solid var(--border);border-radius:12px;background:var(--bg);padding:10px}
@@ -1841,6 +1847,9 @@ var currentSalesDocumentDraft = null;
 var currentSalesDocumentId = null;
 var salesDocumentSaving = false;
 var currentBusinessSettings = null;
+var salesDocumentContactOptions = [];
+var salesDocumentContactsLoading = false;
+var salesDocumentBillingState = { contactId: null, loading: false, profile: null, addresses: [], people: [], error: null };
 var businessSettingsLoading = false;
 var businessSettingsSaving = false;
 var currentCustomerBillingState = null;
@@ -3769,10 +3778,21 @@ function createEmptySalesDocumentDraft(documentType) {
     valid_until: documentType === 'invoice' ? '' : getTodayYMD(),
     due_date: documentType === 'invoice' ? getTodayYMD() : '',
     currency: 'ILS',
+    contact_id: null,
     customer_name_snapshot: '',
     customer_phone_snapshot: '',
     customer_email_snapshot: '',
     customer_tax_id: '',
+    customer_address_snapshot: '',
+    customer_service_address_snapshot: '',
+    customer_finance_contact_snapshot: '',
+    customer_document_contact_snapshot: '',
+    customer_vat_treatment_hint: '',
+    customer_credit_status_snapshot: '',
+    customer_credit_notes_snapshot: '',
+    customer_default_discount_percent: 0,
+    customer_default_discount_amount: 0,
+    internal_notes: '',
     business_name_snapshot: business.business_name_snapshot,
     business_phone_snapshot: business.business_phone_snapshot,
     business_email_snapshot: business.business_email_snapshot,
@@ -3908,6 +3928,7 @@ function renderSalesDocumentsList(documents) {
 function openSalesDocumentEditor(documentType) {
   currentSalesDocumentId = null;
   currentSalesDocumentDraft = null;
+  salesDocumentBillingState = { contactId: null, loading: false, profile: null, addresses: [], people: [], error: null };
   var workspace = document.getElementById('sales-document-workspace');
   var body = document.getElementById('sales-document-editor-body');
   var preview = document.getElementById('sales-document-preview');
@@ -3932,6 +3953,7 @@ function openExistingSalesDocument(id) {
     currentSalesDocumentId = data.document && data.document.id ? data.document.id : id;
     currentSalesDocumentDraft = applySalesDocumentVatRules(data.document);
     renderSalesDocumentEditor();
+    if (currentSalesDocumentDraft && currentSalesDocumentDraft.contact_id) loadSalesDocumentBillingForContact(currentSalesDocumentDraft.contact_id, false);
   }).catch(function(err) {
     toast(err.message || 'שגיאה בטעינת המסמך', 'error');
   });
@@ -3942,6 +3964,217 @@ function closeSalesDocumentEditorPanel() {
   if (workspace) workspace.classList.remove('open');
   currentSalesDocumentDraft = null;
   currentSalesDocumentId = null;
+  salesDocumentBillingState = { contactId: null, loading: false, profile: null, addresses: [], people: [], error: null };
+}
+
+
+function ensureSalesDocumentContactOptions() {
+  if (salesDocumentContactOptions.length || salesDocumentContactsLoading) return;
+  salesDocumentContactsLoading = true;
+  apiCall('GET', '/api/contacts').then(function(data) {
+    salesDocumentContactOptions = Array.isArray(data.contacts) ? data.contacts : [];
+    salesDocumentContactsLoading = false;
+    renderSalesDocumentContactSelectOptions();
+  }).catch(function(err) {
+    salesDocumentContactsLoading = false;
+    console.warn('Failed loading sales document contacts', err);
+  });
+}
+
+function getSalesDocumentContactLabel(contact) {
+  if (!contact) return '';
+  return (contact.name || 'לקוח #' + contact.id) + (contact.phone ? ' · ' + contact.phone : '') + (contact.email ? ' · ' + contact.email : '');
+}
+
+function renderSalesDocumentContactSelectOptions() {
+  var select = document.getElementById('sales-document-contact-select');
+  if (!select) return;
+  var selected = currentSalesDocumentDraft && currentSalesDocumentDraft.contact_id ? Number(currentSalesDocumentDraft.contact_id) : 0;
+  var options = '<option value="">ללא קישור — מילוי ידני</option>';
+  salesDocumentContactOptions.forEach(function(contact) {
+    options += '<option value="' + escapeHtml(contact.id) + '"' + (Number(contact.id) === selected ? ' selected' : '') + '>' + escapeHtml(getSalesDocumentContactLabel(contact)) + '</option>';
+  });
+  select.innerHTML = options;
+}
+
+function findSalesDocumentContact(contactId) {
+  return (salesDocumentContactOptions || []).find(function(c) { return Number(c.id) === Number(contactId); }) || null;
+}
+
+function formatSalesDocumentAddress(address) {
+  if (!address) return '';
+  return address.full_address || [address.street, address.city, address.region, address.postal_code, address.country].filter(Boolean).join(', ');
+}
+
+function formatSalesDocumentPerson(person) {
+  if (!person) return '';
+  var parts = [person.name || '', person.title || '', person.phone || '', person.email || ''].filter(Boolean);
+  return parts.join(' · ');
+}
+
+function findDefaultSalesDocumentAddress(addresses, id, flagName, types) {
+  if (!Array.isArray(addresses) || !addresses.length) return null;
+  if (id) {
+    var byId = addresses.find(function(a) { return Number(a.id) === Number(id) && Number(a.active) !== 0; });
+    if (byId) return byId;
+  }
+  var byFlag = addresses.find(function(a) { return Number(a.active) !== 0 && Number(a[flagName]) === 1; });
+  if (byFlag) return byFlag;
+  return addresses.find(function(a) { return Number(a.active) !== 0 && types.indexOf(a.address_type) !== -1; }) || addresses.find(function(a) { return Number(a.active) !== 0; }) || null;
+}
+
+function findDefaultSalesDocumentPerson(people, id, flagName, roleTypes) {
+  if (!Array.isArray(people) || !people.length) return null;
+  if (id) {
+    var byId = people.find(function(p) { return Number(p.id) === Number(id) && Number(p.active) !== 0; });
+    if (byId) return byId;
+  }
+  var byFlag = people.find(function(p) { return Number(p.active) !== 0 && Number(p[flagName]) === 1; });
+  if (byFlag) return byFlag;
+  return people.find(function(p) { return Number(p.active) !== 0 && roleTypes.indexOf(p.role_type) !== -1; }) || people.find(function(p) { return Number(p.active) !== 0; }) || null;
+}
+
+function buildSalesDocumentAddressOptions(addresses, selectedId) {
+  var html = '<option value="">בחירה ידנית / ללא</option>';
+  (addresses || []).filter(function(a) { return Number(a.active) !== 0; }).forEach(function(address) {
+    var flags = [];
+    if (Number(address.is_default_billing) === 1) flags.push('ברירת חיוב');
+    if (Number(address.is_default_service) === 1) flags.push('ברירת שירות');
+    html += '<option value="' + escapeHtml(address.id) + '"' + (Number(address.id) === Number(selectedId) ? ' selected' : '') + '>' +
+      escapeHtml((address.label || address.address_type || 'כתובת') + ' — ' + formatSalesDocumentAddress(address) + (flags.length ? ' (' + flags.join(', ') + ')' : '')) +
+    '</option>';
+  });
+  return html;
+}
+
+function buildSalesDocumentPersonOptions(people, selectedId) {
+  var html = '<option value="">בחירה ידנית / ללא</option>';
+  (people || []).filter(function(p) { return Number(p.active) !== 0; }).forEach(function(person) {
+    var flags = [];
+    if (Number(person.is_document_recipient) === 1) flags.push('מסמכים');
+    if (Number(person.is_finance) === 1) flags.push('כספים');
+    if (Number(person.is_primary) === 1) flags.push('ראשי');
+    html += '<option value="' + escapeHtml(person.id) + '"' + (Number(person.id) === Number(selectedId) ? ' selected' : '') + '>' +
+      escapeHtml(formatSalesDocumentPerson(person) + (flags.length ? ' (' + flags.join(', ') + ')' : '')) +
+    '</option>';
+  });
+  return html;
+}
+
+function getSalesDocumentCreditWarning(doc) {
+  var status = doc && doc.customer_credit_status_snapshot;
+  if (status !== 'watch' && status !== 'blocked') return '';
+  var text = status === 'blocked' ? 'סטטוס אשראי חסום בפרופיל הלקוח — אזהרה בלבד, יצירת המסמך לא נחסמת כרגע.' : 'סטטוס אשראי במעקב בפרופיל הלקוח — מומלץ לבדוק לפני שליחה.';
+  if (doc.customer_credit_notes_snapshot) text += ' הערות: ' + doc.customer_credit_notes_snapshot;
+  return '<div class="sales-doc-billing-warning ' + escapeHtml(status) + '">' + escapeHtml(text) + '</div>';
+}
+
+function getSalesDocumentVatHintText(doc) {
+  var hint = doc && doc.customer_vat_treatment_hint;
+  if (!hint) return 'מע״מ נקבע לפי הגדרות העסק בלבד.';
+  var labels = { standard: 'רגיל', exempt: 'פטור', reverse_charge: 'חיוב הפוך', foreign: 'לקוח חו״ל', custom: 'מותאם' };
+  return 'רמז מע״מ מהלקוח: ' + (labels[hint] || hint) + '. הגדרות העסק עדיין קובעות חוקית.';
+}
+
+function buildSalesDocumentInternalNotesSnapshot(doc) {
+  var marker = '--- פרופיל חיוב לקוח (Snapshot) ---';
+  var manual = String(doc.internal_notes || '').split(marker)[0].trim();
+  var billingLines = [];
+  if (doc.customer_service_address_snapshot) billingLines.push('כתובת שירות/אירוע: ' + doc.customer_service_address_snapshot);
+  if (doc.customer_finance_contact_snapshot) billingLines.push('איש קשר כספים: ' + doc.customer_finance_contact_snapshot);
+  if (doc.customer_document_contact_snapshot) billingLines.push('איש קשר למסמכים: ' + doc.customer_document_contact_snapshot);
+  if (doc.customer_vat_treatment_hint) billingLines.push('רמז מע״מ לקוח: ' + doc.customer_vat_treatment_hint + ' (הגדרות העסק קובעות)');
+  if (doc.customer_credit_status_snapshot && doc.customer_credit_status_snapshot !== 'normal') billingLines.push('סטטוס אשראי בעת יצירה: ' + doc.customer_credit_status_snapshot + (doc.customer_credit_notes_snapshot ? ' — ' + doc.customer_credit_notes_snapshot : ''));
+  if (doc.customer_default_discount_percent) billingLines.push('הנחת לקוח ברירת מחדל %: ' + doc.customer_default_discount_percent);
+  if (doc.customer_default_discount_amount) billingLines.push('הנחת לקוח ברירת מחדל ₪: ' + doc.customer_default_discount_amount);
+  if (!billingLines.length) return manual || null;
+  return [manual, marker, billingLines.join('\n')].filter(Boolean).join('\n');
+}
+
+function applySalesDocumentCustomerDiscount(doc, profile) {
+  if (!doc || !profile) return;
+  doc.customer_default_discount_percent = Number(profile.default_discount_percent || 0);
+  doc.customer_default_discount_amount = Number(profile.default_discount_amount || 0);
+  if (!doc.items || !doc.items.length) return;
+  var first = doc.items[0];
+  if (Number(first.discount_amount || 0) > 0) return;
+  if (doc.customer_default_discount_amount > 0) {
+    first.discount_amount = doc.customer_default_discount_amount;
+  } else if (doc.customer_default_discount_percent > 0) {
+    var gross = Number(first.quantity || 0) * Number(first.unit_price || 0);
+    if (gross > 0) first.discount_amount = roundSalesMoney(gross * doc.customer_default_discount_percent / 100);
+  }
+}
+
+function applySalesDocumentBillingDefaults(data, options) {
+  if (!currentSalesDocumentDraft || !data) return;
+  options = options || {};
+  var doc = currentSalesDocumentDraft;
+  var profile = data.profile || {};
+  var addresses = data.addresses || [];
+  var people = data.contact_people || data.people || [];
+  var contact = findSalesDocumentContact(doc.contact_id) || {};
+  var billingAddress = findDefaultSalesDocumentAddress(addresses, options.billingAddressId || profile.default_billing_address_id, 'is_default_billing', ['billing']);
+  var serviceAddress = findDefaultSalesDocumentAddress(addresses, options.serviceAddressId || profile.default_service_address_id, 'is_default_service', ['service', 'event']);
+  var financePerson = findDefaultSalesDocumentPerson(people, options.financePersonId || profile.default_finance_contact_id, 'is_finance', ['finance']);
+  var documentPerson = findDefaultSalesDocumentPerson(people, options.documentPersonId, 'is_document_recipient', ['main', 'finance']);
+  doc.sales_document_billing_address_id = billingAddress ? billingAddress.id : '';
+  doc.sales_document_service_address_id = serviceAddress ? serviceAddress.id : '';
+  doc.sales_document_finance_contact_id = financePerson ? financePerson.id : '';
+  doc.sales_document_document_contact_id = documentPerson ? documentPerson.id : '';
+  doc.customer_name_snapshot = profile.invoice_recipient_name || (documentPerson && documentPerson.name) || profile.billing_name || contact.name || doc.customer_name_snapshot || '';
+  doc.customer_email_snapshot = profile.invoice_recipient_email || (documentPerson && documentPerson.email) || contact.email || doc.customer_email_snapshot || '';
+  doc.customer_phone_snapshot = profile.invoice_recipient_phone || (documentPerson && documentPerson.phone) || contact.phone || doc.customer_phone_snapshot || '';
+  doc.customer_tax_id = profile.tax_id || doc.customer_tax_id || '';
+  doc.customer_address_snapshot = formatSalesDocumentAddress(billingAddress) || doc.customer_address_snapshot || '';
+  doc.customer_service_address_snapshot = formatSalesDocumentAddress(serviceAddress) || doc.customer_service_address_snapshot || '';
+  doc.customer_finance_contact_snapshot = formatSalesDocumentPerson(financePerson) || doc.customer_finance_contact_snapshot || '';
+  doc.customer_document_contact_snapshot = formatSalesDocumentPerson(documentPerson) || doc.customer_document_contact_snapshot || '';
+  doc.payment_terms_snapshot = profile.payment_terms || doc.payment_terms_snapshot || '';
+  doc.document_footer_snapshot = profile.default_document_footer || doc.document_footer_snapshot || '';
+  doc.notes = profile.default_notes || doc.notes || '';
+  doc.currency = profile.preferred_currency || doc.currency || 'ILS';
+  doc.customer_vat_treatment_hint = profile.vat_treatment || '';
+  doc.customer_credit_status_snapshot = profile.credit_status || '';
+  doc.customer_credit_notes_snapshot = profile.credit_notes || '';
+  applySalesDocumentCustomerDiscount(doc, profile);
+  applySalesDocumentVatRules(doc);
+}
+
+function loadSalesDocumentBillingForContact(contactId, applyDefaults) {
+  if (!contactId || !currentSalesDocumentDraft) return;
+  salesDocumentBillingState = { contactId: Number(contactId), loading: true, profile: null, addresses: [], people: [], error: null };
+  renderSalesDocumentEditor();
+  Promise.all([
+    apiCall('GET', '/api/contacts/' + encodeURIComponent(contactId) + '/billing-profile'),
+    apiCall('GET', '/api/contacts/' + encodeURIComponent(contactId) + '/addresses'),
+    apiCall('GET', '/api/contacts/' + encodeURIComponent(contactId) + '/contact-people')
+  ]).then(function(results) {
+    var data = { profile: results[0].profile || {}, addresses: results[1].addresses || [], contact_people: results[2].contact_people || [] };
+    salesDocumentBillingState = { contactId: Number(contactId), loading: false, profile: data.profile, addresses: data.addresses, people: data.contact_people, error: null };
+    if (applyDefaults) applySalesDocumentBillingDefaults(data);
+    renderSalesDocumentEditor();
+  }).catch(function(err) {
+    salesDocumentBillingState = { contactId: Number(contactId), loading: false, profile: null, addresses: [], people: [], error: err.message || 'שגיאה בטעינת פרופיל חיוב' };
+    renderSalesDocumentEditor();
+  });
+}
+
+function renderSalesDocumentBillingSelectors(doc, locked) {
+  var state = salesDocumentBillingState || {};
+  if (!doc.contact_id) return '<div class="sales-doc-section-sub">בחרו לקוח כדי לטעון פרופיל חיוב, כתובות ואנשי קשר.</div>';
+  if (state.loading && Number(state.contactId) === Number(doc.contact_id)) return '<div class="sales-doc-section-sub">טוען פרופיל חיוב וכתובות...</div>';
+  if (state.error && Number(state.contactId) === Number(doc.contact_id)) return '<div class="sales-doc-billing-warning blocked">' + escapeHtml(state.error) + '</div>';
+  var addresses = state.addresses || [];
+  var people = state.people || [];
+  return getSalesDocumentCreditWarning(doc) +
+    '<div class="sales-doc-section-sub">' + escapeHtml(getSalesDocumentVatHintText(doc)) + '</div>' +
+    '<div class="sales-doc-grid-2">' +
+      '<div class="sales-doc-billing-selector"><div class="sales-doc-billing-selector-title">כתובת חיוב</div><select class="form-input sales-doc-billing-select" data-billing-select="billing_address"' + (locked ? ' disabled' : '') + '>' + buildSalesDocumentAddressOptions(addresses, doc.sales_document_billing_address_id) + '</select><div class="sales-doc-billing-hint">נשמרת בשדה כתובת הלקוח במסמך.</div></div>' +
+      '<div class="sales-doc-billing-selector"><div class="sales-doc-billing-selector-title">כתובת שירות/אירוע</div><select class="form-input sales-doc-billing-select" data-billing-select="service_address"' + (locked ? ' disabled' : '') + '>' + buildSalesDocumentAddressOptions(addresses, doc.sales_document_service_address_id) + '</select><div class="sales-doc-billing-hint">נשמרת ב-Snapshot הפנימי של המסמך.</div></div>' +
+      '<div class="sales-doc-billing-selector"><div class="sales-doc-billing-selector-title">נמען למסמכים</div><select class="form-input sales-doc-billing-select" data-billing-select="document_contact"' + (locked ? ' disabled' : '') + '>' + buildSalesDocumentPersonOptions(people, doc.sales_document_document_contact_id) + '</select></div>' +
+      '<div class="sales-doc-billing-selector"><div class="sales-doc-billing-selector-title">איש קשר כספים</div><select class="form-input sales-doc-billing-select" data-billing-select="finance_contact"' + (locked ? ' disabled' : '') + '>' + buildSalesDocumentPersonOptions(people, doc.sales_document_finance_contact_id) + '</select></div>' +
+    '</div>';
 }
 
 function renderSalesDocumentEditor() {
@@ -3951,6 +4184,7 @@ function renderSalesDocumentEditor() {
   if (!workspace || !body || !currentSalesDocumentDraft) return;
   var doc = currentSalesDocumentDraft;
   var locked = isSalesDocumentLocked(doc);
+  ensureSalesDocumentContactOptions();
   workspace.classList.add('open');
   if (title) title.textContent = getSalesDocumentTypeLabel(doc.document_type) + ' · ' + (doc.document_number || 'טיוטה חדשה');
   body.innerHTML = (locked ? '<div class="sales-doc-locked-note">מסמך זה אינו טיוטה פתוחה ולכן אינו ניתן לעריכה.</div>' : '') +
@@ -3958,11 +4192,20 @@ function renderSalesDocumentEditor() {
       salesDocumentInput('issue_date', 'תאריך מסמך', doc.issue_date, 'date', locked) +
       salesDocumentInput(doc.document_type === 'invoice' ? 'due_date' : 'valid_until', doc.document_type === 'invoice' ? 'תאריך לתשלום' : 'בתוקף עד', doc.document_type === 'invoice' ? doc.due_date : doc.valid_until, 'date', locked) +
     '</div></div>' +
-    '<div class="sales-doc-section"><div class="sales-doc-section-title">לקוח</div><div class="sales-doc-grid-2">' +
-      salesDocumentInput('customer_name_snapshot', 'שם לקוח', doc.customer_name_snapshot, 'text', locked) +
-      salesDocumentInput('customer_phone_snapshot', 'טלפון', doc.customer_phone_snapshot, 'tel', locked) +
-      salesDocumentInput('customer_email_snapshot', 'אימייל', doc.customer_email_snapshot, 'email', locked) +
+    '<div class="sales-doc-section"><div class="sales-doc-section-title">לקוח וחיוב</div>' +
+      '<div class="form-group"><label class="form-label">בחר לקוח קיים</label><select id="sales-document-contact-select" class="form-input"' + (locked ? ' disabled' : '') + '><option value="">' + (salesDocumentContactsLoading ? 'טוען לקוחות...' : 'ללא קישור — מילוי ידני') + '</option></select></div>' +
+      renderSalesDocumentBillingSelectors(doc, locked) +
+      '<div class="sales-doc-grid-2">' +
+      salesDocumentInput('customer_name_snapshot', 'שם/נמען לחשבונית', doc.customer_name_snapshot, 'text', locked) +
+      salesDocumentInput('customer_phone_snapshot', 'טלפון נמען', doc.customer_phone_snapshot, 'tel', locked) +
+      salesDocumentInput('customer_email_snapshot', 'אימייל נמען', doc.customer_email_snapshot, 'email', locked) +
       salesDocumentInput('customer_tax_id', 'ח.פ / ת.ז', doc.customer_tax_id, 'text', locked) +
+      salesDocumentInput('customer_address_snapshot', 'כתובת חיוב במסמך', doc.customer_address_snapshot, 'text', locked) +
+      salesDocumentInput('customer_service_address_snapshot', 'כתובת שירות/אירוע', doc.customer_service_address_snapshot, 'text', locked) +
+      salesDocumentInput('customer_document_contact_snapshot', 'איש קשר למסמכים', doc.customer_document_contact_snapshot, 'text', locked) +
+      salesDocumentInput('customer_finance_contact_snapshot', 'איש קשר כספים', doc.customer_finance_contact_snapshot, 'text', locked) +
+      salesDocumentInput('customer_default_discount_percent', 'הנחת לקוח % (ידני)', doc.customer_default_discount_percent, 'number', locked) +
+      salesDocumentInput('customer_default_discount_amount', 'הנחת לקוח ₪ (ידני)', doc.customer_default_discount_amount, 'number', locked) +
     '</div></div>' +
     '<div class="sales-doc-section"><div class="sales-doc-section-title">פרטי העסק במסמך</div><div class="sales-doc-grid-2">' +
       salesDocumentInput('business_name_snapshot', 'שם העסק במסמך', doc.business_name_snapshot, 'text', locked) +
@@ -3981,9 +4224,12 @@ function renderSalesDocumentEditor() {
       salesDocumentTextarea('cancellation_policy_snapshot', 'מדיניות ביטול', doc.cancellation_policy_snapshot, locked) +
       salesDocumentTextarea('document_footer_snapshot', 'Footer קבוע', doc.document_footer_snapshot, locked) +
       salesDocumentTextarea('terms', 'תנאים כלליים / טקסט נוסף', doc.terms, locked) +
+      salesDocumentTextarea('internal_notes', 'Snapshot פנימי / הערות לצוות', doc.internal_notes, locked) +
     '</div>';
   renderSalesDocumentItems();
   bindSalesDocumentEditorInputs();
+  bindSalesDocumentBillingControls();
+  renderSalesDocumentContactSelectOptions();
   var addBtn = document.getElementById('sales-document-add-item');
   if (addBtn) addBtn.addEventListener('click', addSalesDocumentItem);
   renderSalesDocumentPreview();
@@ -3996,6 +4242,61 @@ function salesDocumentInput(field, label, value, type, disabled) {
 
 function salesDocumentTextarea(field, label, value, disabled) {
   return '<div class="form-group"><label class="form-label">' + escapeHtml(label) + '</label><textarea class="form-textarea sales-doc-field" data-sales-field="' + escapeHtml(field) + '"' + (disabled ? ' disabled' : '') + '>' + escapeHtml(value || '') + '</textarea></div>';
+}
+
+
+function bindSalesDocumentBillingControls() {
+  var contactSelect = document.getElementById('sales-document-contact-select');
+  if (contactSelect && currentSalesDocumentDraft) {
+    contactSelect.addEventListener('change', function() {
+      if (!currentSalesDocumentDraft) return;
+      var contactId = this.value ? Number(this.value) : null;
+      currentSalesDocumentDraft.contact_id = contactId;
+      if (!contactId) {
+        salesDocumentBillingState = { contactId: null, loading: false, profile: null, addresses: [], people: [], error: null };
+        renderSalesDocumentEditor();
+        return;
+      }
+      var contact = findSalesDocumentContact(contactId);
+      if (contact) {
+        currentSalesDocumentDraft.customer_name_snapshot = currentSalesDocumentDraft.customer_name_snapshot || contact.name || '';
+        currentSalesDocumentDraft.customer_phone_snapshot = currentSalesDocumentDraft.customer_phone_snapshot || contact.phone || '';
+        currentSalesDocumentDraft.customer_email_snapshot = currentSalesDocumentDraft.customer_email_snapshot || contact.email || '';
+      }
+      loadSalesDocumentBillingForContact(contactId, true);
+    });
+  }
+
+  document.querySelectorAll('.sales-doc-billing-select').forEach(function(select) {
+    select.addEventListener('change', function() {
+      if (!currentSalesDocumentDraft) return;
+      var kind = this.getAttribute('data-billing-select');
+      var value = this.value ? Number(this.value) : null;
+      var state = salesDocumentBillingState || {};
+      var addresses = state.addresses || [];
+      var people = state.people || [];
+      if (kind === 'billing_address') {
+        currentSalesDocumentDraft.sales_document_billing_address_id = value || '';
+        currentSalesDocumentDraft.customer_address_snapshot = formatSalesDocumentAddress(findDefaultSalesDocumentAddress(addresses, value, 'is_default_billing', ['billing'])) || '';
+      } else if (kind === 'service_address') {
+        currentSalesDocumentDraft.sales_document_service_address_id = value || '';
+        currentSalesDocumentDraft.customer_service_address_snapshot = formatSalesDocumentAddress(findDefaultSalesDocumentAddress(addresses, value, 'is_default_service', ['service', 'event'])) || '';
+      } else if (kind === 'document_contact') {
+        var documentPerson = findDefaultSalesDocumentPerson(people, value, 'is_document_recipient', ['main', 'finance']);
+        currentSalesDocumentDraft.sales_document_document_contact_id = value || '';
+        currentSalesDocumentDraft.customer_document_contact_snapshot = formatSalesDocumentPerson(documentPerson) || '';
+        if (documentPerson) {
+          currentSalesDocumentDraft.customer_name_snapshot = documentPerson.name || currentSalesDocumentDraft.customer_name_snapshot;
+          currentSalesDocumentDraft.customer_email_snapshot = documentPerson.email || currentSalesDocumentDraft.customer_email_snapshot;
+          currentSalesDocumentDraft.customer_phone_snapshot = documentPerson.phone || currentSalesDocumentDraft.customer_phone_snapshot;
+        }
+      } else if (kind === 'finance_contact') {
+        currentSalesDocumentDraft.sales_document_finance_contact_id = value || '';
+        currentSalesDocumentDraft.customer_finance_contact_snapshot = formatSalesDocumentPerson(findDefaultSalesDocumentPerson(people, value, 'is_finance', ['finance'])) || '';
+      }
+      renderSalesDocumentEditor();
+    });
+  });
 }
 
 function renderSalesDocumentItems() {
@@ -4106,7 +4407,8 @@ function renderSalesDocumentPreview() {
     doc.customer_name_snapshot || 'שם לקוח',
     doc.customer_tax_id ? 'ח.פ/ת.ז: ' + doc.customer_tax_id : '',
     doc.customer_phone_snapshot || '',
-    doc.customer_email_snapshot || ''
+    doc.customer_email_snapshot || '',
+    doc.customer_address_snapshot || ''
   ].filter(Boolean).map(escapeHtml).join('<br>');
   var dateLabel = doc.document_type === 'invoice' ? 'לתשלום עד' : 'בתוקף עד';
   var secondDate = doc.document_type === 'invoice' ? doc.due_date : doc.valid_until;
@@ -4150,6 +4452,7 @@ function renderSalesDocumentPreview() {
     '<table class="sales-doc-preview-table"><thead><tr><th>תיאור</th><th>כמות</th><th>מחיר</th><th>הנחה</th>' + (vatExempt ? '' : '<th>מע״מ</th>') + '<th>סה״כ</th></tr></thead><tbody>' + itemRows + '</tbody></table>' +
     '<div class="sales-doc-preview-mobile-items">' + mobileItems + '</div>' +
     renderSalesDocumentTotalsHtml(totals, vatExempt, getSalesDocumentDefaultVatRate(doc)) +
+    renderSalesDocumentTextBlock('כתובת שירות/אירוע', doc.customer_service_address_snapshot) +
     renderSalesDocumentTextBlock('הערות', doc.notes) +
     (template.show_payment_terms ? renderSalesDocumentTextBlock('תנאי תשלום', doc.payment_terms_snapshot) : '') +
     (template.show_cancellation_policy ? renderSalesDocumentTextBlock('מדיניות ביטול', doc.cancellation_policy_snapshot) : '') +
@@ -4292,10 +4595,12 @@ function buildSalesDocumentPayload() {
     issue_date: doc.issue_date || null,
     due_date: doc.due_date || null,
     valid_until: doc.valid_until || null,
-    currency: 'ILS',
+    contact_id: doc.contact_id || null,
+    currency: doc.currency || 'ILS',
     customer_name_snapshot: doc.customer_name_snapshot || null,
     customer_phone_snapshot: doc.customer_phone_snapshot || null,
     customer_email_snapshot: doc.customer_email_snapshot || null,
+    customer_address_snapshot: doc.customer_address_snapshot || null,
     customer_tax_id: doc.customer_tax_id || null,
     business_name_snapshot: doc.business_name_snapshot || null,
     business_phone_snapshot: doc.business_phone_snapshot || null,
@@ -4310,6 +4615,7 @@ function buildSalesDocumentPayload() {
     document_footer_snapshot: doc.document_footer_snapshot || null,
     notes: doc.notes || null,
     terms: doc.terms || null,
+    internal_notes: buildSalesDocumentInternalNotesSnapshot(doc),
     items: (doc.items || []).map(function(item, index) {
       return {
         line_order: index + 1,

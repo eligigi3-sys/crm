@@ -152,6 +152,94 @@ async function getTenantForSnapshot(tenantId, env) {
   ).bind(tenantId).first();
 }
 
+
+async function getCustomerBillingProfileForSnapshot(contactId, tenantId, env) {
+  if (!contactId) return null;
+  return env.DB.prepare(
+    `SELECT *
+     FROM customer_billing_profiles
+     WHERE contact_id = ?
+       AND tenant_id = ?
+     LIMIT 1`
+  ).bind(contactId, tenantId).first();
+}
+
+async function getDefaultCustomerAddressForSnapshot(contactId, tenantId, env, preferredFlag, preferredAddressId) {
+  if (!contactId) return null;
+  const addressId = normalizeNullablePositiveInteger(preferredAddressId, 'כתובת');
+  if (addressId) {
+    const byId = await env.DB.prepare(
+      `SELECT *
+       FROM customer_addresses
+       WHERE id = ?
+         AND contact_id = ?
+         AND tenant_id = ?
+         AND active = 1
+       LIMIT 1`
+    ).bind(addressId, contactId, tenantId).first();
+    if (byId) return byId;
+  }
+  const flagColumn = preferredFlag === 'service' ? 'is_default_service' : preferredFlag === 'shipping' ? 'is_default_shipping' : 'is_default_billing';
+  const result = await env.DB.prepare(
+    `SELECT *
+     FROM customer_addresses
+     WHERE contact_id = ?
+       AND tenant_id = ?
+       AND active = 1
+     ORDER BY ${flagColumn} DESC,
+              is_default_billing DESC,
+              is_default_service DESC,
+              address_type ASC,
+              id ASC
+     LIMIT 1`
+  ).bind(contactId, tenantId).first();
+  return result || null;
+}
+
+async function getDefaultCustomerPersonForSnapshot(contactId, tenantId, env, preferredFlag, preferredPersonId) {
+  if (!contactId) return null;
+  const personId = normalizeNullablePositiveInteger(preferredPersonId, 'איש קשר');
+  if (personId) {
+    const byId = await env.DB.prepare(
+      `SELECT *
+       FROM customer_contact_people
+       WHERE id = ?
+         AND contact_id = ?
+         AND tenant_id = ?
+         AND active = 1
+       LIMIT 1`
+    ).bind(personId, contactId, tenantId).first();
+    if (byId) return byId;
+  }
+  const flagColumn = preferredFlag === 'finance' ? 'is_finance' : preferredFlag === 'document' ? 'is_document_recipient' : 'is_primary';
+  const result = await env.DB.prepare(
+    `SELECT *
+     FROM customer_contact_people
+     WHERE contact_id = ?
+       AND tenant_id = ?
+       AND active = 1
+     ORDER BY ${flagColumn} DESC,
+              is_document_recipient DESC,
+              is_finance DESC,
+              is_primary DESC,
+              display_order ASC,
+              id ASC
+     LIMIT 1`
+  ).bind(contactId, tenantId).first();
+  return result || null;
+}
+
+function formatCustomerAddressForSnapshot(address) {
+  if (!address) return null;
+  return normalizeOptionalText(address.full_address) || [
+    normalizeOptionalText(address.street),
+    normalizeOptionalText(address.city),
+    normalizeOptionalText(address.region),
+    normalizeOptionalText(address.postal_code),
+    normalizeOptionalText(address.country)
+  ].filter(Boolean).join(', ') || null;
+}
+
 async function getProductForTenant(productId, tenantId, env) {
   if (!productId) return null;
   return env.DB.prepare(
@@ -375,21 +463,30 @@ async function buildSnapshot(body, tenantId, env, businessSettings) {
 
   const tenant = await getTenantForSnapshot(tenantId, env);
   const settings = businessSettings || await getTenantBusinessSettings(tenantId, env);
-  const defaultNotes = normalizeOptionalText(settings.default_notes);
+  const billingProfile = await getCustomerBillingProfileForSnapshot(effectiveContactId, tenantId, env);
+  const billingAddress = await getDefaultCustomerAddressForSnapshot(effectiveContactId, tenantId, env, 'billing', billingProfile && billingProfile.default_billing_address_id);
+  const invoicePerson = await getDefaultCustomerPersonForSnapshot(effectiveContactId, tenantId, env, 'document', null);
+  const defaultNotes = normalizeOptionalText(billingProfile && billingProfile.default_notes) || normalizeOptionalText(settings.default_notes);
+  const defaultPaymentTerms = normalizeOptionalText(billingProfile && billingProfile.payment_terms) || normalizeOptionalText(settings.default_payment_terms);
+  const defaultFooter = normalizeOptionalText(billingProfile && billingProfile.default_document_footer) || normalizeOptionalText(settings.default_document_footer);
   const defaultTerms = [
-    normalizeOptionalText(settings.default_payment_terms),
+    defaultPaymentTerms,
     normalizeOptionalText(settings.default_cancellation_policy)
   ].filter(Boolean).join('\n\n') || null;
+  const invoiceName = normalizeOptionalText(billingProfile && billingProfile.invoice_recipient_name) || normalizeOptionalText(invoicePerson && invoicePerson.name);
+  const invoiceEmail = normalizeOptionalText(billingProfile && billingProfile.invoice_recipient_email) || normalizeOptionalText(invoicePerson && invoicePerson.email);
+  const invoicePhone = normalizeOptionalText(billingProfile && billingProfile.invoice_recipient_phone) || normalizeOptionalText(invoicePerson && invoicePerson.phone);
 
   return {
     contact_id: effectiveContactId,
     lead_id: leadId,
     source_quote_id: sourceQuoteId,
-    customer_name_snapshot: normalizeOptionalText(body.customer_name_snapshot) || (contact && contact.name) || (lead && lead.name) || null,
-    customer_phone_snapshot: normalizeOptionalText(body.customer_phone_snapshot) || (contact && contact.phone) || (lead && lead.phone) || null,
-    customer_email_snapshot: normalizeOptionalText(body.customer_email_snapshot) || (contact && contact.email) || (lead && lead.email) || null,
-    customer_address_snapshot: normalizeOptionalText(body.customer_address_snapshot),
-    customer_tax_id: normalizeOptionalText(body.customer_tax_id),
+    preferred_currency: normalizeOptionalText(billingProfile && billingProfile.preferred_currency),
+    customer_name_snapshot: normalizeOptionalText(body.customer_name_snapshot) || invoiceName || normalizeOptionalText(billingProfile && billingProfile.billing_name) || (contact && contact.name) || (lead && lead.name) || null,
+    customer_phone_snapshot: normalizeOptionalText(body.customer_phone_snapshot) || invoicePhone || (contact && contact.phone) || (lead && lead.phone) || null,
+    customer_email_snapshot: normalizeOptionalText(body.customer_email_snapshot) || invoiceEmail || (contact && contact.email) || (lead && lead.email) || null,
+    customer_address_snapshot: normalizeOptionalText(body.customer_address_snapshot) || formatCustomerAddressForSnapshot(billingAddress),
+    customer_tax_id: normalizeOptionalText(body.customer_tax_id) || normalizeOptionalText(billingProfile && billingProfile.tax_id),
     business_name_snapshot: normalizeOptionalText(body.business_name_snapshot) || settings.business_display_name || settings.business_legal_name || (tenant && tenant.name) || null,
     business_phone_snapshot: normalizeOptionalText(body.business_phone_snapshot) || settings.business_phone || (tenant && tenant.contact_phone) || null,
     business_email_snapshot: normalizeOptionalText(body.business_email_snapshot) || settings.business_email || (tenant && tenant.contact_email) || null,
@@ -401,9 +498,9 @@ async function buildSnapshot(body, tenantId, env, businessSettings) {
     vat_mode_snapshot: settings.vat_mode || 'standard',
     default_vat_rate_snapshot: Number(settings.default_vat_rate || 0),
     business_logo_url_snapshot: normalizeOptionalText(body.business_logo_url_snapshot) || settings.logo_url || null,
-    payment_terms_snapshot: normalizeOptionalText(body.payment_terms_snapshot) || normalizeOptionalText(settings.default_payment_terms),
+    payment_terms_snapshot: normalizeOptionalText(body.payment_terms_snapshot) || defaultPaymentTerms,
     cancellation_policy_snapshot: normalizeOptionalText(body.cancellation_policy_snapshot) || normalizeOptionalText(settings.default_cancellation_policy),
-    document_footer_snapshot: normalizeOptionalText(body.document_footer_snapshot) || normalizeOptionalText(settings.default_document_footer),
+    document_footer_snapshot: normalizeOptionalText(body.document_footer_snapshot) || defaultFooter,
     default_notes: defaultNotes,
     default_terms: defaultTerms
   };
@@ -583,7 +680,7 @@ async function createDocument(request, env, tenantCtx) {
     issueDate,
     normalizeOptionalText(body.due_date),
     normalizeOptionalText(body.valid_until),
-    normalizeOptionalText(body.currency) || 'ILS',
+    normalizeOptionalText(body.currency) || snapshot.preferred_currency || 'ILS',
     totals.subtotal_amount,
     totals.discount_amount,
     totals.vat_rate,
@@ -711,7 +808,7 @@ async function updateDocument(request, env, tenantCtx, documentId) {
     normalizeOptionalText(body.issue_date !== undefined ? body.issue_date : existing.issue_date),
     normalizeOptionalText(body.due_date !== undefined ? body.due_date : existing.due_date),
     normalizeOptionalText(body.valid_until !== undefined ? body.valid_until : existing.valid_until),
-    normalizeOptionalText(body.currency !== undefined ? body.currency : existing.currency) || 'ILS',
+    normalizeOptionalText(body.currency !== undefined ? body.currency : existing.currency) || snapshot.preferred_currency || 'ILS',
     totals.subtotal_amount,
     totals.discount_amount,
     totals.vat_rate,
