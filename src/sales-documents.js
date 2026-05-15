@@ -795,6 +795,128 @@ async function getDocumentDetail(env, tenantId, documentId) {
   return { document: mapDocument(document, items) };
 }
 
+function buildClonePayload(document, items, overrides = {}) {
+  return {
+    document_type: overrides.document_type || document.document_type,
+    contact_id: document.contact_id || null,
+    lead_id: document.lead_id || null,
+    source_quote_id: overrides.source_quote_id !== undefined ? overrides.source_quote_id : (document.source_quote_id || null),
+    issue_date: overrides.issue_date !== undefined ? overrides.issue_date : todayIsoDate(),
+    due_date: overrides.due_date !== undefined ? overrides.due_date : document.due_date,
+    valid_until: overrides.valid_until !== undefined ? overrides.valid_until : document.valid_until,
+    currency: document.currency || 'ILS',
+    customer_name_snapshot: document.customer_name_snapshot,
+    customer_phone_snapshot: document.customer_phone_snapshot,
+    customer_email_snapshot: document.customer_email_snapshot,
+    customer_address_snapshot: document.customer_address_snapshot,
+    customer_tax_id: document.customer_tax_id,
+    business_name_snapshot: document.business_name_snapshot,
+    business_phone_snapshot: document.business_phone_snapshot,
+    business_email_snapshot: document.business_email_snapshot,
+    business_address_snapshot: document.business_address_snapshot,
+    business_tax_id: document.business_tax_id,
+    business_legal_name_snapshot: document.business_legal_name_snapshot,
+    business_display_name_snapshot: document.business_display_name_snapshot,
+    business_logo_url_snapshot: document.business_logo_url_snapshot,
+    payment_terms_snapshot: document.payment_terms_snapshot,
+    cancellation_policy_snapshot: document.cancellation_policy_snapshot,
+    document_footer_snapshot: document.document_footer_snapshot,
+    notes: document.notes,
+    terms: document.terms,
+    internal_notes: document.internal_notes,
+    items: (items || []).map(function(item) {
+      return {
+        product_id: item.product_id || null,
+        description: item.description,
+        quantity: item.quantity,
+        unit: item.unit,
+        unit_price: item.unit_price,
+        discount_amount: item.discount_amount,
+        vat_rate: item.vat_rate
+      };
+    })
+  };
+}
+
+function payloadRequest(payload) {
+  return new Request('https://internal.local/api/sales-documents', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+}
+
+async function duplicateDocument(env, tenantCtx, documentId) {
+  const tenantId = tenantCtx.tenant.id;
+  const document = await getDocumentForTenant(documentId, tenantId, env);
+  if (!document) throw new Error('המסמך לא נמצא');
+  const items = await getDocumentItemsForTenant(documentId, tenantId, env);
+  const payload = buildClonePayload(document, items, {
+    issue_date: todayIsoDate(),
+    due_date: document.document_type === 'invoice' ? todayIsoDate() : null,
+    valid_until: document.document_type === 'quote' ? todayIsoDate() : null
+  });
+  return createDocument(payloadRequest(payload), env, tenantCtx);
+}
+
+async function convertQuoteToInvoice(env, tenantCtx, documentId) {
+  const tenantId = tenantCtx.tenant.id;
+  const userId = tenantCtx.user.id;
+  const document = await getDocumentForTenant(documentId, tenantId, env);
+  if (!document) throw new Error('המסמך לא נמצא');
+  if (document.document_type !== 'quote') {
+    return json({ error: 'ניתן להמיר לחשבונית רק הצעת מחיר' }, 400);
+  }
+  if (['cancelled', 'rejected', 'expired', 'converted'].includes(document.status)) {
+    return json({ error: 'לא ניתן להמיר הצעה במצב הנוכחי' }, 409);
+  }
+  const items = await getDocumentItemsForTenant(documentId, tenantId, env);
+  const created = await createDocument(payloadRequest(buildClonePayload(document, items, {
+    document_type: 'invoice',
+    source_quote_id: documentId,
+    issue_date: todayIsoDate(),
+    due_date: todayIsoDate(),
+    valid_until: null
+  })), env, tenantCtx);
+
+  await env.DB.prepare(
+    `UPDATE sales_documents
+     SET status = 'converted',
+         updated_by_user_id = ?,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = ?
+       AND tenant_id = ?
+       AND status NOT IN ('cancelled', 'rejected', 'expired', 'converted')`
+  ).bind(userId, documentId, tenantId).run();
+
+  return { success: true, source_document: (await getDocumentDetail(env, tenantId, documentId)).document, document: created.document };
+}
+
+async function markDocumentSent(env, tenantCtx, documentId) {
+  const tenantId = tenantCtx.tenant.id;
+  const userId = tenantCtx.user.id;
+  const document = await getDocumentForTenant(documentId, tenantId, env);
+  if (!document) throw new Error('המסמך לא נמצא');
+  if (document.status === 'cancelled' || document.status === 'void' || document.status === 'rejected') {
+    return json({ error: 'לא ניתן לסמן מסמך זה כנשלח' }, 409);
+  }
+
+  const nextStatus = document.status === 'issued' || document.status === 'paid' || document.status === 'partially_paid'
+    ? document.status
+    : 'sent';
+  await env.DB.prepare(
+    `UPDATE sales_documents
+     SET status = ?,
+         sent_at = COALESCE(sent_at, CURRENT_TIMESTAMP),
+         updated_by_user_id = ?,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = ?
+       AND tenant_id = ?`
+  ).bind(nextStatus, userId, documentId, tenantId).run();
+
+  return { success: true, ...(await getDocumentDetail(env, tenantId, documentId)) };
+}
+
 async function issueDocument(env, tenantCtx, documentId) {
   const tenantId = tenantCtx.tenant.id;
   const userId = tenantCtx.user.id;
@@ -870,6 +992,27 @@ export async function handleSalesDocuments(request, env, path) {
     const access = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
     if (access instanceof Response) return access;
     return createDocument(request, env, tenantCtx);
+  }
+
+  const duplicateMatch = path.match(/^\/api/sales-documents\/(\d+)\/duplicate$/);
+  if (duplicateMatch && method === 'POST') {
+    const access = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (access instanceof Response) return access;
+    return duplicateDocument(env, tenantCtx, Number(duplicateMatch[1]));
+  }
+
+  const convertMatch = path.match(/^\/api/sales-documents\/(\d+)\/convert-to-invoice$/);
+  if (convertMatch && method === 'POST') {
+    const access = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (access instanceof Response) return access;
+    return convertQuoteToInvoice(env, tenantCtx, Number(convertMatch[1]));
+  }
+
+  const markSentMatch = path.match(/^\/api/sales-documents\/(\d+)\/mark-sent$/);
+  if (markSentMatch && method === 'POST') {
+    const access = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (access instanceof Response) return access;
+    return markDocumentSent(env, tenantCtx, Number(markSentMatch[1]));
   }
 
   const issueMatch = path.match(/^\/api\/sales-documents\/(\d+)\/issue$/);
