@@ -8,6 +8,7 @@ import { handleProducts } from './src/products.js';
 import { handleAdmin } from './src/admin.js';
 import { handleMembers } from './src/members.js';
 import { handleSalesDocuments } from './src/sales-documents.js';
+import { handleTenantBusinessSettings } from './src/tenant-business-settings.js';
 import { serveHTML } from './src/ui.js';
 
 export default {
@@ -46,6 +47,8 @@ export default {
           response = await handleAdmin(request, env, path);
         } else if (path.startsWith('/api/tenant-members')) {
           response = await handleMembers(request, env, path);
+        } else if (path.startsWith('/api/tenant-business-settings')) {
+          response = await handleTenantBusinessSettings(request, env, path);
         } else if (path.startsWith('/api/sales-documents')) {
           response = await handleSalesDocuments(request, env, path);
         } else if (path.startsWith('/api/dashboard')) {

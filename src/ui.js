@@ -3423,7 +3423,7 @@ function createEmptySalesDocumentDraft(documentType) {
 }
 
 function createEmptySalesDocumentItem(order) {
-  return { line_order: order || 1, description: '', quantity: 1, unit_price: 0, vat_rate: 17, discount_amount: 0 };
+  return { line_order: order || 1, description: '', quantity: 1, unit_price: 0, vat_rate: 18, discount_amount: 0 };
 }
 
 function calculateSalesDocumentPreviewTotals(doc) {

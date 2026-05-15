@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS sales_documents (
 
   subtotal_amount REAL NOT NULL DEFAULT 0,
   discount_amount REAL NOT NULL DEFAULT 0,
-  vat_rate REAL NOT NULL DEFAULT 17,
+  vat_rate REAL NOT NULL DEFAULT 18,
   vat_amount REAL NOT NULL DEFAULT 0,
   total_amount REAL NOT NULL DEFAULT 0,
   paid_amount REAL NOT NULL DEFAULT 0,
@@ -144,7 +144,7 @@ CREATE TABLE IF NOT EXISTS sales_document_items (
   unit TEXT,
   unit_price REAL NOT NULL DEFAULT 0,
   discount_amount REAL NOT NULL DEFAULT 0,
-  vat_rate REAL NOT NULL DEFAULT 17,
+  vat_rate REAL NOT NULL DEFAULT 18,
   vat_amount REAL NOT NULL DEFAULT 0,
   line_subtotal REAL NOT NULL DEFAULT 0,
   line_total REAL NOT NULL DEFAULT 0,

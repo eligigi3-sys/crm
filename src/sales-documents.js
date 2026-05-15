@@ -1,4 +1,7 @@
 import { requireTenantContext, assertTenantRole } from './auth.js';
+import { getTenantBusinessSettings } from './tenant-business-settings.js';
+
+const DEFAULT_STANDARD_VAT_RATE = 18;
 
 const DOCUMENT_TYPES = new Set(['quote', 'invoice']);
 const DOCUMENT_STATUSES = new Set([
@@ -213,6 +216,15 @@ function mapDocument(row, items) {
     business_email_snapshot: row.business_email_snapshot || null,
     business_address_snapshot: row.business_address_snapshot || null,
     business_tax_id: row.business_tax_id || null,
+    business_legal_name_snapshot: row.business_legal_name_snapshot || null,
+    business_display_name_snapshot: row.business_display_name_snapshot || null,
+    business_type_snapshot: row.business_type_snapshot || null,
+    vat_mode_snapshot: row.vat_mode_snapshot || null,
+    default_vat_rate_snapshot: Number(row.default_vat_rate_snapshot || 0),
+    business_logo_url_snapshot: row.business_logo_url_snapshot || null,
+    payment_terms_snapshot: row.payment_terms_snapshot || null,
+    cancellation_policy_snapshot: row.cancellation_policy_snapshot || null,
+    document_footer_snapshot: row.document_footer_snapshot || null,
     tax_allocation_number: row.tax_allocation_number || null,
     tax_allocation_status: row.tax_allocation_status || null,
     tax_allocation_requested_at: row.tax_allocation_requested_at || null,
@@ -257,7 +269,7 @@ function mapDocumentItem(row) {
   };
 }
 
-async function normalizeItems(rawItems, tenantId, env) {
+async function normalizeItems(rawItems, tenantId, env, businessSettings) {
   const items = Array.isArray(rawItems) ? rawItems : [];
   if (items.length === 0) {
     throw new Error('נדרשת לפחות שורת מסמך אחת');
@@ -284,7 +296,11 @@ async function normalizeItems(rawItems, tenantId, env) {
       'מחיר יחידה'
     );
     const discountAmount = normalizeNonNegativeNumber(rawItem.discount_amount, 0, 'הנחה');
-    const vatRate = normalizeNonNegativeNumber(rawItem.vat_rate, 17, 'מע״מ');
+    const isVatExempt = businessSettings && businessSettings.vat_mode === 'exempt';
+    const defaultVatRate = businessSettings && Number.isFinite(Number(businessSettings.default_vat_rate))
+      ? Number(businessSettings.default_vat_rate)
+      : DEFAULT_STANDARD_VAT_RATE;
+    const vatRate = isVatExempt ? 0 : normalizeNonNegativeNumber(rawItem.vat_rate, defaultVatRate, 'מע״מ');
     const grossLineSubtotal = roundMoney(quantity * unitPrice);
     if (discountAmount > grossLineSubtotal) {
       throw new Error('הנחת שורה לא יכולה להיות גבוהה מסכום השורה');
@@ -345,7 +361,7 @@ function calculateTotals(items, paidAmountValue) {
   };
 }
 
-async function buildSnapshot(body, tenantId, env) {
+async function buildSnapshot(body, tenantId, env, businessSettings) {
   const contactId = normalizeNullablePositiveInteger(body.contact_id, 'לקוח');
   const leadId = normalizeNullablePositiveInteger(body.lead_id, 'אירוע');
   const sourceQuoteId = normalizeNullablePositiveInteger(body.source_quote_id, 'הצעת מקור');
@@ -358,6 +374,12 @@ async function buildSnapshot(body, tenantId, env) {
   if (effectiveContactId && !contact) throw new Error('הלקוח לא נמצא');
 
   const tenant = await getTenantForSnapshot(tenantId, env);
+  const settings = businessSettings || await getTenantBusinessSettings(tenantId, env);
+  const defaultNotes = normalizeOptionalText(settings.default_notes);
+  const defaultTerms = [
+    normalizeOptionalText(settings.default_payment_terms),
+    normalizeOptionalText(settings.default_cancellation_policy)
+  ].filter(Boolean).join('\n\n') || null;
 
   return {
     contact_id: effectiveContactId,
@@ -368,11 +390,22 @@ async function buildSnapshot(body, tenantId, env) {
     customer_email_snapshot: normalizeOptionalText(body.customer_email_snapshot) || (contact && contact.email) || (lead && lead.email) || null,
     customer_address_snapshot: normalizeOptionalText(body.customer_address_snapshot),
     customer_tax_id: normalizeOptionalText(body.customer_tax_id),
-    business_name_snapshot: normalizeOptionalText(body.business_name_snapshot) || (tenant && tenant.name) || null,
-    business_phone_snapshot: normalizeOptionalText(body.business_phone_snapshot) || (tenant && tenant.contact_phone) || null,
-    business_email_snapshot: normalizeOptionalText(body.business_email_snapshot) || (tenant && tenant.contact_email) || null,
-    business_address_snapshot: normalizeOptionalText(body.business_address_snapshot),
-    business_tax_id: normalizeOptionalText(body.business_tax_id)
+    business_name_snapshot: normalizeOptionalText(body.business_name_snapshot) || settings.business_display_name || settings.business_legal_name || (tenant && tenant.name) || null,
+    business_phone_snapshot: normalizeOptionalText(body.business_phone_snapshot) || settings.business_phone || (tenant && tenant.contact_phone) || null,
+    business_email_snapshot: normalizeOptionalText(body.business_email_snapshot) || settings.business_email || (tenant && tenant.contact_email) || null,
+    business_address_snapshot: normalizeOptionalText(body.business_address_snapshot) || settings.business_address || null,
+    business_tax_id: normalizeOptionalText(body.business_tax_id) || settings.business_tax_id || null,
+    business_legal_name_snapshot: normalizeOptionalText(body.business_legal_name_snapshot) || settings.business_legal_name || settings.business_display_name || (tenant && tenant.name) || null,
+    business_display_name_snapshot: normalizeOptionalText(body.business_display_name_snapshot) || settings.business_display_name || settings.business_legal_name || (tenant && tenant.name) || null,
+    business_type_snapshot: settings.business_type || null,
+    vat_mode_snapshot: settings.vat_mode || 'standard',
+    default_vat_rate_snapshot: Number(settings.default_vat_rate || 0),
+    business_logo_url_snapshot: normalizeOptionalText(body.business_logo_url_snapshot) || settings.logo_url || null,
+    payment_terms_snapshot: normalizeOptionalText(body.payment_terms_snapshot) || normalizeOptionalText(settings.default_payment_terms),
+    cancellation_policy_snapshot: normalizeOptionalText(body.cancellation_policy_snapshot) || normalizeOptionalText(settings.default_cancellation_policy),
+    document_footer_snapshot: normalizeOptionalText(body.document_footer_snapshot) || normalizeOptionalText(settings.default_document_footer),
+    default_notes: defaultNotes,
+    default_terms: defaultTerms
   };
 }
 
@@ -484,9 +517,10 @@ async function createDocument(request, env, tenantCtx) {
     throw new Error('מסמך חדש חייב להתחיל כטיוטה');
   }
 
-  const items = await normalizeItems(body.items, tenantId, env);
+  const businessSettings = await getTenantBusinessSettings(tenantId, env);
+  const items = await normalizeItems(body.items, tenantId, env, businessSettings);
   const totals = calculateTotals(items, body.paid_amount);
-  const snapshot = await buildSnapshot(body, tenantId, env);
+  const snapshot = await buildSnapshot(body, tenantId, env, businessSettings);
   const numberState = await nextDocumentNumber(tenantId, documentType, env);
   const issueDate = normalizeOptionalText(body.issue_date);
 
@@ -521,6 +555,15 @@ async function createDocument(request, env, tenantCtx) {
        business_email_snapshot,
        business_address_snapshot,
        business_tax_id,
+       business_legal_name_snapshot,
+       business_display_name_snapshot,
+       business_type_snapshot,
+       vat_mode_snapshot,
+       default_vat_rate_snapshot,
+       business_logo_url_snapshot,
+       payment_terms_snapshot,
+       cancellation_policy_snapshot,
+       document_footer_snapshot,
        notes,
        terms,
        internal_notes,
@@ -528,7 +571,7 @@ async function createDocument(request, env, tenantCtx) {
        updated_by_user_id,
        created_at,
        updated_at
-     ) VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+     ) VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
   ).bind(
     tenantId,
     documentType,
@@ -558,8 +601,17 @@ async function createDocument(request, env, tenantCtx) {
     snapshot.business_email_snapshot,
     snapshot.business_address_snapshot,
     snapshot.business_tax_id,
-    normalizeOptionalText(body.notes),
-    normalizeOptionalText(body.terms),
+    snapshot.business_legal_name_snapshot,
+    snapshot.business_display_name_snapshot,
+    snapshot.business_type_snapshot,
+    snapshot.vat_mode_snapshot,
+    snapshot.default_vat_rate_snapshot,
+    snapshot.business_logo_url_snapshot,
+    snapshot.payment_terms_snapshot,
+    snapshot.cancellation_policy_snapshot,
+    snapshot.document_footer_snapshot,
+    normalizeOptionalText(body.notes) || snapshot.default_notes,
+    normalizeOptionalText(body.terms) || snapshot.default_terms,
     normalizeOptionalText(body.internal_notes),
     userId,
     userId
@@ -585,7 +637,8 @@ async function updateDocument(request, env, tenantCtx, documentId) {
   const body = await parseJson(request);
   if (!body) return json({ error: 'בקשה לא תקינה' }, 400);
 
-  const items = await normalizeItems(body.items, tenantId, env);
+  const businessSettings = await getTenantBusinessSettings(tenantId, env);
+  const items = await normalizeItems(body.items, tenantId, env, businessSettings);
   const totals = calculateTotals(items, body.paid_amount);
   const snapshot = await buildSnapshot({
     contact_id: body.contact_id !== undefined ? body.contact_id : existing.contact_id,
@@ -600,8 +653,14 @@ async function updateDocument(request, env, tenantCtx, documentId) {
     business_phone_snapshot: body.business_phone_snapshot !== undefined ? body.business_phone_snapshot : existing.business_phone_snapshot,
     business_email_snapshot: body.business_email_snapshot !== undefined ? body.business_email_snapshot : existing.business_email_snapshot,
     business_address_snapshot: body.business_address_snapshot !== undefined ? body.business_address_snapshot : existing.business_address_snapshot,
-    business_tax_id: body.business_tax_id !== undefined ? body.business_tax_id : existing.business_tax_id
-  }, tenantId, env);
+    business_tax_id: body.business_tax_id !== undefined ? body.business_tax_id : existing.business_tax_id,
+    business_legal_name_snapshot: body.business_legal_name_snapshot !== undefined ? body.business_legal_name_snapshot : existing.business_legal_name_snapshot,
+    business_display_name_snapshot: body.business_display_name_snapshot !== undefined ? body.business_display_name_snapshot : existing.business_display_name_snapshot,
+    business_logo_url_snapshot: body.business_logo_url_snapshot !== undefined ? body.business_logo_url_snapshot : existing.business_logo_url_snapshot,
+    payment_terms_snapshot: body.payment_terms_snapshot !== undefined ? body.payment_terms_snapshot : existing.payment_terms_snapshot,
+    cancellation_policy_snapshot: body.cancellation_policy_snapshot !== undefined ? body.cancellation_policy_snapshot : existing.cancellation_policy_snapshot,
+    document_footer_snapshot: body.document_footer_snapshot !== undefined ? body.document_footer_snapshot : existing.document_footer_snapshot
+  }, tenantId, env, businessSettings);
 
   await env.DB.prepare(
     `UPDATE sales_documents
@@ -629,6 +688,15 @@ async function updateDocument(request, env, tenantCtx, documentId) {
          business_email_snapshot = ?,
          business_address_snapshot = ?,
          business_tax_id = ?,
+         business_legal_name_snapshot = ?,
+         business_display_name_snapshot = ?,
+         business_type_snapshot = ?,
+         vat_mode_snapshot = ?,
+         default_vat_rate_snapshot = ?,
+         business_logo_url_snapshot = ?,
+         payment_terms_snapshot = ?,
+         cancellation_policy_snapshot = ?,
+         document_footer_snapshot = ?,
          notes = ?,
          terms = ?,
          internal_notes = ?,
@@ -661,8 +729,17 @@ async function updateDocument(request, env, tenantCtx, documentId) {
     snapshot.business_email_snapshot,
     snapshot.business_address_snapshot,
     snapshot.business_tax_id,
-    normalizeOptionalText(body.notes !== undefined ? body.notes : existing.notes),
-    normalizeOptionalText(body.terms !== undefined ? body.terms : existing.terms),
+    snapshot.business_legal_name_snapshot,
+    snapshot.business_display_name_snapshot,
+    snapshot.business_type_snapshot,
+    snapshot.vat_mode_snapshot,
+    snapshot.default_vat_rate_snapshot,
+    snapshot.business_logo_url_snapshot,
+    snapshot.payment_terms_snapshot,
+    snapshot.cancellation_policy_snapshot,
+    snapshot.document_footer_snapshot,
+    normalizeOptionalText(body.notes !== undefined ? body.notes : existing.notes) || snapshot.default_notes,
+    normalizeOptionalText(body.terms !== undefined ? body.terms : existing.terms) || snapshot.default_terms,
     normalizeOptionalText(body.internal_notes !== undefined ? body.internal_notes : existing.internal_notes),
     userId,
     documentId,
