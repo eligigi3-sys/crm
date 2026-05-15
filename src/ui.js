@@ -145,6 +145,31 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .guided-empty-title{font-size:14px;font-weight:800;color:var(--text)}
 .guided-empty-sub{font-size:12px;line-height:1.6;color:var(--text3);max-width:420px}
 
+
+.business-settings-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+.business-settings-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.business-settings-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#fafbfc}
+.business-settings-title{font-size:15px;font-weight:800;color:var(--text)}
+.business-settings-sub{font-size:12px;color:var(--text3);line-height:1.5;margin-top:3px}
+.business-settings-body{padding:16px}
+.business-settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.business-settings-grid.single{grid-template-columns:1fr}
+.business-settings-section{padding:14px;border:1px solid var(--border);border-radius:14px;background:#fff;margin-bottom:14px}
+.business-settings-section:last-child{margin-bottom:0}
+.business-settings-section-title{font-size:13px;font-weight:900;color:var(--text);margin-bottom:4px}
+.business-settings-section-sub{font-size:12px;color:var(--text3);line-height:1.5;margin-bottom:12px}
+.business-settings-note{padding:10px 12px;border-radius:12px;background:var(--blue-light);color:var(--blue);font-size:12px;font-weight:700;line-height:1.5;margin-top:10px}
+.business-settings-note.exempt{background:var(--yellow-light);color:var(--yellow)}
+.business-settings-permission{padding:12px 14px;border-radius:12px;background:var(--orange-light);color:var(--orange);font-size:13px;font-weight:700;margin-bottom:14px;line-height:1.5}
+.business-settings-footer{position:sticky;bottom:0;background:rgba(255,255,255,0.96);border-top:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.business-settings-status{font-size:12px;color:var(--text3)}
+@media (max-width:760px){
+  .business-settings-grid{grid-template-columns:1fr}
+  .business-settings-head{align-items:stretch}
+  .business-settings-footer{margin:0;align-items:stretch;flex-direction:column}
+  .business-settings-footer .btn{width:100%;justify-content:center}
+}
+
 .sales-doc-actions{display:flex;gap:8px;flex-wrap:wrap}
 .sales-doc-table-wrap{overflow-x:auto}
 .sales-doc-type-pill{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:800;background:var(--accent-light);color:var(--accent)}
@@ -1286,6 +1311,7 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     <div class="nav-item" id="nav-products"><span class="nav-icon">📦</span> מוצרים</div>
     <div class="nav-item" id="nav-shopping"><span class="nav-icon">🛒</span> רשימות קניות</div>
     <div class="nav-item" id="nav-sales-documents"><span class="nav-icon">🧾</span> מסמכי מכירה</div>
+    <div class="nav-item" id="nav-business-settings"><span class="nav-icon">⚙️</span> הגדרות עסק</div>
     <div class="nav-item" id="nav-calendar"><span class="nav-icon">📅</span> יומן אירועים</div>
     <div class="nav-item" id="nav-archive"><span class="nav-icon">🗂️</span> ארכיון אירועים</div>
     <div class="nav-item" id="nav-super-admin" style="display:none"><span class="nav-icon">🛠️</span> Super Admin</div>
@@ -1474,6 +1500,26 @@ id="customers-search">
       </div>
     </div>
 
+
+    <div id="page-business-settings" class="page">
+      <div class="page-header">
+        <div class="page-title">הגדרות עסק <small>פרטי עסק, מע״מ וברירות מחדל למסמכים</small></div>
+        <button class="btn btn-secondary" id="btn-refresh-business-settings">רענן</button>
+      </div>
+      <div class="business-settings-layout">
+        <div class="business-settings-card">
+          <div class="business-settings-head">
+            <div>
+              <div class="business-settings-title">פרטי העסק למסמכי מכירה</div>
+              <div class="business-settings-sub">הגדרות אלו ישמשו כברירת מחדל למסמכים חדשים בלבד. מסמכים קיימים/נעולים לא ישתנו.</div>
+            </div>
+            <span class="badge badge-blue" id="business-settings-role-badge">טוען...</span>
+          </div>
+          <div class="business-settings-body" id="business-settings-body"><div class="dash-empty">טוען...</div></div>
+          <div class="business-settings-footer" id="business-settings-footer" style="display:none"></div>
+        </div>
+      </div>
+    </div>
     <div id="page-sales-documents" class="page">
       <div class="page-header">
         <div class="page-title">מסמכי מכירה <small>הצעות מחיר וחשבוניות</small></div>
@@ -1696,6 +1742,9 @@ var currentSalesDocuments = [];
 var currentSalesDocumentDraft = null;
 var currentSalesDocumentId = null;
 var salesDocumentSaving = false;
+var currentBusinessSettings = null;
+var businessSettingsLoading = false;
+var businessSettingsSaving = false;
 var allLeadsCache = [];
 var calYear, calMonth;
 var currentTenantContext = null;
@@ -1930,7 +1979,7 @@ function applyShellVisibility() {
   var isAdminShell = shellMode === 'admin';
   var isCrmShell = shellMode === 'crm';
   var isAdminUser = isSuperAdmin();
-  var crmNavIds = ['nav-dashboard', 'nav-leads', 'nav-employees', 'nav-team', 'nav-products', 'nav-shopping', 'nav-sales-documents', 'nav-calendar', 'nav-archive'];
+  var crmNavIds = ['nav-dashboard', 'nav-leads', 'nav-employees', 'nav-team', 'nav-products', 'nav-shopping', 'nav-sales-documents', 'nav-business-settings', 'nav-calendar', 'nav-archive'];
   var logoTitle = document.getElementById('shell-logo-title');
   var logoSub = document.getElementById('shell-logo-sub');
 
@@ -2035,6 +2084,8 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   if (navShopping) navShopping.addEventListener('click', function() { goTo('shopping', this); });
   var navSalesDocuments = document.getElementById('nav-sales-documents');
   if (navSalesDocuments) navSalesDocuments.addEventListener('click', function() { goTo('sales-documents', this); });
+  var navBusinessSettings = document.getElementById('nav-business-settings');
+  if (navBusinessSettings) navBusinessSettings.addEventListener('click', function() { goTo('business-settings', this); });
   document.getElementById('nav-calendar').addEventListener('click', function() { goTo('calendar', this); });
   var navArchive = document.getElementById('nav-archive');
   if (navArchive) navArchive.addEventListener('click', function() { goTo('archive', this); });
@@ -2054,6 +2105,8 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   if (newSalesInvoice) newSalesInvoice.addEventListener('click', function() { openSalesDocumentEditor('invoice'); });
   var closeSalesDocumentEditor = document.getElementById('sales-document-close-editor');
   if (closeSalesDocumentEditor) closeSalesDocumentEditor.addEventListener('click', closeSalesDocumentEditorPanel);
+  var refreshBusinessSettings = document.getElementById('btn-refresh-business-settings');
+  if (refreshBusinessSettings) refreshBusinessSettings.addEventListener('click', loadBusinessSettings);
 
   var enterCrmBtn = document.getElementById('btn-enter-crm');
   if (enterCrmBtn) enterCrmBtn.addEventListener('click', goToCrmShell);
@@ -2175,6 +2228,7 @@ function goTo(page, el) {
   if (page === 'leads') loadLeads();
   if (page === 'shopping') loadShoppingLists();
   if (page === 'sales-documents') loadSalesDocuments();
+  if (page === 'business-settings') loadBusinessSettings();
   if (page === 'calendar') loadCalendar();
   if (page === 'customers') loadCustomers();
   if (page === 'employees') loadEmployees();
@@ -3364,6 +3418,177 @@ function loadEventArchive() {
   });
 }
 
+
+
+function canEditBusinessSettings() {
+  var role = getTenantRole();
+  return role === 'owner' || role === 'admin';
+}
+
+function getBusinessTypeLabel(type) {
+  var labels = { licensed_dealer: 'עוסק מורשה', exempt_dealer: 'עוסק פטור', company: 'חברה בע״מ' };
+  return labels[type] || type || '—';
+}
+
+function getVatModeLabel(mode) {
+  var labels = { standard: 'מע״מ רגיל', exempt: 'פטור ממע״מ' };
+  return labels[mode] || mode || '—';
+}
+
+function loadBusinessSettings() {
+  var body = document.getElementById('business-settings-body');
+  var footer = document.getElementById('business-settings-footer');
+  var roleBadge = document.getElementById('business-settings-role-badge');
+  if (!body) return;
+  businessSettingsLoading = true;
+  currentBusinessSettings = null;
+  body.innerHTML = '<div class="dash-empty">טוען הגדרות עסק...</div>';
+  if (footer) footer.style.display = 'none';
+  if (roleBadge) roleBadge.textContent = getTenantRoleLabel(getTenantRole());
+  apiCall('GET', '/api/tenant-business-settings').then(function(data) {
+    currentBusinessSettings = data.settings || {};
+    renderBusinessSettingsForm();
+  }).catch(function(err) {
+    body.innerHTML = '<div class="dash-empty">שגיאה בטעינת הגדרות עסק: ' + escapeHtml(err.message || 'שגיאה') + '</div>';
+  }).finally(function() {
+    businessSettingsLoading = false;
+  });
+}
+
+function renderBusinessSettingsForm() {
+  var body = document.getElementById('business-settings-body');
+  var footer = document.getElementById('business-settings-footer');
+  if (!body || !currentBusinessSettings) return;
+  var canEdit = canEditBusinessSettings();
+  var disabled = !canEdit || businessSettingsSaving;
+  var s = currentBusinessSettings;
+  var isExemptDealer = s.business_type === 'exempt_dealer';
+  var isVatExempt = isExemptDealer || s.vat_mode === 'exempt';
+  body.innerHTML =
+    (!canEdit ? '<div class="business-settings-permission">אין הרשאה לערוך הגדרות עסק. Owner/Admin יכולים לשנות; משתמשים אחרים יכולים לצפות בלבד.</div>' : '') +
+    '<div class="business-settings-section"><div class="business-settings-section-title">א. פרטי עסק</div><div class="business-settings-section-sub">השם והזיהוי שיופיעו במסמכי מכירה חדשים.</div><div class="business-settings-grid">' +
+      businessSettingsInput('business_legal_name', 'שם משפטי', s.business_legal_name, disabled) +
+      businessSettingsInput('business_display_name', 'שם לתצוגה', s.business_display_name, disabled) +
+      businessSettingsInput('business_tax_id', 'ח.פ / עוסק / מזהה מס', s.business_tax_id, disabled) +
+      businessSettingsSelect('business_type', 'סוג עסק', s.business_type, [
+        ['licensed_dealer', 'עוסק מורשה'],
+        ['exempt_dealer', 'עוסק פטור'],
+        ['company', 'חברה בע״מ']
+      ], disabled) +
+    '</div></div>' +
+    '<div class="business-settings-section"><div class="business-settings-section-title">ב. מע״מ</div><div class="business-settings-section-sub">השרת מחשב את המע״מ בפועל. במסמכים חדשים בלבד, עוסק פטור תמיד נשמר ללא מע״מ.</div><div class="business-settings-grid">' +
+      businessSettingsSelect('vat_mode', 'מצב מע״מ', isExemptDealer ? 'exempt' : s.vat_mode, [
+        ['standard', 'מע״מ רגיל'],
+        ['exempt', 'פטור ממע״מ']
+      ], disabled || isExemptDealer) +
+      businessSettingsInput('default_vat_rate', 'אחוז מע״מ ברירת מחדל', isVatExempt ? 0 : s.default_vat_rate, disabled || isVatExempt, 'number', '0.01') +
+    '</div><div class="business-settings-note ' + (isVatExempt ? 'exempt' : '') + '" id="business-settings-vat-note">' +
+      (isExemptDealer ? 'עוסק פטור — ללא מע״מ. אחוז המע״מ נעול ל־0 והשרת יאכוף זאת גם אם לקוח שולח ערך אחר.' : (isVatExempt ? 'מצב פטור ממע״מ — מסמכים חדשים יחושבו עם 0% מע״מ.' : 'ברירת המחדל לעסקים חייבי מע״מ בישראל היא 18%.')) +
+    '</div></div>' +
+    '<div class="business-settings-section"><div class="business-settings-section-title">ג. פרטי מסמך</div><div class="business-settings-section-sub">פרטי יצירת קשר ו־Logo URL עתידי למסמכים חדשים.</div><div class="business-settings-grid">' +
+      businessSettingsInput('business_address', 'כתובת העסק', s.business_address, disabled) +
+      businessSettingsInput('business_phone', 'טלפון עסק', s.business_phone, disabled, 'tel') +
+      businessSettingsInput('business_email', 'אימייל עסק', s.business_email, disabled, 'email') +
+      businessSettingsInput('logo_url', 'Logo URL — הכנה עתידית', s.logo_url, disabled, 'url') +
+    '</div></div>' +
+    '<div class="business-settings-section"><div class="business-settings-section-title">ד. ברירות מחדל למסמכים</div><div class="business-settings-section-sub">יועתקו למסמך חדש ואז ניתן יהיה לערוך במסמך עצמו.</div><div class="business-settings-grid single">' +
+      businessSettingsTextarea('default_payment_terms', 'תנאי תשלום', s.default_payment_terms, disabled) +
+      businessSettingsTextarea('default_cancellation_policy', 'מדיניות ביטול', s.default_cancellation_policy, disabled) +
+      businessSettingsTextarea('default_document_footer', 'Footer קבוע למסמך', s.default_document_footer, disabled) +
+      businessSettingsTextarea('default_notes', 'הערות ברירת מחדל', s.default_notes, disabled) +
+    '</div></div>';
+  bindBusinessSettingsForm();
+  if (footer) {
+    footer.style.display = 'flex';
+    footer.innerHTML = '<div class="business-settings-status">' + (canEdit ? 'השינויים ישפיעו על מסמכים חדשים בלבד.' : 'מצב צפייה בלבד') + '</div>' +
+      (canEdit ? '<button class="btn btn-primary" id="business-settings-save">שמור הגדרות</button>' : '<button class="btn btn-secondary" disabled>אין הרשאת עריכה</button>');
+    var saveBtn = document.getElementById('business-settings-save');
+    if (saveBtn) saveBtn.addEventListener('click', saveBusinessSettings);
+  }
+}
+
+function businessSettingsInput(field, label, value, disabled, type, step) {
+  var attrs = type === 'number' ? ' min="0" step="' + escapeHtml(step || '1') + '" inputmode="decimal"' : '';
+  return '<div class="form-group" style="margin-bottom:0"><label class="form-label">' + escapeHtml(label) + '</label><input class="form-input business-settings-field" data-business-settings-field="' + escapeHtml(field) + '" type="' + escapeHtml(type || 'text') + '" value="' + escapeHtml(value === undefined || value === null ? '' : value) + '"' + attrs + (disabled ? ' disabled' : '') + '></div>';
+}
+
+function businessSettingsSelect(field, label, value, options, disabled) {
+  return '<div class="form-group" style="margin-bottom:0"><label class="form-label">' + escapeHtml(label) + '</label><select class="form-select business-settings-field" data-business-settings-field="' + escapeHtml(field) + '"' + (disabled ? ' disabled' : '') + '>' +
+    options.map(function(option) { return '<option value="' + escapeHtml(option[0]) + '"' + (String(value || '') === option[0] ? ' selected' : '') + '>' + escapeHtml(option[1]) + '</option>'; }).join('') +
+  '</select></div>';
+}
+
+function businessSettingsTextarea(field, label, value, disabled) {
+  return '<div class="form-group" style="margin-bottom:0"><label class="form-label">' + escapeHtml(label) + '</label><textarea class="form-textarea business-settings-field" data-business-settings-field="' + escapeHtml(field) + '"' + (disabled ? ' disabled' : '') + '>' + escapeHtml(value || '') + '</textarea></div>';
+}
+
+function bindBusinessSettingsForm() {
+  document.querySelectorAll('.business-settings-field').forEach(function(input) {
+    input.addEventListener('input', function() { updateBusinessSettingsDraft(this); });
+    input.addEventListener('change', function() { updateBusinessSettingsDraft(this); });
+  });
+}
+
+function updateBusinessSettingsDraft(input) {
+  if (!currentBusinessSettings || businessSettingsSaving) return;
+  var field = input.getAttribute('data-business-settings-field');
+  var value = input.value;
+  currentBusinessSettings[field] = field === 'default_vat_rate' ? Number(value || 0) : value;
+  if (field === 'business_type' && value === 'exempt_dealer') {
+    currentBusinessSettings.vat_mode = 'exempt';
+    currentBusinessSettings.default_vat_rate = 0;
+    renderBusinessSettingsForm();
+    return;
+  }
+  if (field === 'vat_mode' && value === 'exempt') {
+    currentBusinessSettings.default_vat_rate = 0;
+    renderBusinessSettingsForm();
+    return;
+  }
+  if (field === 'vat_mode' && value === 'standard' && Number(currentBusinessSettings.default_vat_rate || 0) === 0) {
+    currentBusinessSettings.default_vat_rate = 18;
+    renderBusinessSettingsForm();
+  }
+}
+
+function buildBusinessSettingsPayload() {
+  var s = currentBusinessSettings || {};
+  return {
+    business_legal_name: s.business_legal_name || null,
+    business_display_name: s.business_display_name || null,
+    business_tax_id: s.business_tax_id || null,
+    business_type: s.business_type || 'licensed_dealer',
+    vat_mode: s.business_type === 'exempt_dealer' ? 'exempt' : (s.vat_mode || 'standard'),
+    default_vat_rate: (s.business_type === 'exempt_dealer' || s.vat_mode === 'exempt') ? 0 : Number(s.default_vat_rate || 18),
+    business_address: s.business_address || null,
+    business_phone: s.business_phone || null,
+    business_email: s.business_email || null,
+    logo_url: s.logo_url || null,
+    default_payment_terms: s.default_payment_terms || null,
+    default_cancellation_policy: s.default_cancellation_policy || null,
+    default_document_footer: s.default_document_footer || null,
+    default_notes: s.default_notes || null
+  };
+}
+
+function saveBusinessSettings() {
+  if (businessSettingsLoading || businessSettingsSaving || !currentBusinessSettings) return;
+  if (!canEditBusinessSettings()) { toast('אין הרשאה לעריכת הגדרות עסק', 'error'); return; }
+  businessSettingsSaving = true;
+  var footer = document.getElementById('business-settings-footer');
+  if (footer) footer.innerHTML = '<div class="business-settings-status">שומר...</div><button class="btn btn-primary" disabled>שומר...</button>';
+  apiCall('PUT', '/api/tenant-business-settings', buildBusinessSettingsPayload()).then(function(data) {
+    currentBusinessSettings = data.settings || currentBusinessSettings;
+    toast('הגדרות העסק נשמרו', 'success');
+    renderBusinessSettingsForm();
+  }).catch(function(err) {
+    toast(err.message || 'שגיאה בשמירת הגדרות עסק', 'error');
+    renderBusinessSettingsForm();
+  }).finally(function() {
+    businessSettingsSaving = false;
+    renderBusinessSettingsForm();
+  });
+}
 
 function getSalesDocumentTypeLabel(type) {
   return type === 'invoice' ? 'חשבונית' : 'הצעת מחיר';
