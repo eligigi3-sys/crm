@@ -994,21 +994,21 @@ export async function handleSalesDocuments(request, env, path) {
     return createDocument(request, env, tenantCtx);
   }
 
-  const duplicateMatch = path.match(/^\/api/sales-documents\/(\d+)\/duplicate$/);
+  const duplicateMatch = path.match(/^\/api\/sales-documents\/(\d+)\/duplicate$/);
   if (duplicateMatch && method === 'POST') {
     const access = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
     if (access instanceof Response) return access;
     return duplicateDocument(env, tenantCtx, Number(duplicateMatch[1]));
   }
 
-  const convertMatch = path.match(/^\/api/sales-documents\/(\d+)\/convert-to-invoice$/);
+  const convertMatch = path.match(/^\/api\/sales-documents\/(\d+)\/convert-to-invoice$/);
   if (convertMatch && method === 'POST') {
     const access = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
     if (access instanceof Response) return access;
     return convertQuoteToInvoice(env, tenantCtx, Number(convertMatch[1]));
   }
 
-  const markSentMatch = path.match(/^\/api/sales-documents\/(\d+)\/mark-sent$/);
+  const markSentMatch = path.match(/^\/api\/sales-documents\/(\d+)\/mark-sent$/);
   if (markSentMatch && method === 'POST') {
     const access = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
     if (access instanceof Response) return access;
