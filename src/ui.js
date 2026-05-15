@@ -144,6 +144,55 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .guided-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:26px 16px;text-align:center;border:1px dashed var(--border);border-radius:14px;background:linear-gradient(180deg,#faf8ff 0%,#fff 100%)}
 .guided-empty-title{font-size:14px;font-weight:800;color:var(--text)}
 .guided-empty-sub{font-size:12px;line-height:1.6;color:var(--text3);max-width:420px}
+
+.sales-doc-actions{display:flex;gap:8px;flex-wrap:wrap}
+.sales-doc-table-wrap{overflow-x:auto}
+.sales-doc-type-pill{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:800;background:var(--accent-light);color:var(--accent)}
+.sales-doc-status-pill{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:800;background:var(--bg);color:var(--text2);border:1px solid var(--border)}
+.sales-doc-status-pill.draft{background:var(--blue-light);color:var(--blue);border-color:rgba(37,99,235,0.15)}
+.sales-doc-status-pill.issued,.sales-doc-status-pill.accepted,.sales-doc-status-pill.paid{background:var(--green-light);color:var(--green);border-color:rgba(22,163,74,0.15)}
+.sales-doc-status-pill.cancelled,.sales-doc-status-pill.void,.sales-doc-status-pill.rejected{background:var(--red-light);color:var(--red);border-color:rgba(220,38,38,0.15)}
+.sales-doc-workspace{display:none;margin-top:16px;grid-template-columns:minmax(320px,0.9fr) minmax(420px,1.1fr);gap:16px;align-items:start;direction:ltr}
+.sales-doc-workspace.open{display:grid}
+.sales-doc-editor,.sales-doc-preview{direction:rtl;background:var(--white);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.sales-doc-panel-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:#fafbfc}
+.sales-doc-panel-title{font-size:15px;font-weight:800;color:var(--text)}
+.sales-doc-panel-sub{font-size:12px;color:var(--text3);margin-top:2px}
+.sales-doc-editor-body{padding:16px}
+.sales-doc-section{padding:13px;border:1px solid var(--border);border-radius:12px;background:#fff;margin-bottom:12px}
+.sales-doc-section-title{font-size:13px;font-weight:800;color:var(--text);margin-bottom:10px}
+.sales-doc-grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.sales-doc-line-list{display:flex;flex-direction:column;gap:10px}
+.sales-doc-line-card{border:1px solid var(--border);border-radius:12px;background:var(--bg);padding:10px}
+.sales-doc-line-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.sales-doc-line-title{font-size:12px;font-weight:800;color:var(--text2)}
+.sales-doc-line-grid{display:grid;grid-template-columns:2fr repeat(4,minmax(86px,1fr));gap:8px;align-items:end}
+.sales-doc-preview-body{padding:18px;background:#f8fafc}
+.sales-doc-preview-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:18px;min-height:520px;box-shadow:0 8px 22px rgba(15,23,42,0.06)}
+.sales-doc-preview-top{display:flex;justify-content:space-between;gap:16px;border-bottom:2px solid var(--accent-light);padding-bottom:14px;margin-bottom:14px}
+.sales-doc-preview-title{font-size:22px;font-weight:900;color:var(--text)}
+.sales-doc-preview-number{font-size:13px;color:var(--text3);font-weight:700;margin-top:4px}
+.sales-doc-preview-box{background:var(--bg);border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:13px;color:var(--text2);line-height:1.6}
+.sales-doc-preview-table{width:100%;border-collapse:collapse;margin:12px 0}
+.sales-doc-preview-table th,.sales-doc-preview-table td{font-size:12px;padding:8px;border-bottom:1px solid var(--border)}
+.sales-doc-preview-table th{background:#fafbfc;color:var(--text3);font-weight:800}
+.sales-doc-totals-box{margin-right:auto;max-width:260px;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#fff}
+.sales-doc-total-row{display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text2)}
+.sales-doc-total-row:last-child{border-bottom:none;font-weight:900;color:var(--text);font-size:15px;background:var(--accent-light)}
+.sales-doc-sticky-actions{position:sticky;bottom:0;background:rgba(255,255,255,0.96);border-top:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;z-index:2}
+.sales-doc-sticky-total{font-size:13px;color:var(--text2)}
+.sales-doc-sticky-total strong{display:block;font-size:18px;color:var(--accent)}
+.sales-doc-locked-note{padding:10px 12px;border-radius:10px;background:var(--yellow-light);color:var(--yellow);font-size:12px;font-weight:700;margin-bottom:12px}
+@media (max-width:900px){
+  .sales-doc-workspace,.sales-doc-workspace.open{display:flex;flex-direction:column}
+  .sales-doc-preview{order:2}.sales-doc-editor{order:1}
+  .sales-doc-grid-2,.sales-doc-line-grid{grid-template-columns:1fr}
+  .sales-doc-actions{width:100%}.sales-doc-actions .btn{flex:1;justify-content:center}
+  .sales-doc-table-wrap table{min-width:720px}
+  .sales-doc-preview-card{min-height:auto;padding:14px}
+  .sales-doc-sticky-actions{margin:0 -16px -16px}
+}
+
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
 .modal-overlay.open{display:flex}
 .modal{background:var(--white);border-radius:16px;width:620px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:var(--shadow-md)}
@@ -1236,6 +1285,7 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     <div class="nav-item" id="nav-team" style="display:none"><span class="nav-icon">👤</span> צוות</div>
     <div class="nav-item" id="nav-products"><span class="nav-icon">📦</span> מוצרים</div>
     <div class="nav-item" id="nav-shopping"><span class="nav-icon">🛒</span> רשימות קניות</div>
+    <div class="nav-item" id="nav-sales-documents"><span class="nav-icon">🧾</span> מסמכי מכירה</div>
     <div class="nav-item" id="nav-calendar"><span class="nav-icon">📅</span> יומן אירועים</div>
     <div class="nav-item" id="nav-archive"><span class="nav-icon">🗂️</span> ארכיון אירועים</div>
     <div class="nav-item" id="nav-super-admin" style="display:none"><span class="nav-icon">🛠️</span> Super Admin</div>
@@ -1423,6 +1473,38 @@ id="customers-search">
         </div>
       </div>
     </div>
+
+    <div id="page-sales-documents" class="page">
+      <div class="page-header">
+        <div class="page-title">מסמכי מכירה <small>הצעות מחיר וחשבוניות</small></div>
+        <div class="sales-doc-actions">
+          <button class="btn btn-secondary" id="btn-refresh-sales-documents">רענן</button>
+          <button class="btn btn-primary" id="btn-new-sales-quote">צור הצעת מחיר</button>
+          <button class="btn btn-primary" id="btn-new-sales-invoice">צור חשבונית</button>
+        </div>
+      </div>
+      <div class="table-card">
+        <div class="table-toolbar">
+          <input class="search-input" type="text" placeholder="חיפוש מספר / לקוח / טלפון..." id="sales-documents-search">
+          <select class="filter-select" id="sales-documents-type-filter"><option value="">כל הסוגים</option><option value="quote">הצעות מחיר</option><option value="invoice">חשבוניות</option></select>
+          <select class="filter-select" id="sales-documents-status-filter"><option value="">כל הסטטוסים</option><option value="draft">טיוטה</option><option value="issued">הונפק</option><option value="cancelled">בוטל</option><option value="void">מבוטל</option></select>
+        </div>
+        <div class="sales-doc-table-wrap">
+          <table><thead><tr><th>מספר</th><th>סוג</th><th>לקוח</th><th>סטטוס</th><th>סה״כ</th><th>תאריך</th><th></th></tr></thead><tbody id="sales-documents-body"><tr class="empty-row"><td colspan="7">טוען...</td></tr></tbody></table>
+        </div>
+      </div>
+      <div class="sales-doc-workspace" id="sales-document-workspace">
+        <div class="sales-doc-preview">
+          <div class="sales-doc-panel-head"><div><div class="sales-doc-panel-title">תצוגה מקדימה</div><div class="sales-doc-panel-sub">סיכום חי — לא PDF סופי</div></div></div>
+          <div class="sales-doc-preview-body" id="sales-document-preview"><div class="dash-empty">בחר או צור מסמך</div></div>
+        </div>
+        <div class="sales-doc-editor">
+          <div class="sales-doc-panel-head"><div><div class="sales-doc-panel-title" id="sales-document-editor-title">עורך מסמך</div><div class="sales-doc-panel-sub">טיוטת quote/invoice משותפת</div></div><button class="btn btn-ghost btn-sm" id="sales-document-close-editor">סגור</button></div>
+          <div class="sales-doc-editor-body" id="sales-document-editor-body"></div>
+          <div class="sales-doc-sticky-actions" id="sales-document-sticky-actions" style="display:none"></div>
+        </div>
+      </div>
+    </div>
     <div id="page-archive" class="page">
       <div class="page-header">
         <div class="page-title">ארכיון אירועים <small>אירועים שחלף התאריך שלהם</small></div>
@@ -1602,13 +1684,18 @@ var moduleStateCache = {
     employees: { is_enabled: true, source: 'default_enabled' },
     products: { is_enabled: true, source: 'default_enabled' },
     shopping: { is_enabled: true, source: 'default_enabled' },
-    reports: { is_enabled: true, source: 'default_enabled' }
+    reports: { is_enabled: true, source: 'default_enabled' },
+    sales_documents: { is_enabled: true, source: 'default_enabled' }
   }
 };
 var searchTimer, currentLeadId, dupLeadId, selectedContactId = null, currentEmployeeId = null, currentProductId = null, currentProductPurchases = [], currentProductPurchaseEditId = null, currentProductPurchaseFormMode = null, currentProductPurchaseSaving = false, currentProductStock = null, currentProductStockMovements = [], currentProductAdjustmentMode = null, currentProductAdjustmentSaving = false, currentProductReceiveStockPurchaseId = null;
 var currentLowStockProducts = [];
 var currentOperationalUnreceivedPurchases = [];
 var currentOperationalRecentMovements = [];
+var currentSalesDocuments = [];
+var currentSalesDocumentDraft = null;
+var currentSalesDocumentId = null;
+var salesDocumentSaving = false;
 var allLeadsCache = [];
 var calYear, calMonth;
 var currentTenantContext = null;
@@ -1756,7 +1843,8 @@ function renderModuleDisabledPage(page, moduleKey) {
     calendar: { bodyId: 'calendar-body', colspan: 8 },
     employees: { bodyId: 'employees-grid' },
     products: { bodyId: 'products-page-content' },
-    archive: { bodyId: 'archive-events-grid' }
+    archive: { bodyId: 'archive-events-grid' },
+    salesDocuments: { bodyId: 'sales-documents-body', colspan: 7 }
   };
   var target = map[page];
   if (!target) return;
@@ -1780,6 +1868,8 @@ function applyModuleVisibility() {
   if (navProducts) navProducts.style.display = isModuleEnabled('products') ? 'flex' : 'none';
   var navShopping = document.getElementById('nav-shopping');
   if (navShopping) navShopping.style.display = isModuleEnabled('shopping') ? 'flex' : 'none';
+  var navSalesDocuments = document.getElementById('nav-sales-documents');
+  if (navSalesDocuments) navSalesDocuments.style.display = isModuleEnabled('sales_documents') ? 'flex' : 'none';
   var navCalendar = document.getElementById('nav-calendar');
   if (navCalendar) navCalendar.style.display = isModuleEnabled('leads') ? 'flex' : 'none';
   var navArchive = document.getElementById('nav-archive');
@@ -1798,6 +1888,10 @@ function applyModuleVisibility() {
   if (btnNewProduct) btnNewProduct.style.display = isModuleEnabled('products') ? 'inline-flex' : 'none';
   var btnNewShoppingList = document.getElementById('btn-new-shopping-list');
   if (btnNewShoppingList) btnNewShoppingList.style.display = isModuleEnabled('shopping') ? 'inline-flex' : 'none';
+  var btnNewSalesQuote = document.getElementById('btn-new-sales-quote');
+  if (btnNewSalesQuote) btnNewSalesQuote.style.display = isModuleEnabled('sales_documents') ? 'inline-flex' : 'none';
+  var btnNewSalesInvoice = document.getElementById('btn-new-sales-invoice');
+  if (btnNewSalesInvoice) btnNewSalesInvoice.style.display = isModuleEnabled('sales_documents') ? 'inline-flex' : 'none';
   var reportsBtn = document.getElementById('btn-product-reports');
   if (reportsBtn) reportsBtn.style.display = isModuleEnabled('reports') ? 'inline-flex' : 'none';
   var lowStockSummary = document.getElementById('products-low-stock-summary');
@@ -1836,7 +1930,7 @@ function applyShellVisibility() {
   var isAdminShell = shellMode === 'admin';
   var isCrmShell = shellMode === 'crm';
   var isAdminUser = isSuperAdmin();
-  var crmNavIds = ['nav-dashboard', 'nav-leads', 'nav-employees', 'nav-team', 'nav-products', 'nav-shopping', 'nav-calendar', 'nav-archive'];
+  var crmNavIds = ['nav-dashboard', 'nav-leads', 'nav-employees', 'nav-team', 'nav-products', 'nav-shopping', 'nav-sales-documents', 'nav-calendar', 'nav-archive'];
   var logoTitle = document.getElementById('shell-logo-title');
   var logoSub = document.getElementById('shell-logo-sub');
 
@@ -1878,7 +1972,8 @@ function loadModuleStates() {
       employees: { is_enabled: true, source: 'default_enabled' },
       products: { is_enabled: true, source: 'default_enabled' },
       shopping: { is_enabled: true, source: 'default_enabled' },
-      reports: { is_enabled: true, source: 'default_enabled' }
+      reports: { is_enabled: true, source: 'default_enabled' },
+      sales_documents: { is_enabled: true, source: 'default_enabled' }
     };
     (data.modules || []).forEach(function(module) {
       if (next[module.module_key]) next[module.module_key] = module;
@@ -1938,11 +2033,28 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   if (navProducts) navProducts.addEventListener('click', function() { goTo('products', this); });
   var navShopping = document.getElementById('nav-shopping');
   if (navShopping) navShopping.addEventListener('click', function() { goTo('shopping', this); });
+  var navSalesDocuments = document.getElementById('nav-sales-documents');
+  if (navSalesDocuments) navSalesDocuments.addEventListener('click', function() { goTo('sales-documents', this); });
   document.getElementById('nav-calendar').addEventListener('click', function() { goTo('calendar', this); });
   var navArchive = document.getElementById('nav-archive');
   if (navArchive) navArchive.addEventListener('click', function() { goTo('archive', this); });
   var navSuperAdmin = document.getElementById('nav-super-admin');
   if (navSuperAdmin) navSuperAdmin.addEventListener('click', function() { goTo('super-admin', this); });
+  var salesDocumentsSearch = document.getElementById('sales-documents-search');
+  if (salesDocumentsSearch) salesDocumentsSearch.addEventListener('input', function() { clearTimeout(searchTimer); searchTimer = setTimeout(loadSalesDocuments, 300); });
+  var salesDocumentsTypeFilter = document.getElementById('sales-documents-type-filter');
+  if (salesDocumentsTypeFilter) salesDocumentsTypeFilter.addEventListener('change', loadSalesDocuments);
+  var salesDocumentsStatusFilter = document.getElementById('sales-documents-status-filter');
+  if (salesDocumentsStatusFilter) salesDocumentsStatusFilter.addEventListener('change', loadSalesDocuments);
+  var refreshSalesDocuments = document.getElementById('btn-refresh-sales-documents');
+  if (refreshSalesDocuments) refreshSalesDocuments.addEventListener('click', loadSalesDocuments);
+  var newSalesQuote = document.getElementById('btn-new-sales-quote');
+  if (newSalesQuote) newSalesQuote.addEventListener('click', function() { openSalesDocumentEditor('quote'); });
+  var newSalesInvoice = document.getElementById('btn-new-sales-invoice');
+  if (newSalesInvoice) newSalesInvoice.addEventListener('click', function() { openSalesDocumentEditor('invoice'); });
+  var closeSalesDocumentEditor = document.getElementById('sales-document-close-editor');
+  if (closeSalesDocumentEditor) closeSalesDocumentEditor.addEventListener('click', closeSalesDocumentEditorPanel);
+
   var enterCrmBtn = document.getElementById('btn-enter-crm');
   if (enterCrmBtn) enterCrmBtn.addEventListener('click', goToCrmShell);
   var backPlatformBtn = document.getElementById('btn-back-platform');
@@ -2033,6 +2145,7 @@ function goTo(page, el) {
     employees: 'employees',
     products: 'products',
     shopping: 'shopping',
+    'sales-documents': 'sales_documents',
     calendar: 'leads',
     archive: 'leads'
   };
@@ -2048,7 +2161,7 @@ function goTo(page, el) {
     if (!blockedPage) return;
     blockedPage.classList.add('active');
     if (el) el.classList.add('active');
-    renderModuleDisabledPage(page, requiredModule);
+    renderModuleDisabledPage(page === 'sales-documents' ? 'salesDocuments' : page, requiredModule);
     toast('Module disabled', 'error');
     return;
   }
@@ -2061,6 +2174,7 @@ function goTo(page, el) {
   if (page === 'dashboard') loadDashboard();
   if (page === 'leads') loadLeads();
   if (page === 'shopping') loadShoppingLists();
+  if (page === 'sales-documents') loadSalesDocuments();
   if (page === 'calendar') loadCalendar();
   if (page === 'customers') loadCustomers();
   if (page === 'employees') loadEmployees();
@@ -2086,7 +2200,8 @@ function resetSessionState() {
       employees: { is_enabled: true, source: 'default_enabled' },
       products: { is_enabled: true, source: 'default_enabled' },
       shopping: { is_enabled: true, source: 'default_enabled' },
-      reports: { is_enabled: true, source: 'default_enabled' }
+      reports: { is_enabled: true, source: 'default_enabled' },
+      sales_documents: { is_enabled: true, source: 'default_enabled' }
     }
   };
 }
@@ -3246,6 +3361,402 @@ function loadEventArchive() {
   }).catch(function(e) {
     grid.innerHTML = '<div class="dash-empty">שגיאה בטעינת ארכיון האירועים</div>';
     toast(e.message, 'error');
+  });
+}
+
+
+function getSalesDocumentTypeLabel(type) {
+  return type === 'invoice' ? 'חשבונית' : 'הצעת מחיר';
+}
+
+function getSalesDocumentStatusLabel(status) {
+  var labels = { draft: 'טיוטה', sent: 'נשלח', accepted: 'אושר', rejected: 'נדחה', cancelled: 'בוטל', expired: 'פג תוקף', converted: 'הומר', issued: 'הונפק', paid: 'שולם', partially_paid: 'שולם חלקית', void: 'מבוטל' };
+  return labels[status] || status || '—';
+}
+
+function roundSalesMoney(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function formatSalesMoney(value) {
+  return '₪' + roundSalesMoney(value).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function isSalesDocumentLocked(doc) {
+  return !!(doc && (doc.locked_at || doc.issued_at || doc.status !== 'draft'));
+}
+
+function getDefaultBusinessSnapshot() {
+  var tenant = currentTenantContext && currentTenantContext.tenant ? currentTenantContext.tenant : {};
+  return {
+    business_name_snapshot: tenant.name || '',
+    business_phone_snapshot: tenant.contact_phone || '',
+    business_email_snapshot: tenant.contact_email || '',
+    business_address_snapshot: '',
+    business_tax_id: ''
+  };
+}
+
+function createEmptySalesDocumentDraft(documentType) {
+  var business = getDefaultBusinessSnapshot();
+  return {
+    document_type: documentType === 'invoice' ? 'invoice' : 'quote',
+    document_number: 'טיוטה חדשה',
+    status: 'draft',
+    issue_date: getTodayYMD(),
+    valid_until: documentType === 'invoice' ? '' : getTodayYMD(),
+    due_date: documentType === 'invoice' ? getTodayYMD() : '',
+    currency: 'ILS',
+    customer_name_snapshot: '',
+    customer_phone_snapshot: '',
+    customer_email_snapshot: '',
+    customer_tax_id: '',
+    business_name_snapshot: business.business_name_snapshot,
+    business_phone_snapshot: business.business_phone_snapshot,
+    business_email_snapshot: business.business_email_snapshot,
+    business_address_snapshot: business.business_address_snapshot,
+    business_tax_id: business.business_tax_id,
+    notes: '',
+    terms: '',
+    items: [createEmptySalesDocumentItem(1)]
+  };
+}
+
+function createEmptySalesDocumentItem(order) {
+  return { line_order: order || 1, description: '', quantity: 1, unit_price: 0, vat_rate: 17, discount_amount: 0 };
+}
+
+function calculateSalesDocumentPreviewTotals(doc) {
+  var items = (doc && Array.isArray(doc.items)) ? doc.items : [];
+  var subtotal = 0;
+  var discount = 0;
+  var vat = 0;
+  var total = 0;
+  items.forEach(function(item) {
+    var qty = Number(item.quantity || 0);
+    var unit = Number(item.unit_price || 0);
+    var itemDiscount = Number(item.discount_amount || 0);
+    var rate = Number(item.vat_rate || 0);
+    var gross = roundSalesMoney(qty * unit);
+    var net = Math.max(0, roundSalesMoney(gross - itemDiscount));
+    var itemVat = roundSalesMoney(net * rate / 100);
+    subtotal += gross;
+    discount += itemDiscount;
+    vat += itemVat;
+    total += net + itemVat;
+  });
+  return { subtotal: roundSalesMoney(subtotal), discount: roundSalesMoney(discount), vat: roundSalesMoney(vat), total: roundSalesMoney(total) };
+}
+
+function loadSalesDocuments() {
+  var body = document.getElementById('sales-documents-body');
+  if (!body) return;
+  if (!isModuleEnabled('sales_documents')) {
+    renderModuleDisabledPage('salesDocuments', 'sales_documents');
+    return;
+  }
+  body.innerHTML = '<tr class="empty-row"><td colspan="7">טוען...</td></tr>';
+  var params = [];
+  var typeEl = document.getElementById('sales-documents-type-filter');
+  var statusEl = document.getElementById('sales-documents-status-filter');
+  var searchEl = document.getElementById('sales-documents-search');
+  if (typeEl && typeEl.value) params.push('type=' + encodeURIComponent(typeEl.value));
+  if (statusEl && statusEl.value) params.push('status=' + encodeURIComponent(statusEl.value));
+  if (searchEl && searchEl.value.trim()) params.push('search=' + encodeURIComponent(searchEl.value.trim()));
+  apiCall('GET', '/api/sales-documents' + (params.length ? '?' + params.join('&') : '')).then(function(data) {
+    currentSalesDocuments = data.documents || [];
+    renderSalesDocumentsList(currentSalesDocuments);
+  }).catch(function(err) {
+    body.innerHTML = '<tr class="empty-row"><td colspan="7">שגיאה בטעינת מסמכים: ' + escapeHtml(err.message || 'שגיאה') + '</td></tr>';
+  });
+}
+
+function renderSalesDocumentsList(documents) {
+  var body = document.getElementById('sales-documents-body');
+  if (!body) return;
+  if (!documents || documents.length === 0) {
+    body.innerHTML = '<tr class="empty-row"><td colspan="7">אין עדיין מסמכי מכירה</td></tr>';
+    return;
+  }
+  body.innerHTML = documents.map(function(doc) {
+    var dateText = doc.issue_date || (doc.created_at ? String(doc.created_at).slice(0, 10) : '—');
+    return '<tr data-sales-document-id="' + doc.id + '">' +
+      '<td class="bold">' + escapeHtml(doc.document_number || '—') + '</td>' +
+      '<td><span class="sales-doc-type-pill">' + escapeHtml(getSalesDocumentTypeLabel(doc.document_type)) + '</span></td>' +
+      '<td>' + escapeHtml(doc.customer_name_snapshot || '—') + '</td>' +
+      '<td><span class="sales-doc-status-pill ' + escapeHtml(doc.status || '') + '">' + escapeHtml(getSalesDocumentStatusLabel(doc.status)) + '</span></td>' +
+      '<td class="bold">' + escapeHtml(formatSalesMoney(doc.total_amount || 0)) + '</td>' +
+      '<td>' + escapeHtml(dateText) + '</td>' +
+      '<td><button class="btn btn-ghost btn-sm" data-open-sales-document="' + doc.id + '">פתח</button></td>' +
+    '</tr>';
+  }).join('');
+  body.querySelectorAll('[data-open-sales-document]').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      openExistingSalesDocument(this.getAttribute('data-open-sales-document'));
+    });
+  });
+  body.querySelectorAll('tr[data-sales-document-id]').forEach(function(row) {
+    row.addEventListener('click', function() { openExistingSalesDocument(this.getAttribute('data-sales-document-id')); });
+  });
+}
+
+function openSalesDocumentEditor(documentType) {
+  currentSalesDocumentId = null;
+  currentSalesDocumentDraft = createEmptySalesDocumentDraft(documentType);
+  renderSalesDocumentEditor();
+}
+
+function openExistingSalesDocument(id) {
+  if (!id) return;
+  apiCall('GET', '/api/sales-documents/' + encodeURIComponent(id)).then(function(data) {
+    currentSalesDocumentId = data.document && data.document.id ? data.document.id : id;
+    currentSalesDocumentDraft = data.document;
+    renderSalesDocumentEditor();
+  }).catch(function(err) {
+    toast(err.message || 'שגיאה בטעינת המסמך', 'error');
+  });
+}
+
+function closeSalesDocumentEditorPanel() {
+  var workspace = document.getElementById('sales-document-workspace');
+  if (workspace) workspace.classList.remove('open');
+  currentSalesDocumentDraft = null;
+  currentSalesDocumentId = null;
+}
+
+function renderSalesDocumentEditor() {
+  var workspace = document.getElementById('sales-document-workspace');
+  var body = document.getElementById('sales-document-editor-body');
+  var title = document.getElementById('sales-document-editor-title');
+  if (!workspace || !body || !currentSalesDocumentDraft) return;
+  var doc = currentSalesDocumentDraft;
+  var locked = isSalesDocumentLocked(doc);
+  workspace.classList.add('open');
+  if (title) title.textContent = getSalesDocumentTypeLabel(doc.document_type) + ' · ' + (doc.document_number || 'טיוטה חדשה');
+  body.innerHTML = (locked ? '<div class="sales-doc-locked-note">מסמך זה אינו טיוטה פתוחה ולכן אינו ניתן לעריכה.</div>' : '') +
+    '<div class="sales-doc-section"><div class="sales-doc-section-title">פרטי מסמך</div><div class="sales-doc-grid-2">' +
+      salesDocumentInput('issue_date', 'תאריך מסמך', doc.issue_date, 'date', locked) +
+      salesDocumentInput(doc.document_type === 'invoice' ? 'due_date' : 'valid_until', doc.document_type === 'invoice' ? 'תאריך לתשלום' : 'בתוקף עד', doc.document_type === 'invoice' ? doc.due_date : doc.valid_until, 'date', locked) +
+    '</div></div>' +
+    '<div class="sales-doc-section"><div class="sales-doc-section-title">לקוח</div><div class="sales-doc-grid-2">' +
+      salesDocumentInput('customer_name_snapshot', 'שם לקוח', doc.customer_name_snapshot, 'text', locked) +
+      salesDocumentInput('customer_phone_snapshot', 'טלפון', doc.customer_phone_snapshot, 'tel', locked) +
+      salesDocumentInput('customer_email_snapshot', 'אימייל', doc.customer_email_snapshot, 'email', locked) +
+      salesDocumentInput('customer_tax_id', 'ח.פ / ת.ז', doc.customer_tax_id, 'text', locked) +
+    '</div></div>' +
+    '<div class="sales-doc-section"><div class="sales-doc-section-title">פרטי העסק במסמך</div><div class="sales-doc-grid-2">' +
+      salesDocumentInput('business_name_snapshot', 'שם העסק', doc.business_name_snapshot, 'text', locked) +
+      salesDocumentInput('business_phone_snapshot', 'טלפון עסק', doc.business_phone_snapshot, 'tel', locked) +
+      salesDocumentInput('business_email_snapshot', 'אימייל עסק', doc.business_email_snapshot, 'email', locked) +
+      salesDocumentInput('business_tax_id', 'ח.פ / עוסק', doc.business_tax_id, 'text', locked) +
+    '</div></div>' +
+    '<div class="sales-doc-section"><div class="sales-doc-section-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px">שורות מסמך ' + (locked ? '' : '<button class="btn btn-secondary btn-sm" id="sales-document-add-item">+ שורה</button>') + '</div><div class="sales-doc-line-list" id="sales-document-items-list"></div></div>' +
+    '<div class="sales-doc-section"><div class="sales-doc-section-title">הערות ותנאים</div>' +
+      salesDocumentTextarea('notes', 'הערות', doc.notes, locked) +
+      salesDocumentTextarea('terms', 'תנאים', doc.terms, locked) +
+    '</div>';
+  renderSalesDocumentItems();
+  bindSalesDocumentEditorInputs();
+  var addBtn = document.getElementById('sales-document-add-item');
+  if (addBtn) addBtn.addEventListener('click', addSalesDocumentItem);
+  renderSalesDocumentPreview();
+  renderSalesDocumentStickyActions();
+}
+
+function salesDocumentInput(field, label, value, type, disabled) {
+  return '<div class="form-group" style="margin-bottom:0"><label class="form-label">' + escapeHtml(label) + '</label><input class="form-input sales-doc-field" data-sales-field="' + escapeHtml(field) + '" type="' + escapeHtml(type || 'text') + '" value="' + escapeHtml(value || '') + '"' + (disabled ? ' disabled' : '') + '></div>';
+}
+
+function salesDocumentTextarea(field, label, value, disabled) {
+  return '<div class="form-group"><label class="form-label">' + escapeHtml(label) + '</label><textarea class="form-textarea sales-doc-field" data-sales-field="' + escapeHtml(field) + '"' + (disabled ? ' disabled' : '') + '>' + escapeHtml(value || '') + '</textarea></div>';
+}
+
+function renderSalesDocumentItems() {
+  var list = document.getElementById('sales-document-items-list');
+  if (!list || !currentSalesDocumentDraft) return;
+  var locked = isSalesDocumentLocked(currentSalesDocumentDraft);
+  var items = currentSalesDocumentDraft.items || [];
+  list.innerHTML = items.map(function(item, index) {
+    return '<div class="sales-doc-line-card" data-sales-line-index="' + index + '">' +
+      '<div class="sales-doc-line-head"><div class="sales-doc-line-title">שורה ' + (index + 1) + '</div>' + (locked ? '' : '<button class="btn btn-danger btn-sm" data-remove-sales-line="' + index + '">הסר</button>') + '</div>' +
+      '<div class="sales-doc-line-grid">' +
+        salesDocumentLineInput(index, 'description', 'תיאור', item.description, 'text', locked) +
+        salesDocumentLineInput(index, 'quantity', 'כמות', item.quantity, 'number', locked, '0.01') +
+        salesDocumentLineInput(index, 'unit_price', 'מחיר יחידה', item.unit_price, 'number', locked, '0.01') +
+        salesDocumentLineInput(index, 'vat_rate', 'מע״מ %', item.vat_rate, 'number', locked, '0.01') +
+        salesDocumentLineInput(index, 'discount_amount', 'הנחה ₪', item.discount_amount, 'number', locked, '0.01') +
+      '</div>' +
+    '</div>';
+  }).join('');
+  list.querySelectorAll('[data-remove-sales-line]').forEach(function(btn) {
+    btn.addEventListener('click', function() { removeSalesDocumentItem(Number(this.getAttribute('data-remove-sales-line'))); });
+  });
+  list.querySelectorAll('.sales-doc-line-field').forEach(function(input) {
+    input.addEventListener('input', function() {
+      updateSalesDocumentItemField(Number(this.getAttribute('data-sales-line')), this.getAttribute('data-sales-line-field'), this.value);
+    });
+  });
+}
+
+function salesDocumentLineInput(index, field, label, value, type, disabled, step) {
+  var attrs = type === 'number' ? ' min="0" step="' + escapeHtml(step || '1') + '" inputmode="decimal"' : '';
+  return '<div class="form-group" style="margin-bottom:0"><label class="form-label">' + escapeHtml(label) + '</label><input class="form-input sales-doc-line-field" data-sales-line="' + index + '" data-sales-line-field="' + escapeHtml(field) + '" type="' + escapeHtml(type || 'text') + '" value="' + escapeHtml(value === undefined || value === null ? '' : value) + '"' + attrs + (disabled ? ' disabled' : '') + '></div>';
+}
+
+function bindSalesDocumentEditorInputs() {
+  document.querySelectorAll('.sales-doc-field').forEach(function(input) {
+    input.addEventListener('input', function() {
+      if (!currentSalesDocumentDraft) return;
+      currentSalesDocumentDraft[this.getAttribute('data-sales-field')] = this.value;
+      renderSalesDocumentPreview();
+      renderSalesDocumentStickyActions();
+    });
+  });
+}
+
+function updateSalesDocumentItemField(index, field, value) {
+  if (!currentSalesDocumentDraft || !currentSalesDocumentDraft.items || !currentSalesDocumentDraft.items[index]) return;
+  currentSalesDocumentDraft.items[index][field] = ['quantity', 'unit_price', 'vat_rate', 'discount_amount'].indexOf(field) !== -1 ? Number(value || 0) : value;
+  renderSalesDocumentPreview();
+  renderSalesDocumentStickyActions();
+}
+
+function addSalesDocumentItem() {
+  if (!currentSalesDocumentDraft || isSalesDocumentLocked(currentSalesDocumentDraft)) return;
+  currentSalesDocumentDraft.items = currentSalesDocumentDraft.items || [];
+  currentSalesDocumentDraft.items.push(createEmptySalesDocumentItem(currentSalesDocumentDraft.items.length + 1));
+  renderSalesDocumentItems();
+  renderSalesDocumentPreview();
+  renderSalesDocumentStickyActions();
+}
+
+function removeSalesDocumentItem(index) {
+  if (!currentSalesDocumentDraft || isSalesDocumentLocked(currentSalesDocumentDraft)) return;
+  if ((currentSalesDocumentDraft.items || []).length <= 1) { toast('נדרשת לפחות שורה אחת', 'error'); return; }
+  currentSalesDocumentDraft.items.splice(index, 1);
+  currentSalesDocumentDraft.items.forEach(function(item, i) { item.line_order = i + 1; });
+  renderSalesDocumentItems();
+  renderSalesDocumentPreview();
+  renderSalesDocumentStickyActions();
+}
+
+function renderSalesDocumentPreview() {
+  var preview = document.getElementById('sales-document-preview');
+  if (!preview || !currentSalesDocumentDraft) return;
+  var doc = currentSalesDocumentDraft;
+  var totals = calculateSalesDocumentPreviewTotals(doc);
+  var items = doc.items || [];
+  preview.innerHTML = '<div class="sales-doc-preview-card">' +
+    '<div class="sales-doc-preview-top"><div><div class="sales-doc-preview-title">' + escapeHtml(getSalesDocumentTypeLabel(doc.document_type)) + '</div><div class="sales-doc-preview-number">' + escapeHtml(doc.document_number || 'טיוטה חדשה') + '</div></div><div style="text-align:left"><strong>' + escapeHtml(doc.business_name_snapshot || 'שם העסק') + '</strong><br><span style="color:var(--text3);font-size:12px">' + escapeHtml(doc.business_phone_snapshot || '') + '</span></div></div>' +
+    '<div class="sales-doc-preview-box"><strong>לקוח:</strong> ' + escapeHtml(doc.customer_name_snapshot || 'שם לקוח') + '<br>' + escapeHtml(doc.customer_phone_snapshot || '') + ' ' + escapeHtml(doc.customer_email_snapshot || '') + '</div>' +
+    '<table class="sales-doc-preview-table"><thead><tr><th>תיאור</th><th>כמות</th><th>מחיר</th><th>מע״מ</th><th>סה״כ</th></tr></thead><tbody>' +
+      items.map(function(item) {
+        var qty = Number(item.quantity || 0);
+        var unit = Number(item.unit_price || 0);
+        var discount = Number(item.discount_amount || 0);
+        var rate = Number(item.vat_rate || 0);
+        var net = Math.max(0, roundSalesMoney(qty * unit - discount));
+        var lineTotal = roundSalesMoney(net + net * rate / 100);
+        return '<tr><td>' + escapeHtml(item.description || 'שורת פריט') + '</td><td>' + escapeHtml(qty) + '</td><td>' + escapeHtml(formatSalesMoney(unit)) + '</td><td>' + escapeHtml(rate + '%') + '</td><td>' + escapeHtml(formatSalesMoney(lineTotal)) + '</td></tr>';
+      }).join('') +
+    '</tbody></table>' + renderSalesDocumentTotalsHtml(totals) +
+    (doc.notes ? '<div class="sales-doc-preview-box"><strong>הערות:</strong><br>' + escapeHtml(doc.notes).replace(/\n/g, '<br>') + '</div>' : '') +
+    (doc.terms ? '<div class="sales-doc-preview-box"><strong>תנאים:</strong><br>' + escapeHtml(doc.terms).replace(/\n/g, '<br>') + '</div>' : '') +
+  '</div>';
+}
+
+function renderSalesDocumentTotalsHtml(totals) {
+  return '<div class="sales-doc-totals-box">' +
+    '<div class="sales-doc-total-row"><span>ביניים</span><strong>' + escapeHtml(formatSalesMoney(totals.subtotal)) + '</strong></div>' +
+    '<div class="sales-doc-total-row"><span>הנחות</span><strong>' + escapeHtml(formatSalesMoney(totals.discount)) + '</strong></div>' +
+    '<div class="sales-doc-total-row"><span>מע״מ</span><strong>' + escapeHtml(formatSalesMoney(totals.vat)) + '</strong></div>' +
+    '<div class="sales-doc-total-row"><span>סה״כ</span><strong>' + escapeHtml(formatSalesMoney(totals.total)) + '</strong></div>' +
+  '</div>';
+}
+
+function renderSalesDocumentStickyActions() {
+  var bar = document.getElementById('sales-document-sticky-actions');
+  if (!bar || !currentSalesDocumentDraft) return;
+  var totals = calculateSalesDocumentPreviewTotals(currentSalesDocumentDraft);
+  var locked = isSalesDocumentLocked(currentSalesDocumentDraft);
+  bar.style.display = 'flex';
+  bar.innerHTML = '<div class="sales-doc-sticky-total">סה״כ לתצוגה <strong>' + escapeHtml(formatSalesMoney(totals.total)) + '</strong></div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+      '<button class="btn btn-secondary" id="sales-document-cancel-edit">סגור</button>' +
+      (locked ? '' : '<button class="btn btn-primary" id="sales-document-save-draft">שמור טיוטה</button>') +
+    '</div>';
+  var cancelBtn = document.getElementById('sales-document-cancel-edit');
+  if (cancelBtn) cancelBtn.addEventListener('click', closeSalesDocumentEditorPanel);
+  var saveBtn = document.getElementById('sales-document-save-draft');
+  if (saveBtn) saveBtn.addEventListener('click', saveSalesDocumentDraft);
+}
+
+function buildSalesDocumentPayload() {
+  var doc = currentSalesDocumentDraft || {};
+  return {
+    document_type: doc.document_type,
+    issue_date: doc.issue_date || null,
+    due_date: doc.due_date || null,
+    valid_until: doc.valid_until || null,
+    currency: 'ILS',
+    customer_name_snapshot: doc.customer_name_snapshot || null,
+    customer_phone_snapshot: doc.customer_phone_snapshot || null,
+    customer_email_snapshot: doc.customer_email_snapshot || null,
+    customer_tax_id: doc.customer_tax_id || null,
+    business_name_snapshot: doc.business_name_snapshot || null,
+    business_phone_snapshot: doc.business_phone_snapshot || null,
+    business_email_snapshot: doc.business_email_snapshot || null,
+    business_tax_id: doc.business_tax_id || null,
+    notes: doc.notes || null,
+    terms: doc.terms || null,
+    items: (doc.items || []).map(function(item, index) {
+      return {
+        line_order: index + 1,
+        description: item.description,
+        quantity: Number(item.quantity || 0),
+        unit_price: Number(item.unit_price || 0),
+        vat_rate: Number(item.vat_rate || 0),
+        discount_amount: Number(item.discount_amount || 0)
+      };
+    })
+  };
+}
+
+function validateSalesDocumentDraft() {
+  var doc = currentSalesDocumentDraft;
+  if (!doc) return 'אין מסמך פתוח';
+  if (!doc.customer_name_snapshot || !String(doc.customer_name_snapshot).trim()) return 'שם לקוח חובה';
+  var items = doc.items || [];
+  if (!items.length) return 'נדרשת לפחות שורה אחת';
+  for (var i = 0; i < items.length; i += 1) {
+    if (!String(items[i].description || '').trim()) return 'תיאור חובה בשורה ' + (i + 1);
+    if (Number(items[i].quantity || 0) <= 0) return 'כמות לא תקינה בשורה ' + (i + 1);
+    if (Number(items[i].unit_price || 0) < 0) return 'מחיר לא תקין בשורה ' + (i + 1);
+  }
+  return null;
+}
+
+function saveSalesDocumentDraft() {
+  if (salesDocumentSaving || !currentSalesDocumentDraft || isSalesDocumentLocked(currentSalesDocumentDraft)) return;
+  var validationError = validateSalesDocumentDraft();
+  if (validationError) { toast(validationError, 'error'); return; }
+  salesDocumentSaving = true;
+  var saveBtn = document.getElementById('sales-document-save-draft');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'שומר...'; }
+  var method = currentSalesDocumentId ? 'PUT' : 'POST';
+  var path = currentSalesDocumentId ? '/api/sales-documents/' + encodeURIComponent(currentSalesDocumentId) : '/api/sales-documents';
+  apiCall(method, path, buildSalesDocumentPayload()).then(function(data) {
+    toast('הטיוטה נשמרה', 'success');
+    currentSalesDocumentDraft = data.document || currentSalesDocumentDraft;
+    currentSalesDocumentId = currentSalesDocumentDraft.id || currentSalesDocumentId;
+    renderSalesDocumentEditor();
+    loadSalesDocuments();
+  }).catch(function(err) {
+    toast(err.message || 'שגיאה בשמירת המסמך', 'error');
+  }).finally(function() {
+    salesDocumentSaving = false;
+    renderSalesDocumentStickyActions();
   });
 }
 
