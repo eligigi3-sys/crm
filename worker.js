@@ -9,6 +9,7 @@ import { handleAdmin } from './src/admin.js';
 import { handleMembers } from './src/members.js';
 import { handleSalesDocuments } from './src/sales-documents.js';
 import { handleTenantBusinessSettings } from './src/tenant-business-settings.js';
+import { handleCustomerBilling, isCustomerBillingRoute } from './src/customer-billing.js';
 import { serveHTML } from './src/ui.js';
 
 export default {
@@ -57,6 +58,8 @@ export default {
           response = await handleLeads(request, env, path);
         } else if (path.startsWith('/api/google')) {
           response = await handleGoogle(request, env, path);
+        } else if (path.startsWith('/api/contacts') && isCustomerBillingRoute(path)) {
+          response = await handleCustomerBilling(request, env, path);
         } else if (path.startsWith('/api/contacts')) {
           response = await handleContacts(request, env, path);
         } else if (path.startsWith('/api/employees')) {
