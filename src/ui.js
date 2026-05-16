@@ -586,6 +586,7 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .strategic-contact-meta{font-size:12px;color:var(--text3);line-height:1.5;display:flex;gap:6px;flex-wrap:wrap}
 .strategic-contact-actions{display:flex;gap:7px;flex-wrap:wrap}
 .strategic-contact-note{font-size:12px;color:var(--text2);line-height:1.5;background:#f8fafc;border-radius:10px;padding:8px}
+.strategic-contact-linked-notice{border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:12px;padding:10px 12px;font-size:12px;font-weight:800;line-height:1.5;margin-bottom:12px}
 .strategic-contact-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .strategic-contact-form-grid.single{grid-template-columns:1fr}
 @media (max-width:900px){.strategic-contacts-grid,.strategic-contact-form-grid{grid-template-columns:1fr}.strategic-contact-card{padding:12px}.strategic-contact-actions .btn{flex:1;justify-content:center}}
@@ -5814,6 +5815,7 @@ function renderStrategicContactCard(item) {
       '<span class="badge badge-purple">' + escapeHtml(getStrategicContactOptionLabel(strategicContactCategoryOptions, item.category)) + '</span>' +
       '<span class="badge badge-gray">' + escapeHtml(getStrategicContactOptionLabel(strategicContactStatusOptions, item.status)) + '</span>' +
       '<span class="badge badge-blue">עדיפות ' + escapeHtml(getStrategicContactOptionLabel(strategicContactPriorityOptions, item.priority)) + '</span>' +
+      (item.linked_contact_id ? '<span class="badge badge-green">מקושר ללקוח קיים</span>' : '') +
     '</div></div>' +
     '<div class="strategic-contact-meta"><span>' + escapeHtml([item.city, item.area].filter(Boolean).join(' · ') || 'אזור לא צוין') + '</span></div>' +
     '<div class="strategic-contact-actions">' +
@@ -5864,8 +5866,9 @@ function strategicContactTextarea(field, label, value) {
   return '<div class="form-group" style="margin-bottom:0"><label class="form-label">' + escapeHtml(label) + '</label><textarea class="form-textarea strategic-contact-field" data-strategic-contact-field="' + escapeHtml(field) + '">' + escapeHtml(value || '') + '</textarea></div>';
 }
 
-function openStrategicContactModal(id) {
+function openStrategicContactModal(id, defaults) {
   var isEdit = !!id;
+  defaults = defaults || null;
   var overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.id = 'strategic-contact-modal-runtime';
@@ -5878,8 +5881,14 @@ function openStrategicContactModal(id) {
 
   function renderForm(item) {
     item = item || { category: 'other', status: 'new', priority: 'normal', preferred_channel: '', active: 1 };
+    item = Object.assign({}, item, defaults || {});
+    if (!item.category) item.category = 'other';
+    if (!item.status) item.status = 'new';
+    if (!item.priority) item.priority = 'normal';
+    if (item.active === undefined || item.active === null) item.active = 1;
     var body = document.getElementById('strategic-contact-modal-body');
-    body.innerHTML = '<div class="strategic-contact-form-grid">' +
+    var linkedNotice = item.linked_contact_id ? '<div class="strategic-contact-linked-notice">מקושר ללקוח קיים</div>' : '';
+    body.innerHTML = linkedNotice + '<input type="hidden" class="strategic-contact-field" data-strategic-contact-field="linked_contact_id" value="' + escapeHtml(item.linked_contact_id || '') + '">' + '<div class="strategic-contact-form-grid">' +
       strategicContactInput('organization_name', 'שם ארגון', item.organization_name, 'text') +
       strategicContactInput('contact_person_name', 'שם איש קשר', item.contact_person_name, 'text') +
       strategicContactInput('role_title', 'תפקיד', item.role_title, 'text') +
@@ -5921,6 +5930,7 @@ function openStrategicContactModal(id) {
       toast('הקשר האסטרטגי נשמר', 'success');
       close();
       loadStrategicContacts();
+      if (defaults && defaults.return_to_customer_id) openCustomerCard(defaults.return_to_customer_id);
     }).catch(function(err) { toast(err.message || 'שגיאה בשמירה', 'error'); });
   };
 
@@ -5933,6 +5943,52 @@ function openStrategicContactModal(id) {
   } else {
     renderForm(null);
   }
+}
+
+
+function buildStrategicContactDefaultsFromCustomer(customer) {
+  customer = customer || {};
+  var notes = [];
+  if (customer.general_notes) notes.push(customer.general_notes);
+  else if (customer.notes) notes.push(customer.notes);
+  return {
+    linked_contact_id: customer.id,
+    return_to_customer_id: customer.id,
+    organization_name: customer.name || '',
+    contact_person_name: customer.name || '',
+    phone: customer.phone || '',
+    whatsapp: customer.phone || '',
+    email: customer.email || '',
+    city: customer.city || '',
+    area: customer.area || '',
+    source: 'נוצר מכרטיס לקוח קיים #' + (customer.contact_num || customer.id || ''),
+    notes: notes.join('\\n'),
+    category: 'other',
+    status: 'need_first_contact',
+    priority: 'normal',
+    preferred_channel: customer.email ? 'email' : (customer.phone ? 'whatsapp' : '')
+  };
+}
+
+function openStrategicContactFromCustomer(customer) {
+  customer = customer || {};
+  if (!isModuleEnabled('strategic_contacts')) {
+    toast('מודול קשרים אסטרטגיים כבוי', 'error');
+    return;
+  }
+  var customerId = customer.id;
+  if (!customerId) return;
+  apiCall('GET', '/api/strategic-contacts?linked_contact_id=' + encodeURIComponent(customerId) + '&active=all').then(function(data) {
+    var existing = (data.strategic_contacts || [])[0];
+    if (existing && existing.id) {
+      var shouldOpen = window.confirm('לקוח זה כבר מקושר לקשר אסטרטגי. לפתוח את הקשר הקיים לעריכה?');
+      if (shouldOpen) openStrategicContactModal(existing.id);
+      return;
+    }
+    openStrategicContactModal(null, buildStrategicContactDefaultsFromCustomer(customer));
+  }).catch(function(err) {
+    toast(err.message || 'שגיאה בבדיקת קשר אסטרטגי קיים', 'error');
+  });
 }
 
 // ---- Customer Cards ----
@@ -5971,6 +6027,9 @@ function loadCustomers() {
           '</div>' +
           (c.email ? '<div class="customer-card-meta" style="margin-top:2px;color:var(--text3);font-size:12px">' + c.email + '</div>' : '') +
         '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">' +
+        '<button class="btn btn-ghost btn-sm customer-to-strategic-btn" data-cid="' + c.id + '" onclick="event.stopPropagation()">הוסף לקשרים אסטרטגיים</button>' +
       '</div>' +
       '<div class="customer-card-stats" style="margin-top:12px">' +
         '<span class="customer-stat-pill">' + (c.events_count || 0) + ' אירועים</span>' +
@@ -6057,6 +6116,14 @@ function loadCustomers() {
     grid.querySelectorAll('.customer-card[data-cid]').forEach(function(card) {
       card.addEventListener('click', function() {
         openCustomerCard(parseInt(this.getAttribute('data-cid')));
+      });
+    });
+    grid.querySelectorAll('.customer-to-strategic-btn[data-cid]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var cid = parseInt(this.getAttribute('data-cid'));
+        var customer = contacts.find(function(item) { return Number(item.id) === Number(cid); });
+        if (customer) openStrategicContactFromCustomer(customer);
       });
     });
   }).catch(function(e) {
@@ -9530,6 +9597,7 @@ function openCustomerCard(id) {
     html += '<div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">';
     html += '<button class="btn btn-secondary btn-sm" id="back-to-customers">← חזרה לרשימת לקוחות</button>';
     html += '<button class="btn btn-secondary btn-sm" id="edit-customer-btn">✏️ עריכה</button>';
+    html += '<button class="btn btn-secondary btn-sm" id="customer-to-strategic-detail-btn">הוסף לקשרים אסטרטגיים</button>';
     html += '<button class="btn btn-primary btn-sm" id="add-event-btn">+ אירוע חדש ללקוח</button>';
     html += '</div>';
 
@@ -9810,6 +9878,10 @@ function openCustomerCard(id) {
         openEditCustomerModal(c);
       };
     }
+    var strategicDetailBtn = document.getElementById('customer-to-strategic-detail-btn');
+    if (strategicDetailBtn) strategicDetailBtn.addEventListener('click', function() {
+      openStrategicContactFromCustomer(c);
+    });
     var addExtraBtn = document.getElementById('add-extra-contact-btn');
     if (addExtraBtn) addExtraBtn.addEventListener('click', function() {
       openExtraContactModal(c.id);

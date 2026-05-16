@@ -232,6 +232,8 @@ function verifyStrategicContacts(results) {
   expect(worker, "handleStrategicContacts", 'worker routes strategic contacts handler', results);
   expect(ui, 'nav-strategic-contacts', 'UI includes strategic contacts navigation', results);
   expect(ui, 'page-strategic-contacts', 'UI includes strategic contacts page', results);
+  expect(ui, 'הוסף לקשרים אסטרטגיים', 'UI includes customer-to-strategic action', results);
+  expect(ui, 'לקוח זה כבר מקושר לקשר אסטרטגי', 'UI warns before creating duplicate linked strategic contact', results);
 
   expectInBlock(strategic, 'export async function handleStrategicContacts', ['return json({ error: \'Strategic contacts route not found\' }, 404);'], [
     'requireTenantContext(request, env)',
@@ -251,13 +253,21 @@ function verifyStrategicContacts(results) {
     'category = ?',
     'status = ?',
     'priority = ?',
+    'linked_contact_id = ?',
     'active = 1'
-  ], 'strategic contacts list is tenant-scoped and filterable', results);
+  ], 'strategic contacts list is tenant-scoped and filterable including linked contact', results);
+
+  expectInBlock(strategic, 'async function validateLinkedContactId', ['function mapStrategicContact'], [
+    'getContactForTenant(env, tenantId, linkedContactId)',
+    "throw new Error('הלקוח המקושר לא נמצא')"
+  ], 'strategic contacts validate linked_contact_id against same tenant contact', results);
 
   expectInBlock(strategic, 'async function updateStrategicContact', ['export async function handleStrategicContacts'], [
     'getStrategicContactForTenant(env, tenantId, id)',
+    'validateLinkedContactId(env, tenantId, payload.linked_contact_id)',
+    'linked_contact_id = ?',
     'WHERE id = ? AND tenant_id = ?'
-  ], 'strategic contacts update is tenant-scoped', results);
+  ], 'strategic contacts update is tenant-scoped and validates linked contact', results);
 }
 
 function verifyRoleEnforcement(results) {
