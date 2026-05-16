@@ -4123,7 +4123,7 @@ function buildSalesDocumentInternalNotesSnapshot(doc) {
   if (doc.customer_default_discount_percent) billingLines.push('הנחת לקוח ברירת מחדל %: ' + doc.customer_default_discount_percent);
   if (doc.customer_default_discount_amount) billingLines.push('הנחת לקוח ברירת מחדל ₪: ' + doc.customer_default_discount_amount);
   if (!billingLines.length) return manual || null;
-  return [manual, marker, billingLines.join('\n')].filter(Boolean).join('\n');
+  return [manual, marker, billingLines.join('\\n')].filter(Boolean).join('\\n');
 }
 
 function applySalesDocumentCustomerDiscount(doc, profile) {
