@@ -373,13 +373,68 @@ async function listCleanupCandidates(env, entity, search) {
 }
 
 async function getCandidateByTypeAndId(env, type, id) {
-  const entityByType = {
-    tenant: 'tenants', user: 'users', contact: 'contacts', product: 'products', strategic_contact: 'strategic_contacts',
-    sales_document: 'sales_documents', blocked_sales_document: 'sales_documents', orphan_sales_document_counter: 'orphans',
-    strategic_contact_activity: 'orphans', strategic_contact_attribution: 'orphans'
-  };
-  const candidates = await listCleanupCandidates(env, entityByType[type] || 'all', '');
-  return candidates.find(function(item) { return item.type === type && Number(item.id) === Number(id); }) || null;
+  if (type === 'tenant') {
+    const row = await env.DB.prepare('SELECT id, name, slug, status, contact_name, contact_email FROM tenants WHERE id = ?').bind(id).first();
+    return row ? buildTenantCandidate(env, row) : null;
+  }
+  if (type === 'user') {
+    const row = await env.DB.prepare('SELECT id, name, display_name, email, role, status FROM users WHERE id = ?').bind(id).first();
+    return row ? buildUserCandidate(env, row) : null;
+  }
+  if (type === 'contact') {
+    const row = await env.DB.prepare('SELECT id, tenant_id, name, phone, email, status, tags FROM contacts WHERE id = ?').bind(id).first();
+    return row ? buildContactCandidate(env, row) : null;
+  }
+  if (type === 'product') {
+    const row = await env.DB.prepare('SELECT id, tenant_id, name, category, sku, is_active FROM products WHERE id = ?').bind(id).first();
+    return row ? buildProductCandidate(env, row) : null;
+  }
+  if (type === 'strategic_contact') {
+    const row = await env.DB.prepare('SELECT id, tenant_id, organization_name, contact_person_name, email, status, active, tags, notes FROM strategic_contacts WHERE id = ?').bind(id).first();
+    return row ? buildStrategicContactCandidate(env, row) : null;
+  }
+  if (type === 'sales_document' || type === 'blocked_sales_document') {
+    const row = await env.DB.prepare(`
+      SELECT sd.id, sd.tenant_id, sd.document_type, sd.document_number, sd.status, sd.locked_at, sd.issued_at,
+             sd.customer_name_snapshot, sd.customer_email_snapshot, sd.notes, sd.internal_notes,
+             t.name AS tenant_name, t.slug AS tenant_slug,
+             (SELECT COUNT(*) FROM sales_document_items i WHERE i.tenant_id = sd.tenant_id AND i.document_id = sd.id) AS items_count
+      FROM sales_documents sd
+      LEFT JOIN tenants t ON t.id = sd.tenant_id
+      WHERE sd.id = ?
+    `).bind(id).first();
+    if (!row) return null;
+    const built = buildSalesDocumentCandidate(row);
+    return built.type === type ? built : null;
+  }
+  if (type === 'orphan_sales_document_counter') {
+    const row = await env.DB.prepare(`
+      SELECT c.id, c.tenant_id, c.document_type
+      FROM sales_document_counters c
+      LEFT JOIN tenants t ON t.id = c.tenant_id
+      WHERE c.id = ? AND t.id IS NULL
+    `).bind(id).first();
+    return row ? buildOrphanCounterCandidate(row) : null;
+  }
+  if (type === 'strategic_contact_activity') {
+    const row = await env.DB.prepare(`
+      SELECT a.id, a.tenant_id, a.strategic_contact_id
+      FROM strategic_contact_activities a
+      LEFT JOIN strategic_contacts sc ON sc.id = a.strategic_contact_id AND sc.tenant_id = a.tenant_id
+      WHERE a.id = ? AND sc.id IS NULL
+    `).bind(id).first();
+    return row ? buildOrphanStrategicChildCandidate(row, 'strategic_contact_activity') : null;
+  }
+  if (type === 'strategic_contact_attribution') {
+    const row = await env.DB.prepare(`
+      SELECT a.id, a.tenant_id, a.strategic_contact_id
+      FROM strategic_contact_attributions a
+      LEFT JOIN strategic_contacts sc ON sc.id = a.strategic_contact_id AND sc.tenant_id = a.tenant_id
+      WHERE a.id = ? AND sc.id IS NULL
+    `).bind(id).first();
+    return row ? buildOrphanStrategicChildCandidate(row, 'strategic_contact_attribution') : null;
+  }
+  return null;
 }
 
 function auditStatement(env, actor, action, target, details) {
