@@ -25,7 +25,8 @@ const TENANT_MODULE_KEYS = new Set([
   'employees',
   'products',
   'shopping',
-  'reports'
+  'reports',
+  'strategic_contacts'
 ]);
 
 const TENANT_ROLE_HIERARCHY = {

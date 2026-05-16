@@ -577,6 +577,18 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .customer-financial-warning{padding:10px 12px;border-radius:12px;background:var(--yellow-light);color:var(--yellow);font-size:12px;font-weight:800;line-height:1.5}
 .customer-financial-warning.blocked{background:var(--red-light);color:var(--red)}
 .customer-financial-empty{padding:16px;border:1px dashed var(--border);border-radius:12px;background:#f8fafc;color:var(--text3);text-align:center;font-size:13px;line-height:1.6}
+.strategic-contacts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.strategic-contact-card{border:1px solid var(--border);border-radius:14px;background:#fff;padding:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:10px;cursor:pointer;transition:all .12s}
+.strategic-contact-card:hover{border-color:var(--accent);box-shadow:0 2px 10px rgba(124,58,237,.12)}
+.strategic-contact-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.strategic-contact-name{font-size:15px;font-weight:900;color:var(--text);line-height:1.35}
+.strategic-contact-person{font-size:12px;color:var(--text2);margin-top:3px;line-height:1.5}
+.strategic-contact-meta{font-size:12px;color:var(--text3);line-height:1.5;display:flex;gap:6px;flex-wrap:wrap}
+.strategic-contact-actions{display:flex;gap:7px;flex-wrap:wrap}
+.strategic-contact-note{font-size:12px;color:var(--text2);line-height:1.5;background:#f8fafc;border-radius:10px;padding:8px}
+.strategic-contact-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.strategic-contact-form-grid.single{grid-template-columns:1fr}
+@media (max-width:900px){.strategic-contacts-grid,.strategic-contact-form-grid{grid-template-columns:1fr}.strategic-contact-card{padding:12px}.strategic-contact-actions .btn{flex:1;justify-content:center}}
 .autocomplete-list{position:absolute;top:100%;right:0;left:0;background:var(--white);border:1px solid var(--accent);border-radius:var(--radius-sm);box-shadow:var(--shadow-md);z-index:300;max-height:200px;overflow-y:auto}
 .autocomplete-item{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)}
 .autocomplete-item:last-child{border-bottom:none}
@@ -1462,6 +1474,7 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     <div class="nav-item" id="nav-team" style="display:none"><span class="nav-icon">👤</span> צוות</div>
     <div class="nav-item" id="nav-products"><span class="nav-icon">📦</span> מוצרים</div>
     <div class="nav-item" id="nav-shopping"><span class="nav-icon">🛒</span> רשימות קניות</div>
+    <div class="nav-item" id="nav-strategic-contacts"><span class="nav-icon">🤝</span> קשרים אסטרטגיים</div>
     <div class="nav-item" id="nav-sales-documents"><span class="nav-icon">🧾</span> מסמכי מכירה</div>
     <div class="nav-item" id="nav-business-settings"><span class="nav-icon">⚙️</span> הגדרות עסק</div>
     <div class="nav-item" id="nav-calendar"><span class="nav-icon">📅</span> יומן אירועים</div>
@@ -1564,6 +1577,21 @@ id="customers-search">
         <div id="customers-grid" style="padding:16px">
           <div class="dash-empty">טוען...</div>
         </div>
+      </div>
+    </div>
+    <div id="page-strategic-contacts" class="page">
+      <div class="page-header">
+        <div class="page-title">קשרים אסטרטגיים <small>מקורות קשר, שיתופי פעולה ומעקב יזום</small></div>
+        <button class="btn btn-primary" id="btn-new-strategic-contact">+ קשר אסטרטגי חדש</button>
+      </div>
+      <div class="table-card">
+        <div class="table-toolbar">
+          <input class="search-input" type="text" placeholder="חיפוש לפי ארגון / איש קשר / עיר / תגיות..." id="strategic-contacts-search">
+          <select class="filter-select" id="strategic-contacts-category-filter"><option value="">כל הקטגוריות</option></select>
+          <select class="filter-select" id="strategic-contacts-status-filter"><option value="">כל הסטטוסים</option></select>
+          <select class="filter-select" id="strategic-contacts-priority-filter"><option value="">כל העדיפויות</option></select>
+        </div>
+        <div id="strategic-contacts-grid" style="padding:16px"><div class="dash-empty">טוען...</div></div>
       </div>
     </div>
     <div id="page-shopping" class="page">
@@ -1883,7 +1911,8 @@ var moduleStateCache = {
     products: { is_enabled: true, source: 'default_enabled' },
     shopping: { is_enabled: true, source: 'default_enabled' },
     reports: { is_enabled: true, source: 'default_enabled' },
-    sales_documents: { is_enabled: true, source: 'default_enabled' }
+    sales_documents: { is_enabled: true, source: 'default_enabled' },
+    strategic_contacts: { is_enabled: true, source: 'default_enabled' }
   }
 };
 var searchTimer, currentLeadId, dupLeadId, selectedContactId = null, currentEmployeeId = null, currentProductId = null, currentProductPurchases = [], currentProductPurchaseEditId = null, currentProductPurchaseFormMode = null, currentProductPurchaseSaving = false, currentProductStock = null, currentProductStockMovements = [], currentProductAdjustmentMode = null, currentProductAdjustmentSaving = false, currentProductReceiveStockPurchaseId = null;
@@ -2049,7 +2078,8 @@ function renderModuleDisabledPage(page, moduleKey) {
     employees: { bodyId: 'employees-grid' },
     products: { bodyId: 'products-page-content' },
     archive: { bodyId: 'archive-events-grid' },
-    salesDocuments: { bodyId: 'sales-documents-body', colspan: 7 }
+    salesDocuments: { bodyId: 'sales-documents-body', colspan: 7 },
+    strategicContacts: { bodyId: 'strategic-contacts-grid' }
   };
   var target = map[page];
   if (!target) return;
@@ -2073,6 +2103,8 @@ function applyModuleVisibility() {
   if (navProducts) navProducts.style.display = isModuleEnabled('products') ? 'flex' : 'none';
   var navShopping = document.getElementById('nav-shopping');
   if (navShopping) navShopping.style.display = isModuleEnabled('shopping') ? 'flex' : 'none';
+  var navStrategicContacts = document.getElementById('nav-strategic-contacts');
+  if (navStrategicContacts) navStrategicContacts.style.display = isModuleEnabled('strategic_contacts') ? 'flex' : 'none';
   var navSalesDocuments = document.getElementById('nav-sales-documents');
   if (navSalesDocuments) navSalesDocuments.style.display = isModuleEnabled('sales_documents') ? 'flex' : 'none';
   var navCalendar = document.getElementById('nav-calendar');
@@ -2093,6 +2125,8 @@ function applyModuleVisibility() {
   if (btnNewProduct) btnNewProduct.style.display = isModuleEnabled('products') ? 'inline-flex' : 'none';
   var btnNewShoppingList = document.getElementById('btn-new-shopping-list');
   if (btnNewShoppingList) btnNewShoppingList.style.display = isModuleEnabled('shopping') ? 'inline-flex' : 'none';
+  var btnNewStrategicContact = document.getElementById('btn-new-strategic-contact');
+  if (btnNewStrategicContact) btnNewStrategicContact.style.display = isModuleEnabled('strategic_contacts') ? 'inline-flex' : 'none';
   var btnNewSalesQuote = document.getElementById('btn-new-sales-quote');
   if (btnNewSalesQuote) btnNewSalesQuote.style.display = isModuleEnabled('sales_documents') ? 'inline-flex' : 'none';
   var btnNewSalesInvoice = document.getElementById('btn-new-sales-invoice');
@@ -2135,7 +2169,7 @@ function applyShellVisibility() {
   var isAdminShell = shellMode === 'admin';
   var isCrmShell = shellMode === 'crm';
   var isAdminUser = isSuperAdmin();
-  var crmNavIds = ['nav-dashboard', 'nav-leads', 'nav-employees', 'nav-team', 'nav-products', 'nav-shopping', 'nav-sales-documents', 'nav-business-settings', 'nav-calendar', 'nav-archive'];
+  var crmNavIds = ['nav-dashboard', 'nav-leads', 'nav-employees', 'nav-team', 'nav-products', 'nav-shopping', 'nav-strategic-contacts', 'nav-sales-documents', 'nav-business-settings', 'nav-calendar', 'nav-archive'];
   var logoTitle = document.getElementById('shell-logo-title');
   var logoSub = document.getElementById('shell-logo-sub');
 
@@ -2178,7 +2212,8 @@ function loadModuleStates() {
       products: { is_enabled: true, source: 'default_enabled' },
       shopping: { is_enabled: true, source: 'default_enabled' },
       reports: { is_enabled: true, source: 'default_enabled' },
-      sales_documents: { is_enabled: true, source: 'default_enabled' }
+      sales_documents: { is_enabled: true, source: 'default_enabled' },
+      strategic_contacts: { is_enabled: true, source: 'default_enabled' }
     };
     (data.modules || []).forEach(function(module) {
       if (next[module.module_key]) next[module.module_key] = module;
@@ -2238,6 +2273,8 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   if (navProducts) navProducts.addEventListener('click', function() { goTo('products', this); });
   var navShopping = document.getElementById('nav-shopping');
   if (navShopping) navShopping.addEventListener('click', function() { goTo('shopping', this); });
+  var navStrategicContacts = document.getElementById('nav-strategic-contacts');
+  if (navStrategicContacts) navStrategicContacts.addEventListener('click', function() { goTo('strategic-contacts', this); });
   var navSalesDocuments = document.getElementById('nav-sales-documents');
   if (navSalesDocuments) navSalesDocuments.addEventListener('click', function() { goTo('sales-documents', this); });
   var navBusinessSettings = document.getElementById('nav-business-settings');
@@ -2247,6 +2284,11 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   if (navArchive) navArchive.addEventListener('click', function() { goTo('archive', this); });
   var navSuperAdmin = document.getElementById('nav-super-admin');
   if (navSuperAdmin) navSuperAdmin.addEventListener('click', function() { goTo('super-admin', this); });
+  var strategicContactsSearch = document.getElementById('strategic-contacts-search');
+  if (strategicContactsSearch) strategicContactsSearch.addEventListener('input', function() { clearTimeout(searchTimer); searchTimer = setTimeout(loadStrategicContacts, 300); });
+  ['strategic-contacts-category-filter','strategic-contacts-status-filter','strategic-contacts-priority-filter'].forEach(function(id) { var el = document.getElementById(id); if (el) el.addEventListener('change', loadStrategicContacts); });
+  var newStrategicContact = document.getElementById('btn-new-strategic-contact');
+  if (newStrategicContact) newStrategicContact.addEventListener('click', function() { openStrategicContactModal(); });
   var salesDocumentsSearch = document.getElementById('sales-documents-search');
   if (salesDocumentsSearch) salesDocumentsSearch.addEventListener('input', function() { clearTimeout(searchTimer); searchTimer = setTimeout(loadSalesDocuments, 300); });
   var salesDocumentsTypeFilter = document.getElementById('sales-documents-type-filter');
@@ -2356,6 +2398,7 @@ function goTo(page, el) {
     employees: 'employees',
     products: 'products',
     shopping: 'shopping',
+    'strategic-contacts': 'strategic_contacts',
     'sales-documents': 'sales_documents',
     calendar: 'leads',
     archive: 'leads'
@@ -2372,7 +2415,7 @@ function goTo(page, el) {
     if (!blockedPage) return;
     blockedPage.classList.add('active');
     if (el) el.classList.add('active');
-    renderModuleDisabledPage(page === 'sales-documents' ? 'salesDocuments' : page, requiredModule);
+    renderModuleDisabledPage(page === 'sales-documents' ? 'salesDocuments' : (page === 'strategic-contacts' ? 'strategicContacts' : page), requiredModule);
     toast('Module disabled', 'error');
     return;
   }
@@ -2385,6 +2428,7 @@ function goTo(page, el) {
   if (page === 'dashboard') loadDashboard();
   if (page === 'leads') loadLeads();
   if (page === 'shopping') loadShoppingLists();
+  if (page === 'strategic-contacts') loadStrategicContacts();
   if (page === 'sales-documents') loadSalesDocuments();
   if (page === 'business-settings') loadBusinessSettings();
   if (page === 'calendar') loadCalendar();
@@ -2413,7 +2457,8 @@ function resetSessionState() {
       products: { is_enabled: true, source: 'default_enabled' },
       shopping: { is_enabled: true, source: 'default_enabled' },
       reports: { is_enabled: true, source: 'default_enabled' },
-      sales_documents: { is_enabled: true, source: 'default_enabled' }
+      sales_documents: { is_enabled: true, source: 'default_enabled' },
+      strategic_contacts: { is_enabled: true, source: 'default_enabled' }
     }
   };
 }
@@ -3145,7 +3190,8 @@ function getAdminModuleLabel(moduleKey) {
     employees: 'עובדים',
     products: 'מוצרים ומלאי',
     shopping: 'קניות / רכישות',
-    reports: 'דוחות'
+    reports: 'דוחות',
+    strategic_contacts: 'קשרים אסטרטגיים'
   };
   return map[moduleKey] || moduleKey;
 }
@@ -5682,6 +5728,211 @@ function openDupLead() {
   }).catch(function(e) {
     toast(e.message, 'error');
   });
+}
+
+
+var strategicContactCategoryOptions = [
+  ['school', 'בית ספר'],
+  ['kindergarten', 'גן ילדים'],
+  ['hr_welfare', 'מנהלת רווחה / HR'],
+  ['employee_committee', 'ועד עובדים'],
+  ['dj', 'דיג׳יי'],
+  ['hall', 'אולם אירועים'],
+  ['producer', 'מפיק אירועים'],
+  ['supplier', 'ספק משלים'],
+  ['other', 'אחר']
+];
+var strategicContactStatusOptions = [
+  ['new', 'חדש'],
+  ['need_first_contact', 'צריך פנייה ראשונה'],
+  ['contacted', 'נוצר קשר'],
+  ['in_conversation', 'בשיחה'],
+  ['meeting_scheduled', 'נקבעה פגישה'],
+  ['active_relationship', 'קשר פעיל'],
+  ['dormant', 'רדום'],
+  ['not_relevant', 'לא רלוונטי']
+];
+var strategicContactPriorityOptions = [
+  ['low', 'נמוכה'],
+  ['normal', 'רגילה'],
+  ['high', 'גבוהה']
+];
+var strategicContactChannelOptions = [
+  ['', 'לא צוין'],
+  ['phone', 'טלפון'],
+  ['whatsapp', 'WhatsApp'],
+  ['email', 'אימייל'],
+  ['meeting', 'פגישה'],
+  ['other', 'אחר']
+];
+
+function getStrategicContactOptionLabel(options, value) {
+  var found = options.find(function(item) { return item[0] === value; });
+  return found ? found[1] : (value || '—');
+}
+
+function renderStrategicContactOptions(options, selected, includeAllLabel) {
+  var html = includeAllLabel ? '<option value="">' + includeAllLabel + '</option>' : '';
+  return html + options.map(function(item) {
+    return '<option value="' + escapeHtml(item[0]) + '"' + (String(selected || '') === item[0] ? ' selected' : '') + '>' + escapeHtml(item[1]) + '</option>';
+  }).join('');
+}
+
+function setupStrategicContactFilters() {
+  var category = document.getElementById('strategic-contacts-category-filter');
+  var status = document.getElementById('strategic-contacts-status-filter');
+  var priority = document.getElementById('strategic-contacts-priority-filter');
+  if (category && category.options.length <= 1) category.innerHTML = renderStrategicContactOptions(strategicContactCategoryOptions, '', 'כל הקטגוריות');
+  if (status && status.options.length <= 1) status.innerHTML = renderStrategicContactOptions(strategicContactStatusOptions, '', 'כל הסטטוסים');
+  if (priority && priority.options.length <= 1) priority.innerHTML = renderStrategicContactOptions(strategicContactPriorityOptions, '', 'כל העדיפויות');
+}
+
+function buildStrategicContactsQuery() {
+  var params = new URLSearchParams();
+  var search = document.getElementById('strategic-contacts-search');
+  var category = document.getElementById('strategic-contacts-category-filter');
+  var status = document.getElementById('strategic-contacts-status-filter');
+  var priority = document.getElementById('strategic-contacts-priority-filter');
+  if (search && search.value.trim()) params.set('search', search.value.trim());
+  if (category && category.value) params.set('category', category.value);
+  if (status && status.value) params.set('status', status.value);
+  if (priority && priority.value) params.set('priority', priority.value);
+  var query = params.toString();
+  return query ? '?' + query : '';
+}
+
+function renderStrategicContactCard(item) {
+  var phone = item.phone || '';
+  var whatsapp = item.whatsapp || phone || '';
+  var cleanWhatsapp = String(whatsapp).replace(/[^0-9]/g, '').replace(/^0/, '972');
+  var note = item.notes ? String(item.notes).slice(0, 140) : '';
+  return '<div class="strategic-contact-card" data-strategic-contact-id="' + item.id + '">' +
+    '<div class="strategic-contact-head"><div>' +
+      '<div class="strategic-contact-name">' + escapeHtml(item.organization_name || 'ללא שם ארגון') + '</div>' +
+      '<div class="strategic-contact-person">' + escapeHtml([item.contact_person_name, item.role_title].filter(Boolean).join(' · ') || 'איש קשר לא צוין') + '</div>' +
+    '</div><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">' +
+      '<span class="badge badge-purple">' + escapeHtml(getStrategicContactOptionLabel(strategicContactCategoryOptions, item.category)) + '</span>' +
+      '<span class="badge badge-gray">' + escapeHtml(getStrategicContactOptionLabel(strategicContactStatusOptions, item.status)) + '</span>' +
+      '<span class="badge badge-blue">עדיפות ' + escapeHtml(getStrategicContactOptionLabel(strategicContactPriorityOptions, item.priority)) + '</span>' +
+    '</div></div>' +
+    '<div class="strategic-contact-meta"><span>' + escapeHtml([item.city, item.area].filter(Boolean).join(' · ') || 'אזור לא צוין') + '</span></div>' +
+    '<div class="strategic-contact-actions">' +
+      (phone ? '<a class="btn btn-ghost btn-sm" onclick="event.stopPropagation()" href="tel:' + escapeHtml(phone) + '">טלפון</a>' : '') +
+      (cleanWhatsapp ? '<a class="btn btn-ghost btn-sm" onclick="event.stopPropagation()" target="_blank" href="https://wa.me/' + escapeHtml(cleanWhatsapp) + '">WhatsApp</a>' : '') +
+      (item.email ? '<a class="btn btn-ghost btn-sm" onclick="event.stopPropagation()" href="mailto:' + escapeHtml(item.email) + '">אימייל</a>' : '') +
+    '</div>' +
+    '<div class="strategic-contact-meta"><span>קשר אחרון: ' + escapeHtml(formatDate(item.last_contact_at) || '—') + '</span><span>קשר הבא: ' + escapeHtml(formatDate(item.next_contact_at) || '—') + '</span></div>' +
+    (item.followup_reason ? '<div class="strategic-contact-meta"><strong>סיבת מעקב:</strong> ' + escapeHtml(item.followup_reason) + '</div>' : '') +
+    (note ? '<div class="strategic-contact-note">' + escapeHtml(note) + (String(item.notes).length > 140 ? '…' : '') + '</div>' : '') +
+    (Number(item.active) === 0 ? '<div class="strategic-contact-meta"><span class="badge badge-gray">לא פעיל</span></div>' : '') +
+  '</div>';
+}
+
+function loadStrategicContacts() {
+  if (!isModuleEnabled('strategic_contacts')) {
+    renderModuleDisabledPage('strategicContacts', 'strategic_contacts');
+    return;
+  }
+  setupStrategicContactFilters();
+  var grid = document.getElementById('strategic-contacts-grid');
+  if (!grid) return;
+  grid.innerHTML = '<div class="dash-empty">טוען קשרים אסטרטגיים...</div>';
+  apiCall('GET', '/api/strategic-contacts' + buildStrategicContactsQuery()).then(function(data) {
+    var items = data.strategic_contacts || [];
+    if (!items.length) {
+      grid.innerHTML = '<div class="dash-empty">אין עדיין קשרים אסטרטגיים להצגה</div>';
+      return;
+    }
+    grid.innerHTML = '<div class="strategic-contacts-grid">' + items.map(renderStrategicContactCard).join('') + '</div>';
+    grid.querySelectorAll('.strategic-contact-card[data-strategic-contact-id]').forEach(function(card) {
+      card.addEventListener('click', function() { openStrategicContactModal(parseInt(this.getAttribute('data-strategic-contact-id'))); });
+    });
+  }).catch(function(err) {
+    grid.innerHTML = '<div class="dash-empty">שגיאה בטעינת קשרים אסטרטגיים: ' + escapeHtml(err.message || 'שגיאה') + '</div>';
+  });
+}
+
+function strategicContactInput(field, label, value, type) {
+  return '<div class="form-group" style="margin-bottom:0"><label class="form-label">' + escapeHtml(label) + '</label><input class="form-input strategic-contact-field" data-strategic-contact-field="' + escapeHtml(field) + '" type="' + escapeHtml(type || 'text') + '" value="' + escapeHtml(value || '') + '"></div>';
+}
+
+function strategicContactSelect(field, label, value, options) {
+  return '<div class="form-group" style="margin-bottom:0"><label class="form-label">' + escapeHtml(label) + '</label><select class="form-input strategic-contact-field" data-strategic-contact-field="' + escapeHtml(field) + '">' + renderStrategicContactOptions(options, value || '', '') + '</select></div>';
+}
+
+function strategicContactTextarea(field, label, value) {
+  return '<div class="form-group" style="margin-bottom:0"><label class="form-label">' + escapeHtml(label) + '</label><textarea class="form-textarea strategic-contact-field" data-strategic-contact-field="' + escapeHtml(field) + '">' + escapeHtml(value || '') + '</textarea></div>';
+}
+
+function openStrategicContactModal(id) {
+  var isEdit = !!id;
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'strategic-contact-modal-runtime';
+  overlay.innerHTML = '<div class="modal"><div class="modal-header"><h2>' + (isEdit ? 'עריכת קשר אסטרטגי' : 'קשר אסטרטגי חדש') + '</h2><button class="modal-close" id="strategic-contact-close">✕</button></div><div class="modal-body" id="strategic-contact-modal-body"><div class="dash-empty">טוען...</div></div><div class="modal-footer"><button class="btn btn-secondary" id="strategic-contact-cancel">ביטול</button><button class="btn btn-primary" id="strategic-contact-save">שמור</button></div></div>';
+  document.body.appendChild(overlay);
+  function close() { overlay.remove(); }
+  document.getElementById('strategic-contact-close').onclick = close;
+  document.getElementById('strategic-contact-cancel').onclick = close;
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) close(); });
+
+  function renderForm(item) {
+    item = item || { category: 'other', status: 'new', priority: 'normal', preferred_channel: '', active: 1 };
+    var body = document.getElementById('strategic-contact-modal-body');
+    body.innerHTML = '<div class="strategic-contact-form-grid">' +
+      strategicContactInput('organization_name', 'שם ארגון', item.organization_name, 'text') +
+      strategicContactInput('contact_person_name', 'שם איש קשר', item.contact_person_name, 'text') +
+      strategicContactInput('role_title', 'תפקיד', item.role_title, 'text') +
+      strategicContactSelect('category', 'קטגוריה', item.category || 'other', strategicContactCategoryOptions) +
+      strategicContactSelect('status', 'סטטוס', item.status || 'new', strategicContactStatusOptions) +
+      strategicContactSelect('priority', 'עדיפות', item.priority || 'normal', strategicContactPriorityOptions) +
+      strategicContactInput('phone', 'טלפון', item.phone, 'tel') +
+      strategicContactInput('whatsapp', 'WhatsApp', item.whatsapp, 'tel') +
+      strategicContactInput('email', 'אימייל', item.email, 'email') +
+      strategicContactInput('website', 'אתר', item.website, 'url') +
+      strategicContactInput('city', 'עיר', item.city, 'text') +
+      strategicContactInput('area', 'אזור', item.area, 'text') +
+      strategicContactSelect('preferred_channel', 'ערוץ מועדף', item.preferred_channel || '', strategicContactChannelOptions) +
+      strategicContactInput('source', 'מקור', item.source, 'text') +
+      strategicContactInput('tags', 'תגיות', item.tags, 'text') +
+      strategicContactInput('last_contact_at', 'קשר אחרון', item.last_contact_at, 'date') +
+      strategicContactInput('next_contact_at', 'קשר הבא', item.next_contact_at, 'date') +
+      strategicContactSelect('active', 'פעיל', String(item.active) === '0' ? '0' : '1', [['1','פעיל'],['0','לא פעיל']]) +
+    '</div><div class="strategic-contact-form-grid single" style="margin-top:12px">' +
+      strategicContactInput('followup_reason', 'סיבת מעקב', item.followup_reason, 'text') +
+      strategicContactTextarea('notes', 'הערות', item.notes) +
+    '</div>';
+  }
+
+  function collectPayload() {
+    var payload = {};
+    overlay.querySelectorAll('.strategic-contact-field').forEach(function(input) {
+      payload[input.getAttribute('data-strategic-contact-field')] = input.value;
+    });
+    if (!payload.organization_name || !payload.organization_name.trim()) throw new Error('שם ארגון חובה');
+    payload.active = payload.active === '0' ? 0 : 1;
+    return payload;
+  }
+
+  document.getElementById('strategic-contact-save').onclick = function() {
+    var payload;
+    try { payload = collectPayload(); } catch (err) { toast(err.message, 'error'); return; }
+    apiCall(isEdit ? 'PUT' : 'POST', '/api/strategic-contacts' + (isEdit ? '/' + id : ''), payload).then(function() {
+      toast('הקשר האסטרטגי נשמר', 'success');
+      close();
+      loadStrategicContacts();
+    }).catch(function(err) { toast(err.message || 'שגיאה בשמירה', 'error'); });
+  };
+
+  if (isEdit) {
+    apiCall('GET', '/api/strategic-contacts/' + id).then(function(data) {
+      renderForm(data.strategic_contact || {});
+    }).catch(function(err) {
+      document.getElementById('strategic-contact-modal-body').innerHTML = '<div class="dash-empty">שגיאה בטעינת קשר: ' + escapeHtml(err.message || 'שגיאה') + '</div>';
+    });
+  } else {
+    renderForm(null);
+  }
 }
 
 // ---- Customer Cards ----

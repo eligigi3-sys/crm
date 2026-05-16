@@ -10,6 +10,7 @@ import { handleMembers } from './src/members.js';
 import { handleSalesDocuments } from './src/sales-documents.js';
 import { handleTenantBusinessSettings } from './src/tenant-business-settings.js';
 import { handleCustomerBilling, isCustomerBillingRoute } from './src/customer-billing.js';
+import { handleStrategicContacts } from './src/strategic-contacts.js';
 import { serveHTML } from './src/ui.js';
 
 export default {
@@ -52,6 +53,8 @@ export default {
           response = await handleTenantBusinessSettings(request, env, path);
         } else if (path.startsWith('/api/sales-documents')) {
           response = await handleSalesDocuments(request, env, path);
+        } else if (path.startsWith('/api/strategic-contacts')) {
+          response = await handleStrategicContacts(request, env, path);
         } else if (path.startsWith('/api/dashboard')) {
           response = await handleDashboard(request, env, path);
         } else if (path.startsWith('/api/leads') || path.startsWith('/api/lead-employees')) {

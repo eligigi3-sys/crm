@@ -7,7 +7,8 @@ const MODULE_KEYS = [
   'employees',
   'products',
   'shopping',
-  'reports'
+  'reports',
+  'strategic_contacts'
 ];
 const MODULE_KEY_SET = new Set(MODULE_KEYS);
 const AUDIT_ACTIONS = new Set([

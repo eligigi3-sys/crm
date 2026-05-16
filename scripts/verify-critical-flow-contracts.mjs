@@ -220,9 +220,49 @@ function verifyShopping(results) {
   ], 'shopping product sync is owner/admin-only and tenant-scoped', results);
 }
 
+function verifyStrategicContacts(results) {
+  const strategic = read('src/strategic-contacts.js');
+  const auth = read('src/auth.js');
+  const admin = read('src/admin.js');
+  const worker = read('worker.js');
+  const ui = read('src/ui.js');
+
+  expect(auth, "'strategic_contacts'", 'auth module allowlist includes strategic_contacts', results);
+  expect(admin, "'strategic_contacts'", 'admin module allowlist includes strategic_contacts', results);
+  expect(worker, "handleStrategicContacts", 'worker routes strategic contacts handler', results);
+  expect(ui, 'nav-strategic-contacts', 'UI includes strategic contacts navigation', results);
+  expect(ui, 'page-strategic-contacts', 'UI includes strategic contacts page', results);
+
+  expectInBlock(strategic, 'export async function handleStrategicContacts', ['return json({ error: \'Strategic contacts route not found\' }, 404);'], [
+    'requireTenantContext(request, env)',
+    "assertTenantModuleEnabled(tenantCtx, env, 'strategic_contacts')",
+    "path === '/api/strategic-contacts' && method === 'GET'",
+    "path === '/api/strategic-contacts' && method === 'POST'",
+    "assertTenantRole(tenantCtx, ['owner', 'admin', 'manager'])",
+    "path.match(/^\\/api\\/strategic-contacts\\/(\\d+)$/)"
+  ], 'strategic contacts routes require tenant context, module guard, and write RBAC', results);
+
+  expectInBlock(strategic, 'async function getStrategicContactForTenant', ['async function listStrategicContacts'], [
+    'WHERE id = ? AND tenant_id = ?'
+  ], 'strategic contacts id lookup is tenant-scoped', results);
+
+  expectInBlock(strategic, 'async function listStrategicContacts', ['async function createStrategicContact'], [
+    'WHERE tenant_id = ?',
+    'category = ?',
+    'status = ?',
+    'priority = ?',
+    'active = 1'
+  ], 'strategic contacts list is tenant-scoped and filterable', results);
+
+  expectInBlock(strategic, 'async function updateStrategicContact', ['export async function handleStrategicContacts'], [
+    'getStrategicContactForTenant(env, tenantId, id)',
+    'WHERE id = ? AND tenant_id = ?'
+  ], 'strategic contacts update is tenant-scoped', results);
+}
+
 function verifyRoleEnforcement(results) {
   const auth = read('src/auth.js');
-  const roleFiles = ['src/contacts.js', 'src/employees.js', 'src/leads.js', 'src/members.js', 'src/products.js', 'src/shopping.js'];
+  const roleFiles = ['src/contacts.js', 'src/employees.js', 'src/leads.js', 'src/members.js', 'src/products.js', 'src/shopping.js', 'src/strategic-contacts.js'];
 
   expectInBlock(auth, 'const TENANT_ROLE_HIERARCHY = {', ['};'], [
     'employee: 1',
@@ -249,6 +289,7 @@ function main() {
   verifyAuth(results);
   verifyAdmin(results);
   verifyShopping(results);
+  verifyStrategicContacts(results);
   verifyRoleEnforcement(results);
 
   console.log(`Critical flow contract verification: PASS (${results.length} checks)`);
