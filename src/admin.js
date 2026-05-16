@@ -1,5 +1,6 @@
 import { requireSuperAdmin } from './auth.js';
 import { hashPassword } from './passwords.js';
+import { handleAdminCleanup } from './cleanup.js';
 
 const MODULE_KEYS = [
   'leads',
@@ -17,7 +18,8 @@ const AUDIT_ACTIONS = new Set([
   'tenant_activate',
   'tenant_suspend',
   'tenant_modules_update',
-  'tenant_owner_password_reset'
+  'tenant_owner_password_reset',
+  'cleanup_hard_delete'
 ]);
 
 function normalizeOptionalText(value) {
@@ -307,6 +309,10 @@ export async function handleAdmin(request, env, path) {
   const method = request.method;
   const superAdminCtx = await requireSuperAdmin(request, env);
   if (superAdminCtx instanceof Response) return superAdminCtx;
+
+  if (path.startsWith('/api/admin/cleanup')) {
+    return handleAdminCleanup(request, env, path, superAdminCtx);
+  }
 
   if (path === '/api/admin/tenants' && method === 'GET') {
     const result = await env.DB.prepare(`

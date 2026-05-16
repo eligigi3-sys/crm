@@ -1771,6 +1771,19 @@ id="customers-search">
           <tbody id="super-admin-tenants-body"><tr class="empty-row"><td colspan="6">טוען...</td></tr></tbody>
         </table>
       </div>
+      <div class="table-card" style="margin-top:16px">
+        <div class="super-admin-summary">
+          <div>
+            <div class="super-admin-summary-title">כלי ניקוי מערכת</div>
+            <div class="super-admin-summary-sub">מחיקה קשיחה מותרת רק למועמדים נמוכי סיכון שעברו בדיקת תלותים וחסימות.</div>
+          </div>
+          <button class="btn btn-secondary" id="super-admin-refresh-cleanup">רענן מועמדים</button>
+        </div>
+        <table>
+          <thead><tr><th>סוג</th><th>רשומה</th><th>סיבה</th><th>תלויות</th><th>סטטוס</th><th></th></tr></thead>
+          <tbody id="super-admin-cleanup-body"><tr class="empty-row"><td colspan="6">טוען...</td></tr></tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
@@ -2400,6 +2413,8 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   if (superAdminModal) superAdminModal.addEventListener('click', function(e) { if (e.target === this) closeSuperAdminTenantModal(); });
   var superAdminCreateBtn = document.getElementById('super-admin-create-btn');
   if (superAdminCreateBtn) superAdminCreateBtn.addEventListener('click', createTenantFromSuperAdmin);
+  var superAdminRefreshCleanup = document.getElementById('super-admin-refresh-cleanup');
+  if (superAdminRefreshCleanup) superAdminRefreshCleanup.addEventListener('click', loadSuperAdminCleanupCandidates);
 
   if (token && currentUser) showApp();
 }
@@ -2450,7 +2465,7 @@ function goTo(page, el) {
   if (page === 'team') loadTeamMembers();
   if (page === 'products') loadProducts();
   if (page === 'archive') loadEventArchive();
-  if (page === 'super-admin') loadSuperAdminTenants();
+  if (page === 'super-admin') { loadSuperAdminTenants(); loadSuperAdminCleanupCandidates(); }
 }
 
 function resetSessionState() {
@@ -3099,6 +3114,65 @@ function loadSuperAdminTenants() {
     });
   }).catch(function(err) {
     body.innerHTML = '<tr class="empty-row"><td colspan="6">' + escapeHtml(err.message || 'שגיאה בטעינת עסקים') + '</td></tr>';
+  });
+}
+
+function formatCleanupDependencies(deps) {
+  deps = deps || [];
+  if (!deps.length) return 'אין';
+  return deps.map(function(dep) {
+    var ids = (dep.ids || []).slice(0, 6).join(',');
+    return dep.table + '=' + dep.count + (ids ? ' #' + ids : '');
+  }).join(' · ');
+}
+
+function loadSuperAdminCleanupCandidates() {
+  var body = document.getElementById('super-admin-cleanup-body');
+  if (!body) return;
+  body.innerHTML = '<tr class="empty-row"><td colspan="6">טוען מועמדים...</td></tr>';
+  apiCall('GET', '/api/admin/cleanup/candidates').then(function(data) {
+    var candidates = data.candidates || [];
+    if (!candidates.length) {
+      body.innerHTML = '<tr class="empty-row"><td colspan="6">אין מועמדים לניקוי</td></tr>';
+      return;
+    }
+    body.innerHTML = candidates.map(function(c) {
+      var status = c.allowed ? '<span class="badge badge-green">מותר</span>' : '<span class="badge badge-red">חסום</span>';
+      var action = c.allowed ? '<button class="btn btn-danger btn-sm" data-cleanup-delete="' + escapeHtml(c.type + ':' + c.id) + '">מחק</button>' : '';
+      return '<tr>' +
+        '<td>' + escapeHtml(c.type || '—') + '</td>' +
+        '<td><strong>' + escapeHtml(c.label || ('#' + c.id)) + '</strong><div class="text-muted">tenant ' + escapeHtml(c.tenant_id || '—') + ' · id ' + escapeHtml(c.id || '—') + '</div></td>' +
+        '<td>' + escapeHtml(c.allowed ? (c.reason || '—') : (c.blocked_reason || c.reason || 'חסום')) + '</td>' +
+        '<td style="max-width:320px;white-space:normal">' + escapeHtml(formatCleanupDependencies(c.dependencies)) + '</td>' +
+        '<td>' + status + '</td>' +
+        '<td>' + action + '</td>' +
+      '</tr>';
+    }).join('');
+    body.querySelectorAll('[data-cleanup-delete]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var parts = String(this.getAttribute('data-cleanup-delete') || '').split(':');
+        deleteCleanupCandidate(parts[0], Number(parts[1]));
+      });
+    });
+  }).catch(function(err) {
+    body.innerHTML = '<tr class="empty-row"><td colspan="6">' + escapeHtml(err.message || 'שגיאה בטעינת מועמדים') + '</td></tr>';
+  });
+}
+
+function deleteCleanupCandidate(type, id) {
+  var confirmation = window.prompt('להקליד DELETE כדי למחוק קשיח את המועמד');
+  if (confirmation === null) return;
+  if (confirmation !== 'DELETE') {
+    toast('אישור לא תואם — המחיקה בוטלה', 'error');
+    return;
+  }
+  apiCall('POST', '/api/admin/cleanup/delete', { type: type, id: id, confirmation: confirmation }).then(function() {
+    toast('המועמד נמחק ונרשם ב-audit', 'success');
+    loadSuperAdminCleanupCandidates();
+    loadSuperAdminTenants();
+  }).catch(function(err) {
+    toast(err.message || 'המחיקה נחסמה', 'error');
+    loadSuperAdminCleanupCandidates();
   });
 }
 
