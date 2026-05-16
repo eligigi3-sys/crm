@@ -1835,6 +1835,8 @@ id="customers-search">
           <label class="module-toggle checked"><input type="checkbox" data-module-key="products" checked><span class="module-toggle-text"><span class="module-toggle-title">מוצרים ומלאי</span><span class="module-toggle-status">פעיל</span></span><span class="module-toggle-pill">ON</span></label>
           <label class="module-toggle checked"><input type="checkbox" data-module-key="shopping" checked><span class="module-toggle-text"><span class="module-toggle-title">קניות / רכישות</span><span class="module-toggle-status">פעיל</span></span><span class="module-toggle-pill">ON</span></label>
           <label class="module-toggle checked"><input type="checkbox" data-module-key="reports" checked><span class="module-toggle-text"><span class="module-toggle-title">דוחות</span><span class="module-toggle-status">פעיל</span></span><span class="module-toggle-pill">ON</span></label>
+          <label class="module-toggle checked"><input type="checkbox" data-module-key="sales_documents" checked><span class="module-toggle-text"><span class="module-toggle-title">מסמכי מכירה</span><span class="module-toggle-status">פעיל</span></span><span class="module-toggle-pill">ON</span></label>
+          <label class="module-toggle checked"><input type="checkbox" data-module-key="strategic_contacts" checked><span class="module-toggle-text"><span class="module-toggle-title">קשרים אסטרטגיים</span><span class="module-toggle-status">פעיל</span></span><span class="module-toggle-pill">ON</span></label>
         </div>
       </div>
     </div>
@@ -2108,6 +2110,36 @@ function isModuleEnabled(moduleKey) {
   return !item || item.is_enabled !== false;
 }
 
+function getModuleSortOrder(moduleKey, fallback) {
+  var item = moduleStateCache && moduleStateCache.byKey ? moduleStateCache.byKey[moduleKey] : null;
+  return item && item.sort_order !== undefined && item.sort_order !== null ? Number(item.sort_order) : fallback;
+}
+
+function applySidebarModuleOrder() {
+  var orderedNav = [
+    { module_key: 'contacts', ids: ['nav-leads'], fallback: 20 },
+    { module_key: 'employees', ids: ['nav-employees', 'nav-team'], fallback: 30 },
+    { module_key: 'products', ids: ['nav-products'], fallback: 40 },
+    { module_key: 'shopping', ids: ['nav-shopping'], fallback: 50 },
+    { module_key: 'sales_documents', ids: ['nav-sales-documents'], fallback: 70 },
+    { module_key: 'strategic_contacts', ids: ['nav-strategic-contacts'], fallback: 80 },
+    { module_key: 'leads', ids: ['nav-calendar', 'nav-archive'], fallback: 90 }
+  ];
+  var dashboard = document.getElementById('nav-dashboard');
+  if (dashboard) dashboard.style.order = 10;
+  var businessSettings = document.getElementById('nav-business-settings');
+  if (businessSettings) businessSettings.style.order = 95;
+  orderedNav.forEach(function(item) {
+    var order = 20 + getModuleSortOrder(item.module_key, item.fallback) * 10;
+    item.ids.forEach(function(id, idx) {
+      var el = document.getElementById(id);
+      if (el) el.style.order = order + idx;
+    });
+  });
+  var superAdmin = document.getElementById('nav-super-admin');
+  if (superAdmin) superAdmin.style.order = 120;
+}
+
 function renderModuleDisabledPage(page, moduleKey) {
   var map = {
     leads: { bodyId: 'leads-body', colspan: 10 },
@@ -2176,6 +2208,7 @@ function applyModuleVisibility() {
   if (lowStockSummary) lowStockSummary.style.display = isModuleEnabled('reports') ? 'block' : 'none';
   var operationalWidgets = document.getElementById('products-operational-widgets');
   if (operationalWidgets) operationalWidgets.style.display = isModuleEnabled('reports') ? 'block' : 'none';
+  applySidebarModuleOrder();
 }
 
 function getShellMode() {
@@ -2245,14 +2278,14 @@ function loadModuleStates() {
   moduleStateCache.loaded = false;
   return apiCall('GET', '/api/auth/modules').then(function(data) {
     var next = {
-      leads: { is_enabled: true, source: 'default_enabled' },
-      contacts: { is_enabled: true, source: 'default_enabled' },
-      employees: { is_enabled: true, source: 'default_enabled' },
-      products: { is_enabled: true, source: 'default_enabled' },
-      shopping: { is_enabled: true, source: 'default_enabled' },
-      reports: { is_enabled: true, source: 'default_enabled' },
-      sales_documents: { is_enabled: true, source: 'default_enabled' },
-      strategic_contacts: { is_enabled: true, source: 'default_enabled' }
+      leads: { is_enabled: true, sort_order: 1, source: 'default_enabled' },
+      contacts: { is_enabled: true, sort_order: 2, source: 'default_enabled' },
+      employees: { is_enabled: true, sort_order: 3, source: 'default_enabled' },
+      products: { is_enabled: true, sort_order: 4, source: 'default_enabled' },
+      shopping: { is_enabled: true, sort_order: 5, source: 'default_enabled' },
+      reports: { is_enabled: true, sort_order: 6, source: 'default_enabled' },
+      sales_documents: { is_enabled: true, sort_order: 7, source: 'default_enabled' },
+      strategic_contacts: { is_enabled: true, sort_order: 8, source: 'default_enabled' }
     };
     (data.modules || []).forEach(function(module) {
       if (next[module.module_key]) next[module.module_key] = module;
@@ -2496,14 +2529,14 @@ function resetSessionState() {
   moduleStateCache = {
     loaded: false,
     byKey: {
-      leads: { is_enabled: true, source: 'default_enabled' },
-      contacts: { is_enabled: true, source: 'default_enabled' },
-      employees: { is_enabled: true, source: 'default_enabled' },
-      products: { is_enabled: true, source: 'default_enabled' },
-      shopping: { is_enabled: true, source: 'default_enabled' },
-      reports: { is_enabled: true, source: 'default_enabled' },
-      sales_documents: { is_enabled: true, source: 'default_enabled' },
-      strategic_contacts: { is_enabled: true, source: 'default_enabled' }
+      leads: { is_enabled: true, sort_order: 1, source: 'default_enabled' },
+      contacts: { is_enabled: true, sort_order: 2, source: 'default_enabled' },
+      employees: { is_enabled: true, sort_order: 3, source: 'default_enabled' },
+      products: { is_enabled: true, sort_order: 4, source: 'default_enabled' },
+      shopping: { is_enabled: true, sort_order: 5, source: 'default_enabled' },
+      reports: { is_enabled: true, sort_order: 6, source: 'default_enabled' },
+      sales_documents: { is_enabled: true, sort_order: 7, source: 'default_enabled' },
+      strategic_contacts: { is_enabled: true, sort_order: 8, source: 'default_enabled' }
     }
   };
 }
@@ -3314,6 +3347,7 @@ function getAdminModuleLabel(moduleKey) {
     products: 'מוצרים ומלאי',
     shopping: 'קניות / רכישות',
     reports: 'דוחות',
+    sales_documents: 'מסמכי מכירה',
     strategic_contacts: 'קשרים אסטרטגיים'
   };
   return map[moduleKey] || moduleKey;
@@ -3353,12 +3387,14 @@ function saveSuperAdminTenantDetails(tenantId) {
 }
 
 function saveSuperAdminTenantModules(tenantId) {
-  var moduleInputs = Array.prototype.slice.call(document.querySelectorAll('#super-admin-tenant-modules-form input[data-module-key]'));
+  var moduleRows = Array.prototype.slice.call(document.querySelectorAll('#super-admin-tenant-modules-form .super-admin-module-row'));
   var body = {
-    modules: moduleInputs.map(function(input) {
+    modules: moduleRows.map(function(row, index) {
+      var input = row.querySelector('input[data-module-key]');
       return {
         module_key: input.getAttribute('data-module-key'),
-        is_enabled: !!input.checked
+        is_enabled: !!input.checked,
+        sort_order: index + 1
       };
     })
   };
@@ -3383,6 +3419,24 @@ function resetSuperAdminTenantOwnerPassword(tenantId) {
     openSuperAdminTenantModal(tenantId);
   }).catch(function(err) {
     toast(err.message || 'שגיאה באיפוס סיסמת בעלים', 'error');
+  });
+}
+
+function bindSuperAdminModuleOrdering(container) {
+  if (!container) return;
+  container.querySelectorAll('[data-module-move]').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      var row = this.closest('.super-admin-module-row');
+      if (!row) return;
+      var direction = this.getAttribute('data-module-move');
+      if (direction === 'up' && row.previousElementSibling) {
+        container.insertBefore(row, row.previousElementSibling);
+      }
+      if (direction === 'down' && row.nextElementSibling) {
+        container.insertBefore(row.nextElementSibling, row);
+      }
+    });
   });
 }
 
@@ -3443,12 +3497,15 @@ function openSuperAdminTenantModal(tenantId) {
       '</div>' +
       '<div class="super-admin-section">' +
         '<div class="super-admin-section-header">' +
-          '<div><div class="super-admin-section-title">מודולים</div><div class="super-admin-section-sub">הפעל או השבת מודולים באופן מיידי עבור העסק.</div></div>' +
+          '<div><div class="super-admin-section-title">מודולים וסדר תפריט</div><div class="super-admin-section-sub">הפעל/השבת מודולים ושנה את סדר הופעתם בסרגל הצד של העסק.</div></div>' +
         '</div>' +
-        '<div class="check-grid" id="super-admin-tenant-modules-form">' + modules.map(function(module) {
-        return '<label class="module-toggle' + (module.is_enabled ? ' checked' : '') + '"><input type="checkbox" data-module-key="' + escapeHtml(module.module_key) + '"' + (module.is_enabled ? ' checked' : '') + '><span class="module-toggle-text"><span class="module-toggle-title">' + escapeHtml(getAdminModuleLabel(module.module_key)) + '</span><span class="module-toggle-status">' + (module.is_enabled ? 'פעיל' : 'כבוי') + '</span></span><span class="module-toggle-pill">' + (module.is_enabled ? 'ON' : 'OFF') + '</span></label>';
+        '<div class="admin-module-grid" id="super-admin-tenant-modules-form">' + modules.map(function(module) {
+        return '<div class="admin-module-card super-admin-module-row" data-module-key="' + escapeHtml(module.module_key) + '">' +
+          '<label class="module-toggle' + (module.is_enabled ? ' checked' : '') + '"><input type="checkbox" data-module-key="' + escapeHtml(module.module_key) + '"' + (module.is_enabled ? ' checked' : '') + '><span class="module-toggle-text"><span class="module-toggle-title">' + escapeHtml(getAdminModuleLabel(module.module_key)) + '</span><span class="module-toggle-status">' + (module.is_enabled ? 'פעיל' : 'כבוי') + '</span></span><span class="module-toggle-pill">' + (module.is_enabled ? 'ON' : 'OFF') + '</span></label>' +
+          '<div class="super-admin-action-row" style="margin-top:8px"><button class="btn btn-secondary btn-sm" data-module-move="up">↑</button><button class="btn btn-secondary btn-sm" data-module-move="down">↓</button></div>' +
+        '</div>';
       }).join('') + '</div>' +
-        '<div class="super-admin-action-row"><button class="btn btn-primary super-admin-primary-action" id="super-admin-save-modules">שמור מודולים</button></div>' +
+        '<div class="super-admin-action-row"><button class="btn btn-primary super-admin-primary-action" id="super-admin-save-modules">שמור מודולים וסדר</button></div>' +
       '</div>' +
       '<div class="super-admin-section" style="margin-bottom:0">' +
         '<div class="super-admin-section-header">' +
@@ -3473,6 +3530,7 @@ function openSuperAdminTenantModal(tenantId) {
     var resetOwnerPasswordBtn = document.getElementById('super-admin-reset-owner-password');
     if (resetOwnerPasswordBtn) resetOwnerPasswordBtn.onclick = function() { resetSuperAdminTenantOwnerPassword(tenantId); };
     bindModuleToggleGroup(document.getElementById('super-admin-tenant-modules-form'));
+    bindSuperAdminModuleOrdering(document.getElementById('super-admin-tenant-modules-form'));
   }).catch(function(err) {
     body.innerHTML = '<div class="super-admin-audit-empty">' + escapeHtml(err.message || 'שגיאה בטעינת העסק') + '</div>';
   });

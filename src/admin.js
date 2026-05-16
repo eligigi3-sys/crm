@@ -9,6 +9,7 @@ const MODULE_KEYS = [
   'products',
   'shopping',
   'reports',
+  'sales_documents',
   'strategic_contacts'
 ];
 const MODULE_KEY_SET = new Set(MODULE_KEYS);
@@ -119,20 +120,28 @@ function normalizeModuleEnabled(value) {
   throw new Error('is_enabled לא תקין');
 }
 
+function normalizeModuleSortOrder(value, fallback) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const order = Number(value);
+  if (!Number.isInteger(order) || order < 0 || order > 1000) throw new Error('sort_order לא תקין');
+  return order;
+}
+
 function normalizeModulesPayload(modules) {
   if (!Array.isArray(modules) || modules.length !== MODULE_KEYS.length) {
     throw new Error('בחירת מודולים לא תקינה');
   }
 
   const seen = new Set();
-  const normalized = modules.map(function(item) {
+  const normalized = modules.map(function(item, index) {
     if (!item || typeof item !== 'object') throw new Error('בחירת מודולים לא תקינה');
     const moduleKey = normalizeModuleKey(item.module_key);
     if (seen.has(moduleKey)) throw new Error('module_key כפול בבקשה');
     seen.add(moduleKey);
     return {
       module_key: moduleKey,
-      is_enabled: normalizeModuleEnabled(item.is_enabled)
+      is_enabled: normalizeModuleEnabled(item.is_enabled),
+      sort_order: normalizeModuleSortOrder(item.sort_order, index + 1)
     };
   });
 
@@ -140,8 +149,14 @@ function normalizeModulesPayload(modules) {
     throw new Error('חסרים מודולים בבקשה');
   }
 
-  return MODULE_KEYS.map(function(moduleKey) {
-    return normalized.find(function(item) { return item.module_key === moduleKey; });
+  const byKey = new Map(normalized.map(function(item) { return [item.module_key, item]; }));
+  return MODULE_KEYS.map(function(moduleKey, index) {
+    const item = byKey.get(moduleKey);
+    return {
+      module_key: moduleKey,
+      is_enabled: item.is_enabled,
+      sort_order: item.sort_order || (index + 1)
+    };
   });
 }
 
@@ -245,7 +260,7 @@ async function getPrimaryOwner(tenantId, env) {
 
 async function getEffectiveTenantModules(tenantId, env) {
   const rows = await env.DB.prepare(`
-    SELECT module_key, is_enabled
+    SELECT module_key, is_enabled, sort_order
     FROM tenant_modules
     WHERE tenant_id = ?
   `).bind(tenantId).all();
@@ -254,13 +269,16 @@ async function getEffectiveTenantModules(tenantId, env) {
     return [row.module_key, row];
   }));
 
-  return MODULE_KEYS.map(function(moduleKey) {
+  return MODULE_KEYS.map(function(moduleKey, index) {
     const row = rowMap.get(moduleKey);
     return {
       module_key: moduleKey,
       is_enabled: row ? Number(row.is_enabled) === 1 : true,
+      sort_order: row && row.sort_order !== null && row.sort_order !== undefined ? Number(row.sort_order) : (index + 1),
       source: row ? 'row' : 'default_enabled'
     };
+  }).sort(function(a, b) {
+    return (a.sort_order - b.sort_order) || MODULE_KEYS.indexOf(a.module_key) - MODULE_KEYS.indexOf(b.module_key);
   });
 }
 
@@ -432,13 +450,15 @@ export async function handleAdmin(request, env, path) {
           tenant_id,
           module_key,
           is_enabled,
+          sort_order,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `).bind(
         tenantId,
         item.module_key,
-        item.is_enabled ? 1 : 0
+        item.is_enabled ? 1 : 0,
+        item.sort_order
       ).run();
     }
 
@@ -610,17 +630,20 @@ export async function handleAdmin(request, env, path) {
           tenant_id,
           module_key,
           is_enabled,
+          sort_order,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ON CONFLICT(tenant_id, module_key)
         DO UPDATE SET
           is_enabled = excluded.is_enabled,
+          sort_order = excluded.sort_order,
           updated_at = CURRENT_TIMESTAMP
       `).bind(
         tenantId,
         item.module_key,
-        item.is_enabled ? 1 : 0
+        item.is_enabled ? 1 : 0,
+        item.sort_order
       ).run();
     }
 
@@ -630,8 +653,8 @@ export async function handleAdmin(request, env, path) {
       id: tenantId,
       slug: tenant.slug
     }, {
-      before: beforeModules.map(function(item) { return { module_key: item.module_key, is_enabled: item.is_enabled }; }),
-      after: updatedModules.map(function(item) { return { module_key: item.module_key, is_enabled: item.is_enabled }; })
+      before: beforeModules.map(function(item) { return { module_key: item.module_key, is_enabled: item.is_enabled, sort_order: item.sort_order }; }),
+      after: updatedModules.map(function(item) { return { module_key: item.module_key, is_enabled: item.is_enabled, sort_order: item.sort_order }; })
     });
     return {
       success: true,

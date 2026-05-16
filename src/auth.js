@@ -26,6 +26,7 @@ const TENANT_MODULE_KEYS = new Set([
   'products',
   'shopping',
   'reports',
+  'sales_documents',
   'strategic_contacts'
 ]);
 
@@ -179,7 +180,7 @@ export async function requireTenantContext(request, env) {
 export async function getTenantModuleState(tenantId, moduleKey, env) {
   const normalizedModuleKey = normalizeTenantModuleKey(moduleKey);
   const row = await env.DB.prepare(
-    `SELECT module_key, is_enabled
+    `SELECT module_key, is_enabled, sort_order
      FROM tenant_modules
      WHERE tenant_id = ?
        AND module_key = ?
@@ -190,6 +191,7 @@ export async function getTenantModuleState(tenantId, moduleKey, env) {
     return {
       module_key: normalizedModuleKey,
       is_enabled: true,
+      sort_order: Array.from(TENANT_MODULE_KEYS).indexOf(normalizedModuleKey) + 1,
       source: 'default_enabled'
     };
   }
@@ -197,6 +199,7 @@ export async function getTenantModuleState(tenantId, moduleKey, env) {
   return {
     module_key: normalizedModuleKey,
     is_enabled: Number(row.is_enabled) === 1,
+    sort_order: row.sort_order !== null && row.sort_order !== undefined ? Number(row.sort_order) : Array.from(TENANT_MODULE_KEYS).indexOf(normalizedModuleKey) + 1,
     source: 'row'
   };
 }
@@ -247,9 +250,12 @@ export async function assertTenantRole(ctx, allowedRoles) {
 }
 
 async function getEffectiveTenantModules(tenantId, env) {
-  return Promise.all(Array.from(TENANT_MODULE_KEYS).map(function(moduleKey) {
+  const modules = await Promise.all(Array.from(TENANT_MODULE_KEYS).map(function(moduleKey) {
     return getTenantModuleState(tenantId, moduleKey, env);
   }));
+  return modules.sort(function(a, b) {
+    return (a.sort_order - b.sort_order) || Array.from(TENANT_MODULE_KEYS).indexOf(a.module_key) - Array.from(TENANT_MODULE_KEYS).indexOf(b.module_key);
+  });
 }
 
 async function updateUserLoginSuccess(userId, env, options = {}) {
