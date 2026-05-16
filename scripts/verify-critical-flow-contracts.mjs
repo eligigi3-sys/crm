@@ -238,6 +238,9 @@ function verifyStrategicContacts(results) {
   expect(ui, '/activities', 'UI calls strategic contact activities API', results);
   expect(ui, 'סמן שפניתי', 'UI includes strategic contact mark contacted action', results);
   expect(ui, '/mark-contacted', 'UI calls strategic contact mark contacted API', results);
+  expect(ui, 'strategic-contacts-follow-up-filter', 'UI includes strategic contacts follow-up filter', results);
+  expect(ui, 'צריך פנייה היום', 'UI includes today follow-up filter option', results);
+  expect(ui, 'לא פניתי מעל 90 יום', 'UI includes dormant follow-up filter option', results);
 
   expectInBlock(strategic, 'export async function handleStrategicContacts', ['return json({ error: \'Strategic contacts route not found\' }, 404);'], [
     'requireTenantContext(request, env)',
@@ -260,8 +263,13 @@ function verifyStrategicContacts(results) {
     'status = ?',
     'priority = ?',
     'linked_contact_id = ?',
+    "next_contact_at = date('now')",
+    "next_contact_at <= date('now', '+7 days')",
+    "next_contact_at < date('now')",
+    "priority = 'high'",
+    "last_contact_at <= date('now', '-90 days')",
     'active = 1'
-  ], 'strategic contacts list is tenant-scoped and filterable including linked contact', results);
+  ], 'strategic contacts list is tenant-scoped and filterable including linked contact and follow-up queue', results);
 
   expectInBlock(strategic, 'async function validateLinkedContactId', ['function mapStrategicContact'], [
     'getContactForTenant(env, tenantId, linkedContactId)',

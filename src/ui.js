@@ -1597,6 +1597,7 @@ id="customers-search">
           <select class="filter-select" id="strategic-contacts-category-filter"><option value="">כל הקטגוריות</option></select>
           <select class="filter-select" id="strategic-contacts-status-filter"><option value="">כל הסטטוסים</option></select>
           <select class="filter-select" id="strategic-contacts-priority-filter"><option value="">כל העדיפויות</option></select>
+          <select class="filter-select" id="strategic-contacts-follow-up-filter"><option value="">כל המעקבים</option></select>
         </div>
         <div id="strategic-contacts-grid" style="padding:16px"><div class="dash-empty">טוען...</div></div>
       </div>
@@ -2293,7 +2294,7 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   if (navSuperAdmin) navSuperAdmin.addEventListener('click', function() { goTo('super-admin', this); });
   var strategicContactsSearch = document.getElementById('strategic-contacts-search');
   if (strategicContactsSearch) strategicContactsSearch.addEventListener('input', function() { clearTimeout(searchTimer); searchTimer = setTimeout(loadStrategicContacts, 300); });
-  ['strategic-contacts-category-filter','strategic-contacts-status-filter','strategic-contacts-priority-filter'].forEach(function(id) { var el = document.getElementById(id); if (el) el.addEventListener('change', loadStrategicContacts); });
+  ['strategic-contacts-category-filter','strategic-contacts-status-filter','strategic-contacts-priority-filter','strategic-contacts-follow-up-filter'].forEach(function(id) { var el = document.getElementById(id); if (el) el.addEventListener('change', loadStrategicContacts); });
   var newStrategicContact = document.getElementById('btn-new-strategic-contact');
   if (newStrategicContact) newStrategicContact.addEventListener('click', function() { openStrategicContactModal(); });
   var salesDocumentsSearch = document.getElementById('sales-documents-search');
@@ -5781,6 +5782,13 @@ var strategicContactActivityTypeOptions = [
   ['followup', 'מעקב'],
   ['other', 'אחר']
 ];
+var strategicContactFollowUpFilterOptions = [
+  ['today', 'צריך פנייה היום'],
+  ['week', 'צריך פנייה השבוע'],
+  ['overdue', 'עבר תאריך פנייה'],
+  ['high_priority', 'עדיפות גבוהה'],
+  ['dormant_90', 'לא פניתי מעל 90 יום']
+];
 
 function getStrategicContactOptionLabel(options, value) {
   var found = options.find(function(item) { return item[0] === value; });
@@ -5798,9 +5806,11 @@ function setupStrategicContactFilters() {
   var category = document.getElementById('strategic-contacts-category-filter');
   var status = document.getElementById('strategic-contacts-status-filter');
   var priority = document.getElementById('strategic-contacts-priority-filter');
+  var followUp = document.getElementById('strategic-contacts-follow-up-filter');
   if (category && category.options.length <= 1) category.innerHTML = renderStrategicContactOptions(strategicContactCategoryOptions, '', 'כל הקטגוריות');
   if (status && status.options.length <= 1) status.innerHTML = renderStrategicContactOptions(strategicContactStatusOptions, '', 'כל הסטטוסים');
   if (priority && priority.options.length <= 1) priority.innerHTML = renderStrategicContactOptions(strategicContactPriorityOptions, '', 'כל העדיפויות');
+  if (followUp && followUp.options.length <= 1) followUp.innerHTML = renderStrategicContactOptions(strategicContactFollowUpFilterOptions, '', 'כל המעקבים');
 }
 
 function buildStrategicContactsQuery() {
@@ -5809,10 +5819,12 @@ function buildStrategicContactsQuery() {
   var category = document.getElementById('strategic-contacts-category-filter');
   var status = document.getElementById('strategic-contacts-status-filter');
   var priority = document.getElementById('strategic-contacts-priority-filter');
+  var followUp = document.getElementById('strategic-contacts-follow-up-filter');
   if (search && search.value.trim()) params.set('search', search.value.trim());
   if (category && category.value) params.set('category', category.value);
   if (status && status.value) params.set('status', status.value);
   if (priority && priority.value) params.set('priority', priority.value);
+  if (followUp && followUp.value) params.set('follow_up', followUp.value);
   var query = params.toString();
   return query ? '?' + query : '';
 }

@@ -35,6 +35,7 @@ const STATUS_VALUES = new Set(['new', 'need_first_contact', 'contacted', 'in_con
 const PRIORITY_VALUES = new Set(['low', 'normal', 'high']);
 const CHANNEL_VALUES = new Set(['', 'phone', 'whatsapp', 'email', 'meeting', 'other']);
 const ACTIVITY_TYPE_VALUES = new Set(['note', 'call', 'whatsapp', 'email', 'meeting', 'followup', 'other']);
+const FOLLOW_UP_FILTER_VALUES = new Set(['today', 'week', 'overdue', 'high_priority', 'dormant_90']);
 
 function normalizeEnum(value, allowed, fallback, label) {
   const text = String(value === undefined || value === null ? fallback : value).trim();
@@ -179,6 +180,7 @@ async function listStrategicContacts(request, env, tenantId) {
   const priority = normalizeOptionalText(url.searchParams.get('priority'));
   const active = normalizeOptionalText(url.searchParams.get('active'));
   const linkedContactId = normalizeOptionalPositiveInteger(url.searchParams.get('linked_contact_id'), 'לקוח מקושר');
+  const followUp = normalizeOptionalText(url.searchParams.get('follow_up'));
   const due = normalizeOptionalText(url.searchParams.get('next_contact_due')) || normalizeOptionalText(url.searchParams.get('overdue'));
 
   let sql = 'SELECT * FROM strategic_contacts WHERE tenant_id = ?';
@@ -228,6 +230,21 @@ async function listStrategicContacts(request, env, tenantId) {
   } else if (active !== 'all') {
     sql += ' AND active = ?';
     params.push(normalizeActive(active));
+  }
+
+  if (followUp) {
+    if (!FOLLOW_UP_FILTER_VALUES.has(followUp)) return json({ error: 'מסנן מעקב לא תקין' }, 400);
+    if (followUp === 'today') {
+      sql += " AND next_contact_at = date('now')";
+    } else if (followUp === 'week') {
+      sql += " AND next_contact_at IS NOT NULL AND next_contact_at >= date('now') AND next_contact_at <= date('now', '+7 days')";
+    } else if (followUp === 'overdue') {
+      sql += " AND next_contact_at IS NOT NULL AND next_contact_at < date('now')";
+    } else if (followUp === 'high_priority') {
+      sql += " AND priority = 'high'";
+    } else if (followUp === 'dormant_90') {
+      sql += " AND (status = 'dormant' OR last_contact_at IS NULL OR last_contact_at <= date('now', '-90 days'))";
+    }
   }
 
   if (due === '1' || due === 'true') {
