@@ -1775,12 +1775,25 @@ id="customers-search">
         <div class="super-admin-summary">
           <div>
             <div class="super-admin-summary-title">כלי ניקוי מערכת</div>
-            <div class="super-admin-summary-sub">מחיקה קשיחה מותרת רק למועמדים נמוכי סיכון שעברו בדיקת תלותים וחסימות.</div>
+            <div class="super-admin-summary-sub">מחיקה מלאה — לא ניתן לשחזר. פעולות מוצגות רק אחרי בדיקת תלותים וחסימות.</div>
           </div>
-          <button class="btn btn-secondary" id="super-admin-refresh-cleanup">רענן מועמדים</button>
+          <button class="btn btn-secondary" id="super-admin-refresh-cleanup">רענן</button>
+        </div>
+        <div class="filters-row" style="padding:0 16px 12px">
+          <select class="filter-select" id="super-admin-cleanup-entity">
+            <option value="tenants">Tenants</option>
+            <option value="users">Users / Employees</option>
+            <option value="contacts">Customers</option>
+            <option value="products">Products</option>
+            <option value="strategic_contacts">Strategic Contacts</option>
+            <option value="sales_documents">Draft/Test Sales Docs</option>
+            <option value="orphans">Orphans / System leftovers</option>
+            <option value="all">All</option>
+          </select>
+          <input class="filter-input" id="super-admin-cleanup-search" placeholder="חיפוש לפי שם / אימייל / ID">
         </div>
         <table>
-          <thead><tr><th>סוג</th><th>רשומה</th><th>סיבה</th><th>תלויות</th><th>סטטוס</th><th></th></tr></thead>
+          <thead><tr><th>סוג</th><th>רשומה</th><th>סטטוס</th><th>תלויות</th><th>חסימה / סיבה</th><th>פעולות</th></tr></thead>
           <tbody id="super-admin-cleanup-body"><tr class="empty-row"><td colspan="6">טוען...</td></tr></tbody>
         </table>
       </div>
@@ -2415,6 +2428,10 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   if (superAdminCreateBtn) superAdminCreateBtn.addEventListener('click', createTenantFromSuperAdmin);
   var superAdminRefreshCleanup = document.getElementById('super-admin-refresh-cleanup');
   if (superAdminRefreshCleanup) superAdminRefreshCleanup.addEventListener('click', loadSuperAdminCleanupCandidates);
+  var superAdminCleanupEntity = document.getElementById('super-admin-cleanup-entity');
+  if (superAdminCleanupEntity) superAdminCleanupEntity.addEventListener('change', loadSuperAdminCleanupCandidates);
+  var superAdminCleanupSearch = document.getElementById('super-admin-cleanup-search');
+  if (superAdminCleanupSearch) superAdminCleanupSearch.addEventListener('input', function() { clearTimeout(searchTimer); searchTimer = setTimeout(loadSuperAdminCleanupCandidates, 300); });
 
   if (token && currentUser) showApp();
 }
@@ -3126,52 +3143,71 @@ function formatCleanupDependencies(deps) {
   }).join(' · ');
 }
 
+function cleanupActionButtons(c) {
+  var actions = c.actions || [];
+  if (!actions.length) return '<span class="text-muted">אין פעולה</span>';
+  return actions.map(function(a) {
+    var danger = a.action === 'delete';
+    var label = escapeHtml(a.label || a.action);
+    if (!a.allowed) return '<button class="btn btn-secondary btn-sm" disabled title="' + escapeHtml(a.blocked_reason || 'חסום') + '">' + label + '</button>';
+    return '<button class="btn ' + (danger ? 'btn-danger' : 'btn-secondary') + ' btn-sm" data-cleanup-action="' + escapeHtml([c.type, c.id, a.action].join(':')) + '" data-cleanup-name="' + escapeHtml(a.requires_name || '') + '">' + label + '</button>';
+  }).join(' ');
+}
+
 function loadSuperAdminCleanupCandidates() {
   var body = document.getElementById('super-admin-cleanup-body');
   if (!body) return;
-  body.innerHTML = '<tr class="empty-row"><td colspan="6">טוען מועמדים...</td></tr>';
-  apiCall('GET', '/api/admin/cleanup/candidates').then(function(data) {
+  var entity = document.getElementById('super-admin-cleanup-entity');
+  var search = document.getElementById('super-admin-cleanup-search');
+  var path = '/api/admin/cleanup/candidates?entity=' + encodeURIComponent(entity ? entity.value : 'tenants') + '&search=' + encodeURIComponent(search ? search.value || '' : '');
+  body.innerHTML = '<tr class="empty-row"><td colspan="6">טוען רשומות...</td></tr>';
+  apiCall('GET', path).then(function(data) {
     var candidates = data.candidates || [];
     if (!candidates.length) {
-      body.innerHTML = '<tr class="empty-row"><td colspan="6">אין מועמדים לניקוי</td></tr>';
+      body.innerHTML = '<tr class="empty-row"><td colspan="6">אין רשומות להצגה</td></tr>';
       return;
     }
     body.innerHTML = candidates.map(function(c) {
-      var status = c.allowed ? '<span class="badge badge-green">מותר</span>' : '<span class="badge badge-red">חסום</span>';
-      var action = c.allowed ? '<button class="btn btn-danger btn-sm" data-cleanup-delete="' + escapeHtml(c.type + ':' + c.id) + '">מחק</button>' : '';
+      var blocked = c.blocked_reason || c.reason || '—';
       return '<tr>' +
         '<td>' + escapeHtml(c.type || '—') + '</td>' +
         '<td><strong>' + escapeHtml(c.label || ('#' + c.id)) + '</strong><div class="text-muted">tenant ' + escapeHtml(c.tenant_id || '—') + ' · id ' + escapeHtml(c.id || '—') + '</div></td>' +
-        '<td>' + escapeHtml(c.allowed ? (c.reason || '—') : (c.blocked_reason || c.reason || 'חסום')) + '</td>' +
-        '<td style="max-width:320px;white-space:normal">' + escapeHtml(formatCleanupDependencies(c.dependencies)) + '</td>' +
-        '<td>' + status + '</td>' +
-        '<td>' + action + '</td>' +
+        '<td>' + escapeHtml(c.status || '—') + '</td>' +
+        '<td style="max-width:300px;white-space:normal">' + escapeHtml(formatCleanupDependencies(c.dependencies)) + '</td>' +
+        '<td style="max-width:280px;white-space:normal">' + escapeHtml(blocked) + '</td>' +
+        '<td style="min-width:220px">' + cleanupActionButtons(c) + '</td>' +
       '</tr>';
     }).join('');
-    body.querySelectorAll('[data-cleanup-delete]').forEach(function(btn) {
+    body.querySelectorAll('[data-cleanup-action]').forEach(function(btn) {
       btn.addEventListener('click', function() {
-        var parts = String(this.getAttribute('data-cleanup-delete') || '').split(':');
-        deleteCleanupCandidate(parts[0], Number(parts[1]));
+        var parts = String(this.getAttribute('data-cleanup-action') || '').split(':');
+        runCleanupAction(parts[0], Number(parts[1]), parts[2], this.getAttribute('data-cleanup-name') || '');
       });
     });
   }).catch(function(err) {
-    body.innerHTML = '<tr class="empty-row"><td colspan="6">' + escapeHtml(err.message || 'שגיאה בטעינת מועמדים') + '</td></tr>';
+    body.innerHTML = '<tr class="empty-row"><td colspan="6">' + escapeHtml(err.message || 'שגיאה בטעינת רשומות') + '</td></tr>';
   });
 }
 
-function deleteCleanupCandidate(type, id) {
-  var confirmation = window.prompt('להקליד DELETE כדי למחוק קשיח את המועמד');
-  if (confirmation === null) return;
-  if (confirmation !== 'DELETE') {
-    toast('אישור לא תואם — המחיקה בוטלה', 'error');
-    return;
+function runCleanupAction(type, id, action, requiredName) {
+  var body = { type: type, id: id, action: action };
+  if (action === 'delete') {
+    var confirmation = window.prompt('מחיקה מלאה — לא ניתן לשחזר. להקליד DELETE כדי למחוק קשיח');
+    if (confirmation === null) return;
+    if (confirmation !== 'DELETE') { toast('אישור לא תואם — המחיקה בוטלה', 'error'); return; }
+    body.confirmation = confirmation;
+    if (requiredName) {
+      var nameConfirmation = window.prompt('לאישור מחיקת העסק, להקליד את שם העסק בדיוק: ' + requiredName);
+      if (nameConfirmation === null) return;
+      body.name_confirmation = nameConfirmation;
+    }
   }
-  apiCall('POST', '/api/admin/cleanup/delete', { type: type, id: id, confirmation: confirmation }).then(function() {
-    toast('המועמד נמחק ונרשם ב-audit', 'success');
+  apiCall('POST', '/api/admin/cleanup/action', body).then(function() {
+    toast(action === 'delete' ? 'הרשומה נמחקה ונרשמה ב-audit' : 'הפעולה בוצעה ונרשמה ב-audit', 'success');
     loadSuperAdminCleanupCandidates();
     loadSuperAdminTenants();
   }).catch(function(err) {
-    toast(err.message || 'המחיקה נחסמה', 'error');
+    toast(err.message || 'הפעולה נחסמה', 'error');
     loadSuperAdminCleanupCandidates();
   });
 }

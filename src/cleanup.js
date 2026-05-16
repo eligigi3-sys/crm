@@ -1,62 +1,33 @@
 const TEST_MARKERS = [
-  'example.invalid',
-  'test',
-  'temp',
-  'smoke',
-  'validation',
-  'phase',
-  'demo',
-  'johnny',
-  'openclaw',
-  'טסט',
-  'בדיקה',
-  'זמני'
+  'example.invalid', 'test', 'temp', 'smoke', 'validation', 'phase', 'demo', 'johnny', 'openclaw', 'טסט', 'בדיקה', 'זמני'
 ];
 
-const LOW_RISK_TENANT_DELETE_TABLES = [
-  'strategic_contact_attributions',
-  'strategic_contact_activities',
-  'strategic_contacts',
-  'sales_document_counters',
-  'tenant_business_settings',
-  'tenant_modules',
-  'tenant_memberships'
+const LOCKED_SALES_STATUSES = new Set(['issued', 'paid', 'partially_paid', 'void']);
+const TENANT_LOW_RISK_DELETE_TABLES = [
+  'strategic_contact_attributions', 'strategic_contact_activities', 'strategic_contacts',
+  'sales_document_counters', 'tenant_business_settings', 'tenant_modules', 'tenant_memberships'
 ];
-
-const TENANT_BLOCK_TABLES = [
-  'contacts',
-  'contact_notes',
-  'customer_billing_profiles',
-  'customer_addresses',
-  'customer_contact_people',
-  'leads',
-  'lead_notes',
-  'lead_employees',
-  'employees',
-  'products',
-  'product_purchases',
-  'product_stock_movements',
-  'event_product_allocations',
-  'event_inventory_actions',
-  'shopping_lists',
-  'shopping_items',
-  'shopping_purchases',
-  'shopping_purchase_items',
-  'sales_documents',
-  'sales_document_items'
+const TENANT_PROTECTED_TABLES = [
+  'contacts', 'contact_notes', 'customer_billing_profiles', 'customer_addresses', 'customer_contact_people',
+  'leads', 'lead_notes', 'lead_employees', 'employees', 'products', 'product_purchases', 'product_stock_movements',
+  'event_product_allocations', 'event_inventory_actions', 'shopping_lists', 'shopping_items', 'shopping_purchases',
+  'shopping_purchase_items', 'sales_documents', 'sales_document_items'
 ];
 
 function safeJsonStringify(value) {
-  try {
-    return JSON.stringify(value || {});
-  } catch {
-    return JSON.stringify({ error: 'details_json_serialize_failed' });
-  }
+  try { return JSON.stringify(value || {}); } catch { return JSON.stringify({ error: 'details_json_serialize_failed' }); }
 }
 
 function hasTestMarker(values) {
   const text = values.map(function(value) { return String(value || '').toLowerCase(); }).join(' ');
   return TEST_MARKERS.some(function(marker) { return text.includes(marker); });
+}
+
+function textLike(row, fields, search) {
+  if (!search) return true;
+  const needle = String(search || '').trim().toLowerCase();
+  if (!needle) return true;
+  return fields.some(function(field) { return String(row[field] || '').toLowerCase().includes(needle); });
 }
 
 function formatIds(rows) {
@@ -68,361 +39,504 @@ async function countRows(env, tableName, whereSql, binds) {
   return Number(row && row.count ? row.count : 0);
 }
 
-async function listIds(env, tableName, whereSql, binds, limit = 25) {
+async function listIds(env, tableName, whereSql, binds, limit = 12) {
   const result = await env.DB.prepare(`SELECT id FROM ${tableName} ${whereSql} ORDER BY id LIMIT ?`).bind(...(binds || []), limit).all();
   return formatIds(result.results || []);
 }
 
 async function dependency(env, tableName, whereSql, binds) {
-  return {
-    table: tableName,
-    count: await countRows(env, tableName, whereSql, binds),
-    ids: await listIds(env, tableName, whereSql, binds)
-  };
+  return { table: tableName, count: await countRows(env, tableName, whereSql, binds), ids: await listIds(env, tableName, whereSql, binds) };
 }
 
 function compactDependencies(deps) {
   return (deps || []).filter(function(dep) { return dep.count > 0; });
 }
 
-function candidateKey(type, id) {
-  return type + ':' + String(id);
-}
-
 function summarizeBlockedReasons(reasons) {
   return (reasons || []).filter(Boolean).join('; ');
 }
 
-async function buildStrategicContactCandidate(env, row) {
-  const dependencies = compactDependencies([
-    await dependency(env, 'strategic_contact_attributions', 'WHERE strategic_contact_id = ? AND tenant_id = ?', [row.id, row.tenant_id]),
-    await dependency(env, 'strategic_contact_activities', 'WHERE strategic_contact_id = ? AND tenant_id = ?', [row.id, row.tenant_id])
-  ]);
-  const marker = hasTestMarker([
-    row.organization_name,
-    row.contact_person_name,
-    row.email,
-    row.source,
-    row.tags,
-    row.notes,
-    row.tenant_name,
-    row.tenant_slug,
-    row.tenant_contact_email
-  ]);
-  const blocked = [];
-  if (Number(row.tenant_id) === 1) blocked.push('tenant 1 data is protected in this phase');
-  if (!marker) blocked.push('no clear test marker');
-
-  return {
-    type: 'strategic_contact',
-    id: row.id,
-    tenant_id: row.tenant_id,
-    label: row.organization_name || ('Strategic contact #' + row.id),
-    reason: marker ? 'strategic contact has test marker' : 'strategic contact lacks clear test marker',
-    allowed: blocked.length === 0,
-    blocked_reason: summarizeBlockedReasons(blocked),
-    dependencies
-  };
+function mkAction(action, label, allowed, blocked_reason, extra) {
+  return Object.assign({ action, label, allowed: !!allowed, blocked_reason: allowed ? '' : (blocked_reason || 'blocked') }, extra || {});
 }
 
-async function buildOrphanStrategicChildCandidate(env, row, type) {
-  const tableName = type === 'strategic_contact_activity' ? 'strategic_contact_activities' : 'strategic_contact_attributions';
-  const blocked = [];
-  if (Number(row.tenant_id) === 1) blocked.push('tenant 1 data is protected in this phase');
-  return {
+function candidate(type, row, fields) {
+  return Object.assign({
     type,
     id: row.id,
-    tenant_id: row.tenant_id,
-    label: tableName + ' #' + row.id,
-    reason: 'orphan strategic contact child row; parent strategic_contact is missing',
-    allowed: blocked.length === 0,
-    blocked_reason: summarizeBlockedReasons(blocked),
-    dependencies: [{ table: tableName, count: 1, ids: [row.id] }]
-  };
+    tenant_id: row.tenant_id || null,
+    label: row.label || (type + ' #' + row.id),
+    status: row.status || null,
+    reason: row.reason || '',
+    allowed: !!row.allowed,
+    blocked_reason: row.blocked_reason || '',
+    dependencies: row.dependencies || [],
+    actions: row.actions || []
+  }, fields || {});
 }
 
-async function buildOrphanCounterCandidate(row) {
-  return {
-    type: 'orphan_sales_document_counter',
-    id: row.id,
-    tenant_id: row.tenant_id,
-    label: (row.document_type || 'counter') + ' counter #' + row.id + ' / tenant #' + row.tenant_id,
-    reason: 'sales document counter references a tenant that no longer exists',
-    allowed: true,
-    blocked_reason: '',
-    dependencies: [{ table: 'sales_document_counters', count: 1, ids: [row.id] }]
-  };
+function candidateKey(item) {
+  return item.type + ':' + String(item.id);
+}
+
+function isLockedSalesDocument(row) {
+  return LOCKED_SALES_STATUSES.has(String(row.status || '')) || !!row.locked_at || !!row.issued_at;
+}
+
+async function tenantDependencies(env, tenantId) {
+  const lowRisk = [];
+  const protectedDeps = [];
+  for (const tableName of TENANT_LOW_RISK_DELETE_TABLES) lowRisk.push(await dependency(env, tableName, 'WHERE tenant_id = ?', [tenantId]));
+  for (const tableName of TENANT_PROTECTED_TABLES) protectedDeps.push(await dependency(env, tableName, 'WHERE tenant_id = ?', [tenantId]));
+  return { lowRisk, protectedDeps, all: compactDependencies(lowRisk.concat(protectedDeps)) };
 }
 
 async function buildTenantCandidate(env, row) {
-  const marker = hasTestMarker([row.name, row.slug, row.contact_name, row.contact_email]);
-  const lowRiskDeps = [];
-  for (const tableName of LOW_RISK_TENANT_DELETE_TABLES) {
-    lowRiskDeps.push(await dependency(env, tableName, 'WHERE tenant_id = ?', [row.id]));
-  }
-
-  const protectedDeps = [];
-  for (const tableName of TENANT_BLOCK_TABLES) {
-    protectedDeps.push(await dependency(env, tableName, 'WHERE tenant_id = ?', [row.id]));
-  }
-
-  const blocked = [];
-  if (Number(row.id) === 1) blocked.push('tenant 1 is protected');
-  if (row.status !== 'suspended') blocked.push('tenant is not suspended');
-  if (!marker) blocked.push('tenant is not clearly marked as test');
-  const nonZeroProtected = protectedDeps.filter(function(dep) { return dep.count > 0; });
-  if (nonZeroProtected.length) {
-    blocked.push('has protected business/financial/inventory data: ' + nonZeroProtected.map(function(dep) { return dep.table + '=' + dep.count; }).join(', '));
-  }
-
-  return {
-    type: 'test_tenant',
+  const deps = await tenantDependencies(env, row.id);
+  const protectedNonZero = deps.protectedDeps.filter(function(dep) { return dep.count > 0; });
+  const deleteBlocked = [];
+  if (Number(row.id) === 1) deleteBlocked.push('tenant 1 cannot be hard-deleted');
+  if (row.status !== 'suspended') deleteBlocked.push('tenant must be suspended before hard delete');
+  if (protectedNonZero.length) deleteBlocked.push('protected business/financial/inventory data exists: ' + protectedNonZero.map(function(dep) { return dep.table + '=' + dep.count; }).join(', '));
+  return candidate('tenant', {
     id: row.id,
     tenant_id: row.id,
     label: (row.name || 'Tenant') + ' / ' + (row.slug || ('#' + row.id)),
-    reason: marker ? 'suspended tenant with clear test marker and only low-risk dependencies' : 'tenant lacks clear test marker',
-    allowed: blocked.length === 0,
-    blocked_reason: summarizeBlockedReasons(blocked),
-    dependencies: compactDependencies(lowRiskDeps.concat(protectedDeps))
-  };
+    status: row.status,
+    reason: Number(row.id) === 1 ? 'tenant 1 protected' : 'tenant controls',
+    allowed: deleteBlocked.length === 0,
+    blocked_reason: summarizeBlockedReasons(deleteBlocked),
+    dependencies: deps.all,
+    actions: [
+      mkAction('archive', 'Suspend', Number(row.id) !== 1 && row.status !== 'suspended', Number(row.id) === 1 ? 'tenant 1 cannot be suspended in this phase' : 'already suspended'),
+      mkAction('reactivate', 'Reactivate', row.status === 'suspended', 'tenant is already active'),
+      mkAction('delete', 'Hard Delete', deleteBlocked.length === 0, summarizeBlockedReasons(deleteBlocked), { requires_delete: true, requires_name: row.name || '' })
+    ]
+  });
 }
 
-async function buildIssuedDocumentBlock(row) {
-  return {
-    type: 'blocked_sales_document',
+async function buildUserCandidate(env, row) {
+  const deps = compactDependencies([
+    await dependency(env, 'tenant_memberships', 'WHERE user_id = ?', [row.id])
+  ]);
+  const tenantOneMemberships = await countRows(env, 'tenant_memberships', 'WHERE user_id = ? AND tenant_id = 1', [row.id]);
+  const ownerMemberships = await countRows(env, 'tenant_memberships', "WHERE user_id = ? AND role = 'owner'", [row.id]);
+  const membershipCount = deps.find(function(dep) { return dep.table === 'tenant_memberships'; })?.count || 0;
+  const isSuperAdmin = String(row.role || '').toLowerCase() === 'super_admin';
+  const status = row.status || 'active';
+  const deleteBlocked = [];
+  if (isSuperAdmin) deleteBlocked.push('super_admin users are protected');
+  if (tenantOneMemberships > 0) deleteBlocked.push('user belongs to tenant 1');
+  if (ownerMemberships > 0) deleteBlocked.push('user owns a tenant; deactivate instead');
+  if (membershipCount > 0) deleteBlocked.push('user has tenant memberships; deactivate instead');
+  return candidate('user', {
+    id: row.id,
+    tenant_id: null,
+    label: (row.display_name || row.name || row.email || 'User') + ' / ' + row.email,
+    status,
+    reason: 'user controls',
+    allowed: deleteBlocked.length === 0,
+    blocked_reason: summarizeBlockedReasons(deleteBlocked),
+    dependencies: deps,
+    actions: [
+      mkAction('archive', 'Deactivate', !isSuperAdmin && status !== 'inactive', isSuperAdmin ? 'super_admin users are protected' : 'already inactive'),
+      mkAction('reactivate', 'Reactivate', !isSuperAdmin && status === 'inactive', isSuperAdmin ? 'super_admin users are protected' : 'already active'),
+      mkAction('delete', 'Hard Delete', deleteBlocked.length === 0, summarizeBlockedReasons(deleteBlocked), { requires_delete: true })
+    ]
+  });
+}
+
+async function buildContactCandidate(env, row) {
+  const deps = compactDependencies([
+    await dependency(env, 'sales_documents', 'WHERE tenant_id = ? AND contact_id = ?', [row.tenant_id, row.id]),
+    await dependency(env, 'leads', 'WHERE tenant_id = ? AND contact_id = ?', [row.tenant_id, row.id]),
+    await dependency(env, 'contact_notes', 'WHERE tenant_id = ? AND contact_id = ?', [row.tenant_id, row.id]),
+    await dependency(env, 'customer_billing_profiles', 'WHERE tenant_id = ? AND contact_id = ?', [row.tenant_id, row.id]),
+    await dependency(env, 'customer_addresses', 'WHERE tenant_id = ? AND contact_id = ?', [row.tenant_id, row.id]),
+    await dependency(env, 'customer_contact_people', 'WHERE tenant_id = ? AND contact_id = ?', [row.tenant_id, row.id]),
+    await dependency(env, 'strategic_contact_attributions', 'WHERE tenant_id = ? AND contact_id = ?', [row.tenant_id, row.id])
+  ]);
+  const lockedDocs = await countRows(env, 'sales_documents', "WHERE tenant_id = ? AND contact_id = ? AND (status IN ('issued','paid','partially_paid','void') OR locked_at IS NOT NULL OR issued_at IS NOT NULL)", [row.tenant_id, row.id]);
+  const salesDocs = deps.find(function(dep) { return dep.table === 'sales_documents'; })?.count || 0;
+  const leads = deps.find(function(dep) { return dep.table === 'leads'; })?.count || 0;
+  const blocked = [];
+  if (Number(row.tenant_id) === 1) blocked.push('tenant 1 customer data cannot be hard-deleted in this phase');
+  if (lockedDocs > 0) blocked.push('customer has issued/locked sales documents');
+  if (salesDocs > 0) blocked.push('customer has sales document history');
+  if (leads > 0) blocked.push('customer has event/lead history');
+  const status = row.status || 'פעיל';
+  return candidate('contact', {
     id: row.id,
     tenant_id: row.tenant_id,
-    label: (row.document_type || 'document') + ' #' + (row.document_number || row.id) + ' / ' + row.status,
-    reason: 'issued/locked sales documents are not hard-deletable',
-    allowed: false,
-    blocked_reason: 'issued/locked sales document',
-    dependencies: [{ table: 'sales_documents', count: 1, ids: [row.id] }]
-  };
+    label: row.name || ('Customer #' + row.id),
+    status,
+    reason: 'customer controls',
+    allowed: blocked.length === 0,
+    blocked_reason: summarizeBlockedReasons(blocked),
+    dependencies: deps,
+    actions: [
+      mkAction('archive', 'Archive', status !== 'לא פעיל', 'already inactive'),
+      mkAction('reactivate', 'Reactivate', status === 'לא פעיל', 'customer is not archived'),
+      mkAction('delete', 'Hard Delete', blocked.length === 0, summarizeBlockedReasons(blocked), { requires_delete: true })
+    ]
+  });
 }
 
-async function buildTenantOneBlock(env) {
-  const deps = [];
-  for (const tableName of ['contacts', 'leads', 'products', 'product_stock_movements', 'sales_documents', 'strategic_contacts']) {
-    deps.push(await dependency(env, tableName, 'WHERE tenant_id = ?', [1]));
-  }
-  return {
-    type: 'protected_tenant',
-    id: 1,
-    tenant_id: 1,
-    label: 'Tenant 1 protected data',
-    reason: 'tenant 1 data is not deletable in this phase',
-    allowed: false,
-    blocked_reason: 'tenant 1 protected',
-    dependencies: compactDependencies(deps)
-  };
+async function buildProductCandidate(env, row) {
+  const deps = compactDependencies([
+    await dependency(env, 'product_stock_movements', 'WHERE tenant_id = ? AND product_id = ?', [row.tenant_id, row.id]),
+    await dependency(env, 'product_purchases', 'WHERE tenant_id = ? AND product_id = ?', [row.tenant_id, row.id]),
+    await dependency(env, 'event_product_allocations', 'WHERE tenant_id = ? AND product_id = ?', [row.tenant_id, row.id]),
+    await dependency(env, 'event_inventory_actions', 'WHERE tenant_id = ? AND product_id = ?', [row.tenant_id, row.id]),
+    await dependency(env, 'sales_document_items', 'WHERE tenant_id = ? AND product_id = ?', [row.tenant_id, row.id])
+  ]);
+  const blocked = [];
+  if (Number(row.tenant_id) === 1) blocked.push('tenant 1 product data cannot be hard-deleted in this phase');
+  if (deps.length) blocked.push('product has stock/purchase/allocation/sales history');
+  const active = Number(row.is_active) !== 0;
+  return candidate('product', {
+    id: row.id,
+    tenant_id: row.tenant_id,
+    label: row.name || ('Product #' + row.id),
+    status: active ? 'active' : 'inactive',
+    reason: 'product controls',
+    allowed: blocked.length === 0,
+    blocked_reason: summarizeBlockedReasons(blocked),
+    dependencies: deps,
+    actions: [
+      mkAction('archive', 'Deactivate', active, 'already inactive'),
+      mkAction('reactivate', 'Reactivate', !active, 'already active'),
+      mkAction('delete', 'Hard Delete', blocked.length === 0, summarizeBlockedReasons(blocked), { requires_delete: true })
+    ]
+  });
 }
 
-async function getCleanupCandidates(env) {
+async function buildStrategicContactCandidate(env, row) {
+  const deps = compactDependencies([
+    await dependency(env, 'strategic_contact_attributions', 'WHERE strategic_contact_id = ? AND tenant_id = ?', [row.id, row.tenant_id]),
+    await dependency(env, 'strategic_contact_activities', 'WHERE strategic_contact_id = ? AND tenant_id = ?', [row.id, row.tenant_id])
+  ]);
+  const active = Number(row.active) !== 0;
+  const blocked = [];
+  if (Number(row.tenant_id) === 1) blocked.push('tenant 1 strategic contact data cannot be hard-deleted in this phase');
+  return candidate('strategic_contact', {
+    id: row.id,
+    tenant_id: row.tenant_id,
+    label: row.organization_name || ('Strategic contact #' + row.id),
+    status: active ? 'active' : 'inactive',
+    reason: 'strategic contact controls',
+    allowed: blocked.length === 0,
+    blocked_reason: summarizeBlockedReasons(blocked),
+    dependencies: deps,
+    actions: [
+      mkAction('archive', 'Deactivate', active, 'already inactive'),
+      mkAction('reactivate', 'Reactivate', !active, 'already active'),
+      mkAction('delete', 'Hard Delete', blocked.length === 0, summarizeBlockedReasons(blocked), { requires_delete: true })
+    ]
+  });
+}
+
+function buildOrphanCounterCandidate(row) {
+  return candidate('orphan_sales_document_counter', {
+    id: row.id,
+    tenant_id: row.tenant_id,
+    label: (row.document_type || 'counter') + ' counter #' + row.id + ' / tenant #' + row.tenant_id,
+    status: 'orphan',
+    reason: 'sales document counter references a missing tenant',
+    allowed: true,
+    dependencies: [{ table: 'sales_document_counters', count: 1, ids: [row.id] }],
+    actions: [mkAction('delete', 'Hard Delete', true, '', { requires_delete: true })]
+  });
+}
+
+function buildOrphanStrategicChildCandidate(row, type) {
+  const tableName = type === 'strategic_contact_activity' ? 'strategic_contact_activities' : 'strategic_contact_attributions';
+  const blocked = Number(row.tenant_id) === 1 ? 'tenant 1 data is protected in this phase' : '';
+  return candidate(type, {
+    id: row.id,
+    tenant_id: row.tenant_id,
+    label: tableName + ' #' + row.id,
+    status: 'orphan',
+    reason: 'strategic contact child references missing parent',
+    allowed: !blocked,
+    blocked_reason: blocked,
+    dependencies: [{ table: tableName, count: 1, ids: [row.id] }],
+    actions: [mkAction('delete', 'Hard Delete', !blocked, blocked, { requires_delete: true })]
+  });
+}
+
+function buildSalesDocumentCandidate(row) {
+  const locked = isLockedSalesDocument(row);
+  const marker = hasTestMarker([
+    row.document_number, row.customer_name_snapshot, row.customer_email_snapshot, row.notes, row.internal_notes, row.tenant_name, row.tenant_slug
+  ]);
+  const safeDraft = !locked && (row.status === 'draft' || marker);
+  const blocked = locked ? 'issued/locked sales document cannot be hard-deleted' : (safeDraft ? '' : 'only draft/test non-locked sales documents can be hard-deleted');
+  return candidate(locked ? 'blocked_sales_document' : 'sales_document', {
+    id: row.id,
+    tenant_id: row.tenant_id,
+    label: (row.document_type || 'document') + ' #' + (row.document_number || row.id) + ' / ' + (row.customer_name_snapshot || ''),
+    status: row.status,
+    reason: locked ? 'issued/locked sales documents are protected' : 'draft/test sales document controls',
+    allowed: safeDraft,
+    blocked_reason: blocked,
+    dependencies: [{ table: 'sales_document_items', count: Number(row.items_count || 0), ids: [] }].filter(function(dep) { return dep.count > 0; }),
+    actions: [
+      mkAction('archive', 'Cancel', !locked && row.status !== 'cancelled', locked ? 'issued/locked sales document cannot be cancelled here' : 'already cancelled'),
+      mkAction('delete', 'Hard Delete', safeDraft, blocked, { requires_delete: true })
+    ]
+  });
+}
+
+async function listCleanupCandidates(env, entity, search) {
   const candidates = [];
+  const want = function(name) { return !entity || entity === 'all' || entity === name; };
+
+  if (want('tenants')) {
+    const rows = await env.DB.prepare('SELECT id, name, slug, status, contact_name, contact_email FROM tenants ORDER BY id LIMIT 100').all();
+    for (const row of rows.results || []) if (textLike(row, ['id', 'name', 'slug', 'contact_email'], search)) candidates.push(await buildTenantCandidate(env, row));
+  }
+
+  if (want('users')) {
+    const rows = await env.DB.prepare('SELECT id, name, display_name, email, role, status FROM users ORDER BY id LIMIT 100').all();
+    for (const row of rows.results || []) if (textLike(row, ['id', 'name', 'display_name', 'email', 'role'], search)) candidates.push(await buildUserCandidate(env, row));
+  }
+
+  if (want('contacts')) {
+    const rows = await env.DB.prepare('SELECT id, tenant_id, name, phone, email, status, tags FROM contacts ORDER BY id DESC LIMIT 100').all();
+    for (const row of rows.results || []) if (textLike(row, ['id', 'name', 'phone', 'email', 'tags'], search)) candidates.push(await buildContactCandidate(env, row));
+  }
+
+  if (want('products')) {
+    const rows = await env.DB.prepare('SELECT id, tenant_id, name, category, sku, is_active FROM products ORDER BY id DESC LIMIT 100').all();
+    for (const row of rows.results || []) if (textLike(row, ['id', 'name', 'category', 'sku'], search)) candidates.push(await buildProductCandidate(env, row));
+  }
+
+  if (want('strategic_contacts')) {
+    const rows = await env.DB.prepare('SELECT id, tenant_id, organization_name, contact_person_name, email, status, active, tags, notes FROM strategic_contacts ORDER BY id DESC LIMIT 100').all();
+    for (const row of rows.results || []) if (textLike(row, ['id', 'organization_name', 'contact_person_name', 'email', 'tags'], search)) candidates.push(await buildStrategicContactCandidate(env, row));
+  }
+
+  if (want('sales_documents')) {
+    const rows = await env.DB.prepare(`
+      SELECT sd.id, sd.tenant_id, sd.document_type, sd.document_number, sd.status, sd.locked_at, sd.issued_at,
+             sd.customer_name_snapshot, sd.customer_email_snapshot, sd.notes, sd.internal_notes,
+             t.name AS tenant_name, t.slug AS tenant_slug,
+             (SELECT COUNT(*) FROM sales_document_items i WHERE i.tenant_id = sd.tenant_id AND i.document_id = sd.id) AS items_count
+      FROM sales_documents sd
+      LEFT JOIN tenants t ON t.id = sd.tenant_id
+      ORDER BY sd.id DESC
+      LIMIT 100
+    `).all();
+    for (const row of rows.results || []) if (textLike(row, ['id', 'document_number', 'customer_name_snapshot', 'customer_email_snapshot', 'tenant_name'], search)) candidates.push(buildSalesDocumentCandidate(row));
+  }
+
+  if (want('orphans')) {
+    const counters = await env.DB.prepare(`
+      SELECT c.id, c.tenant_id, c.document_type
+      FROM sales_document_counters c
+      LEFT JOIN tenants t ON t.id = c.tenant_id
+      WHERE t.id IS NULL
+      ORDER BY c.id
+      LIMIT 100
+    `).all();
+    for (const row of counters.results || []) candidates.push(buildOrphanCounterCandidate(row));
+
+    const activities = await env.DB.prepare(`
+      SELECT a.id, a.tenant_id, a.strategic_contact_id
+      FROM strategic_contact_activities a
+      LEFT JOIN strategic_contacts sc ON sc.id = a.strategic_contact_id AND sc.tenant_id = a.tenant_id
+      WHERE sc.id IS NULL
+      ORDER BY a.id
+      LIMIT 100
+    `).all();
+    for (const row of activities.results || []) candidates.push(buildOrphanStrategicChildCandidate(row, 'strategic_contact_activity'));
+
+    const attributions = await env.DB.prepare(`
+      SELECT a.id, a.tenant_id, a.strategic_contact_id
+      FROM strategic_contact_attributions a
+      LEFT JOIN strategic_contacts sc ON sc.id = a.strategic_contact_id AND sc.tenant_id = a.tenant_id
+      WHERE sc.id IS NULL
+      ORDER BY a.id
+      LIMIT 100
+    `).all();
+    for (const row of attributions.results || []) candidates.push(buildOrphanStrategicChildCandidate(row, 'strategic_contact_attribution'));
+  }
+
   const seen = new Set();
-
-  const orphanCounters = await env.DB.prepare(`
-    SELECT c.id, c.tenant_id, c.document_type
-    FROM sales_document_counters c
-    LEFT JOIN tenants t ON t.id = c.tenant_id
-    WHERE t.id IS NULL
-    ORDER BY c.id
-    LIMIT 100
-  `).all();
-  for (const row of orphanCounters.results || []) candidates.push(await buildOrphanCounterCandidate(row));
-
-  const orphanActivities = await env.DB.prepare(`
-    SELECT a.id, a.tenant_id, a.strategic_contact_id
-    FROM strategic_contact_activities a
-    LEFT JOIN strategic_contacts sc ON sc.id = a.strategic_contact_id AND sc.tenant_id = a.tenant_id
-    WHERE sc.id IS NULL
-    ORDER BY a.id
-    LIMIT 100
-  `).all();
-  for (const row of orphanActivities.results || []) candidates.push(await buildOrphanStrategicChildCandidate(env, row, 'strategic_contact_activity'));
-
-  const orphanAttributions = await env.DB.prepare(`
-    SELECT a.id, a.tenant_id, a.strategic_contact_id
-    FROM strategic_contact_attributions a
-    LEFT JOIN strategic_contacts sc ON sc.id = a.strategic_contact_id AND sc.tenant_id = a.tenant_id
-    WHERE sc.id IS NULL
-    ORDER BY a.id
-    LIMIT 100
-  `).all();
-  for (const row of orphanAttributions.results || []) candidates.push(await buildOrphanStrategicChildCandidate(env, row, 'strategic_contact_attribution'));
-
-  const strategicContacts = await env.DB.prepare(`
-    SELECT sc.*, t.name AS tenant_name, t.slug AS tenant_slug, t.contact_email AS tenant_contact_email
-    FROM strategic_contacts sc
-    JOIN tenants t ON t.id = sc.tenant_id
-    WHERE sc.tenant_id <> 1
-    ORDER BY sc.id
-    LIMIT 100
-  `).all();
-  for (const row of strategicContacts.results || []) {
-    const candidate = await buildStrategicContactCandidate(env, row);
-    if (candidate.allowed || candidate.blocked_reason) candidates.push(candidate);
-  }
-
-  const tenants = await env.DB.prepare(`
-    SELECT id, name, slug, status, contact_name, contact_email
-    FROM tenants
-    ORDER BY id
-  `).all();
-  for (const row of tenants.results || []) {
-    if (Number(row.id) === 1) continue;
-    if (!hasTestMarker([row.name, row.slug, row.contact_name, row.contact_email])) continue;
-    candidates.push(await buildTenantCandidate(env, row));
-  }
-
-  const issuedDocs = await env.DB.prepare(`
-    SELECT id, tenant_id, document_type, document_number, status
-    FROM sales_documents
-    WHERE status IN ('issued','paid','partially_paid','void') OR locked_at IS NOT NULL
-    ORDER BY id
-    LIMIT 25
-  `).all();
-  for (const row of issuedDocs.results || []) candidates.push(await buildIssuedDocumentBlock(row));
-
-  const tenantOne = await buildTenantOneBlock(env);
-  candidates.push(tenantOne);
-
-  const deduped = [];
-  for (const candidate of candidates) {
-    const key = candidateKey(candidate.type, candidate.id);
-    if (seen.has(key)) continue;
+  return candidates.filter(function(item) {
+    const key = candidateKey(item);
+    if (seen.has(key)) return false;
     seen.add(key);
-    deduped.push(candidate);
-  }
-
-  return deduped;
+    return true;
+  });
 }
 
 async function getCandidateByTypeAndId(env, type, id) {
-  const candidates = await getCleanupCandidates(env);
-  return candidates.find(function(candidate) {
-    return candidate.type === type && Number(candidate.id) === Number(id);
-  }) || null;
+  const entityByType = {
+    tenant: 'tenants', user: 'users', contact: 'contacts', product: 'products', strategic_contact: 'strategic_contacts',
+    sales_document: 'sales_documents', blocked_sales_document: 'sales_documents', orphan_sales_document_counter: 'orphans',
+    strategic_contact_activity: 'orphans', strategic_contact_attribution: 'orphans'
+  };
+  const candidates = await listCleanupCandidates(env, entityByType[type] || 'all', '');
+  return candidates.find(function(item) { return item.type === type && Number(item.id) === Number(id); }) || null;
 }
 
-function auditStatement(env, actor, candidate) {
+function auditStatement(env, actor, action, target, details) {
   return env.DB.prepare(`
-    INSERT INTO admin_audit_logs (
-      actor_user_id,
-      actor_email,
-      action,
-      target_type,
-      target_id,
-      target_slug,
-      details_json,
-      created_at
-    ) VALUES (?, ?, 'cleanup_hard_delete', ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    INSERT INTO admin_audit_logs (actor_user_id, actor_email, action, target_type, target_id, target_slug, details_json, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
   `).bind(
     actor && actor.id ? actor.id : null,
     actor && actor.email ? actor.email : null,
-    candidate.type,
-    candidate.id,
-    candidate.label || null,
-    safeJsonStringify({ candidate })
+    action,
+    target.type,
+    target.id,
+    target.label || null,
+    safeJsonStringify(details)
   );
 }
 
-async function deleteCleanupCandidate(env, actor, candidate) {
-  const statements = [];
-
-  if (candidate.type === 'orphan_sales_document_counter') {
-    statements.push(env.DB.prepare(`
-      DELETE FROM sales_document_counters
-      WHERE id = ?
-        AND NOT EXISTS (SELECT 1 FROM tenants t WHERE t.id = sales_document_counters.tenant_id)
-    `).bind(candidate.id));
+async function runArchiveAction(env, actor, candidate) {
+  const s = [];
+  if (candidate.type === 'tenant') {
+    if (Number(candidate.id) === 1) throw new Error('tenant 1 cannot be suspended in this phase');
+    s.push(env.DB.prepare("UPDATE tenants SET status = 'suspended', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND id <> 1").bind(candidate.id));
+  } else if (candidate.type === 'user') {
+    s.push(env.DB.prepare("UPDATE users SET status = 'inactive', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND lower(COALESCE(role,'')) <> 'super_admin'").bind(candidate.id));
+  } else if (candidate.type === 'contact') {
+    s.push(env.DB.prepare("UPDATE contacts SET status = 'לא פעיל', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ?").bind(candidate.id, candidate.tenant_id));
+  } else if (candidate.type === 'product') {
+    s.push(env.DB.prepare('UPDATE products SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ?').bind(candidate.id, candidate.tenant_id));
   } else if (candidate.type === 'strategic_contact') {
-    statements.push(env.DB.prepare('DELETE FROM strategic_contact_attributions WHERE strategic_contact_id = ? AND tenant_id = ?').bind(candidate.id, candidate.tenant_id));
-    statements.push(env.DB.prepare('DELETE FROM strategic_contact_activities WHERE strategic_contact_id = ? AND tenant_id = ?').bind(candidate.id, candidate.tenant_id));
-    statements.push(env.DB.prepare('DELETE FROM strategic_contacts WHERE id = ? AND tenant_id = ? AND tenant_id <> 1').bind(candidate.id, candidate.tenant_id));
-  } else if (candidate.type === 'strategic_contact_activity') {
-    statements.push(env.DB.prepare(`
-      DELETE FROM strategic_contact_activities
-      WHERE id = ?
-        AND tenant_id <> 1
-        AND NOT EXISTS (
-          SELECT 1 FROM strategic_contacts sc
-          WHERE sc.id = strategic_contact_activities.strategic_contact_id
-            AND sc.tenant_id = strategic_contact_activities.tenant_id
-        )
-    `).bind(candidate.id));
-  } else if (candidate.type === 'strategic_contact_attribution') {
-    statements.push(env.DB.prepare(`
-      DELETE FROM strategic_contact_attributions
-      WHERE id = ?
-        AND tenant_id <> 1
-        AND NOT EXISTS (
-          SELECT 1 FROM strategic_contacts sc
-          WHERE sc.id = strategic_contact_attributions.strategic_contact_id
-            AND sc.tenant_id = strategic_contact_attributions.tenant_id
-        )
-    `).bind(candidate.id));
-  } else if (candidate.type === 'test_tenant') {
-    statements.push(env.DB.prepare('DELETE FROM strategic_contact_attributions WHERE tenant_id = ?').bind(candidate.id));
-    statements.push(env.DB.prepare('DELETE FROM strategic_contact_activities WHERE tenant_id = ?').bind(candidate.id));
-    statements.push(env.DB.prepare('DELETE FROM strategic_contacts WHERE tenant_id = ?').bind(candidate.id));
-    statements.push(env.DB.prepare('DELETE FROM sales_document_counters WHERE tenant_id = ?').bind(candidate.id));
-    statements.push(env.DB.prepare('DELETE FROM tenant_business_settings WHERE tenant_id = ?').bind(candidate.id));
-    statements.push(env.DB.prepare('DELETE FROM tenant_modules WHERE tenant_id = ?').bind(candidate.id));
-    statements.push(env.DB.prepare('DELETE FROM tenant_memberships WHERE tenant_id = ?').bind(candidate.id));
-    statements.push(env.DB.prepare(`
+    s.push(env.DB.prepare('UPDATE strategic_contacts SET active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ?').bind(candidate.id, candidate.tenant_id));
+  } else if (candidate.type === 'sales_document') {
+    s.push(env.DB.prepare("UPDATE sales_documents SET status = 'cancelled', cancelled_at = COALESCE(cancelled_at, CURRENT_TIMESTAMP), updated_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ? AND locked_at IS NULL AND issued_at IS NULL AND status NOT IN ('issued','paid','partially_paid','void')").bind(candidate.id, candidate.tenant_id));
+  } else {
+    throw new Error('Archive/deactivate is not supported for this record');
+  }
+  s.push(auditStatement(env, actor, 'cleanup_archive', candidate, { candidate }));
+  return env.DB.batch(s);
+}
+
+async function runReactivateAction(env, actor, candidate) {
+  const s = [];
+  if (candidate.type === 'tenant') {
+    s.push(env.DB.prepare("UPDATE tenants SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(candidate.id));
+  } else if (candidate.type === 'user') {
+    s.push(env.DB.prepare("UPDATE users SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND lower(COALESCE(role,'')) <> 'super_admin'").bind(candidate.id));
+  } else if (candidate.type === 'contact') {
+    s.push(env.DB.prepare("UPDATE contacts SET status = 'פעיל', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ?").bind(candidate.id, candidate.tenant_id));
+  } else if (candidate.type === 'product') {
+    s.push(env.DB.prepare('UPDATE products SET is_active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ?').bind(candidate.id, candidate.tenant_id));
+  } else if (candidate.type === 'strategic_contact') {
+    s.push(env.DB.prepare('UPDATE strategic_contacts SET active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ?').bind(candidate.id, candidate.tenant_id));
+  } else {
+    throw new Error('Reactivate is not supported for this record');
+  }
+  s.push(auditStatement(env, actor, 'cleanup_reactivate', candidate, { candidate }));
+  return env.DB.batch(s);
+}
+
+async function runDeleteAction(env, actor, candidate) {
+  const s = [];
+  if (candidate.type === 'tenant') {
+    s.push(env.DB.prepare('DELETE FROM strategic_contact_attributions WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM strategic_contact_activities WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM strategic_contacts WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM sales_document_counters WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM tenant_business_settings WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM tenant_modules WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM tenant_memberships WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare(`
       DELETE FROM tenants
-      WHERE id = ?
-        AND id <> 1
-        AND status = 'suspended'
+      WHERE id = ? AND id <> 1 AND status = 'suspended'
         AND NOT EXISTS (SELECT 1 FROM contacts WHERE tenant_id = tenants.id)
         AND NOT EXISTS (SELECT 1 FROM leads WHERE tenant_id = tenants.id)
         AND NOT EXISTS (SELECT 1 FROM products WHERE tenant_id = tenants.id)
         AND NOT EXISTS (SELECT 1 FROM product_stock_movements WHERE tenant_id = tenants.id)
         AND NOT EXISTS (SELECT 1 FROM sales_documents WHERE tenant_id = tenants.id)
     `).bind(candidate.id));
+  } else if (candidate.type === 'user') {
+    s.push(env.DB.prepare("DELETE FROM users WHERE id = ? AND lower(COALESCE(role,'')) <> 'super_admin' AND NOT EXISTS (SELECT 1 FROM tenant_memberships WHERE user_id = users.id)").bind(candidate.id));
+  } else if (candidate.type === 'contact') {
+    s.push(env.DB.prepare('DELETE FROM strategic_contact_attributions WHERE tenant_id = ? AND contact_id = ?').bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM customer_contact_people WHERE tenant_id = ? AND contact_id = ?').bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM customer_addresses WHERE tenant_id = ? AND contact_id = ?').bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM customer_billing_profiles WHERE tenant_id = ? AND contact_id = ?').bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM contact_notes WHERE tenant_id = ? AND contact_id = ?').bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM contacts WHERE id = ? AND tenant_id = ? AND tenant_id <> 1 AND NOT EXISTS (SELECT 1 FROM sales_documents WHERE tenant_id = contacts.tenant_id AND contact_id = contacts.id) AND NOT EXISTS (SELECT 1 FROM leads WHERE tenant_id = contacts.tenant_id AND contact_id = contacts.id)').bind(candidate.id, candidate.tenant_id));
+  } else if (candidate.type === 'product') {
+    s.push(env.DB.prepare('DELETE FROM products WHERE id = ? AND tenant_id = ? AND tenant_id <> 1').bind(candidate.id, candidate.tenant_id));
+  } else if (candidate.type === 'strategic_contact') {
+    s.push(env.DB.prepare('DELETE FROM strategic_contact_attributions WHERE strategic_contact_id = ? AND tenant_id = ?').bind(candidate.id, candidate.tenant_id));
+    s.push(env.DB.prepare('DELETE FROM strategic_contact_activities WHERE strategic_contact_id = ? AND tenant_id = ?').bind(candidate.id, candidate.tenant_id));
+    s.push(env.DB.prepare('DELETE FROM strategic_contacts WHERE id = ? AND tenant_id = ? AND tenant_id <> 1').bind(candidate.id, candidate.tenant_id));
+  } else if (candidate.type === 'sales_document') {
+    s.push(env.DB.prepare('DELETE FROM sales_document_items WHERE document_id = ? AND tenant_id = ?').bind(candidate.id, candidate.tenant_id));
+    s.push(env.DB.prepare("DELETE FROM sales_documents WHERE id = ? AND tenant_id = ? AND locked_at IS NULL AND issued_at IS NULL AND status NOT IN ('issued','paid','partially_paid','void')").bind(candidate.id, candidate.tenant_id));
+  } else if (candidate.type === 'orphan_sales_document_counter') {
+    s.push(env.DB.prepare('DELETE FROM sales_document_counters WHERE id = ? AND NOT EXISTS (SELECT 1 FROM tenants t WHERE t.id = sales_document_counters.tenant_id)').bind(candidate.id));
+  } else if (candidate.type === 'strategic_contact_activity') {
+    s.push(env.DB.prepare(`DELETE FROM strategic_contact_activities WHERE id = ? AND tenant_id <> 1 AND NOT EXISTS (SELECT 1 FROM strategic_contacts sc WHERE sc.id = strategic_contact_activities.strategic_contact_id AND sc.tenant_id = strategic_contact_activities.tenant_id)`).bind(candidate.id));
+  } else if (candidate.type === 'strategic_contact_attribution') {
+    s.push(env.DB.prepare(`DELETE FROM strategic_contact_attributions WHERE id = ? AND tenant_id <> 1 AND NOT EXISTS (SELECT 1 FROM strategic_contacts sc WHERE sc.id = strategic_contact_attributions.strategic_contact_id AND sc.tenant_id = strategic_contact_attributions.tenant_id)`).bind(candidate.id));
   } else {
-    throw new Error('סוג ניקוי לא נתמך');
+    throw new Error('סוג ניקוי לא נתמך למחיקה');
   }
+  s.push(auditStatement(env, actor, 'cleanup_hard_delete', candidate, { candidate }));
+  return env.DB.batch(s);
+}
 
-  statements.push(auditStatement(env, actor, candidate));
-  return env.DB.batch(statements);
+function findAction(candidate, action) {
+  return (candidate.actions || []).find(function(item) { return item.action === action; }) || null;
 }
 
 export async function handleAdminCleanup(request, env, path, superAdminCtx) {
   const method = request.method;
+  const url = new URL(request.url);
 
   if (path === '/api/admin/cleanup/candidates' && method === 'GET') {
-    const candidates = await getCleanupCandidates(env);
+    const entity = url.searchParams.get('entity') || 'all';
+    const search = url.searchParams.get('search') || '';
+    const candidates = await listCleanupCandidates(env, entity, search);
     return {
       candidates,
       summary: {
         total: candidates.length,
-        allowed: candidates.filter(function(candidate) { return candidate.allowed; }).length,
-        blocked: candidates.filter(function(candidate) { return !candidate.allowed; }).length
+        allowed: candidates.filter(function(item) { return (item.actions || []).some(function(action) { return action.allowed; }); }).length,
+        blocked: candidates.filter(function(item) { return !(item.actions || []).some(function(action) { return action.allowed; }); }).length
       }
     };
   }
 
-  if (path === '/api/admin/cleanup/delete' && method === 'POST') {
+  const actionMatch = path === '/api/admin/cleanup/action' || path === '/api/admin/cleanup/delete';
+  if (actionMatch && method === 'POST') {
     let body;
-    try {
-      body = await request.json();
-    } catch {
-      throw new Error('בקשה לא תקינה');
+    try { body = await request.json(); } catch { throw new Error('בקשה לא תקינה'); }
+    const type = String(body && body.type || '').trim();
+    const id = Number(body && body.id);
+    const actionName = path.endsWith('/delete') ? 'delete' : String(body && body.action || '').trim();
+    if (!type || !Number.isFinite(id) || id <= 0 || !actionName) throw new Error('מועמד ניקוי לא תקין');
+
+    const item = await getCandidateByTypeAndId(env, type, id);
+    if (!item) throw new Error('מועמד ניקוי לא נמצא');
+    const action = findAction(item, actionName);
+    if (!action) throw new Error('פעולת ניקוי לא נתמכת לרשומה');
+    if (!action.allowed) throw new Error(action.blocked_reason || item.blocked_reason || 'הפעולה חסומה');
+    if (actionName === 'delete') {
+      if (!body || body.confirmation !== 'DELETE') throw new Error('נדרש אישור DELETE מדויק');
+      if (action.requires_name && String(body.name_confirmation || '').trim() !== String(action.requires_name).trim()) {
+        throw new Error('נדרש אישור שם עסק מדויק למחיקת tenant');
+      }
     }
 
-    if (!body || body.confirmation !== 'DELETE') throw new Error('נדרש אישור DELETE מדויק');
-    const type = String(body.type || '').trim();
-    const id = Number(body.id);
-    if (!type || !Number.isFinite(id) || id <= 0) throw new Error('מועמד ניקוי לא תקין');
+    if (actionName === 'archive') await runArchiveAction(env, superAdminCtx && superAdminCtx.user, item);
+    else if (actionName === 'reactivate') await runReactivateAction(env, superAdminCtx && superAdminCtx.user, item);
+    else if (actionName === 'delete') await runDeleteAction(env, superAdminCtx && superAdminCtx.user, item);
+    else throw new Error('פעולת ניקוי לא נתמכת');
 
-    const candidate = await getCandidateByTypeAndId(env, type, id);
-    if (!candidate) throw new Error('מועמד ניקוי לא נמצא');
-    if (!candidate.allowed) throw new Error(candidate.blocked_reason || 'מחיקה חסומה');
-
-    await deleteCleanupCandidate(env, superAdminCtx && superAdminCtx.user, candidate);
-    return { success: true, deleted: candidate };
+    return { success: true, action: actionName, record: item };
   }
 
   return { error: 'Cleanup route not found' };
