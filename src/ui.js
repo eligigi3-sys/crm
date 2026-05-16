@@ -5817,6 +5817,41 @@ function buildStrategicContactsQuery() {
   return query ? '?' + query : '';
 }
 
+function openStrategicContactMarkContactedModal(item) {
+  if (!item || !item.id) return;
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'strategic-contact-mark-contacted-modal';
+  overlay.innerHTML = '<div class="modal"><div class="modal-header"><h2>סמן שפניתי</h2><button class="modal-close" id="mark-contacted-close">✕</button></div><div class="modal-body">' +
+    '<div class="strategic-contact-form-grid">' +
+      '<div class="form-group" style="margin-bottom:0"><label class="form-label">סוג פעילות</label><select class="form-input" id="mark-contacted-activity-type">' + renderStrategicContactOptions(strategicContactActivityTypeOptions, 'call', '') + '</select></div>' +
+      '<div class="form-group" style="margin-bottom:0"><label class="form-label">ערוץ</label><select class="form-input" id="mark-contacted-channel">' + renderStrategicContactOptions(strategicContactChannelOptions, item.preferred_channel || '', '') + '</select></div>' +
+      '<div class="form-group" style="margin-bottom:0"><label class="form-label">קשר הבא</label><input class="form-input" id="mark-contacted-next" type="date" value="' + escapeHtml(item.next_contact_at || '') + '"></div>' +
+      '<div class="form-group" style="margin-bottom:0"><label class="form-label">סיבת מעקב</label><input class="form-input" id="mark-contacted-followup" type="text" value="' + escapeHtml(item.followup_reason || '') + '"></div>' +
+      '<div class="form-group" style="grid-column:1/-1;margin-bottom:0"><label class="form-label">סיכום</label><textarea class="form-textarea" id="mark-contacted-summary" placeholder="סיכום הפנייה"></textarea></div>' +
+    '</div>' +
+    '</div><div class="modal-footer"><button class="btn btn-secondary" id="mark-contacted-cancel">ביטול</button><button class="btn btn-primary" id="mark-contacted-save">שמור</button></div></div>';
+  document.body.appendChild(overlay);
+  function close() { overlay.remove(); }
+  document.getElementById('mark-contacted-close').onclick = close;
+  document.getElementById('mark-contacted-cancel').onclick = close;
+  document.getElementById('mark-contacted-save').onclick = function() {
+    var payload = {
+      activity_type: document.getElementById('mark-contacted-activity-type').value,
+      channel: document.getElementById('mark-contacted-channel').value,
+      next_contact_at: document.getElementById('mark-contacted-next').value,
+      followup_reason: document.getElementById('mark-contacted-followup').value,
+      summary: document.getElementById('mark-contacted-summary').value
+    };
+    if (!payload.summary || !payload.summary.trim()) { toast('סיכום פעילות חובה', 'error'); return; }
+    apiCall('POST', '/api/strategic-contacts/' + item.id + '/mark-contacted', payload).then(function() {
+      toast('הפנייה נשמרה', 'success');
+      close();
+      loadStrategicContacts();
+    }).catch(function(err) { toast(err.message || 'שגיאה בסימון פנייה', 'error'); });
+  };
+}
+
 function renderStrategicContactCard(item) {
   var phone = item.phone || '';
   var whatsapp = item.whatsapp || phone || '';
@@ -5834,6 +5869,7 @@ function renderStrategicContactCard(item) {
     '</div></div>' +
     '<div class="strategic-contact-meta"><span>' + escapeHtml([item.city, item.area].filter(Boolean).join(' · ') || 'אזור לא צוין') + '</span></div>' +
     '<div class="strategic-contact-actions">' +
+      '<button class="btn btn-primary btn-sm strategic-contact-mark-contacted-btn" data-strategic-contact-id="' + item.id + '" onclick="event.stopPropagation()">סמן שפניתי</button>' +
       (phone ? '<a class="btn btn-ghost btn-sm" onclick="event.stopPropagation()" href="tel:' + escapeHtml(phone) + '">טלפון</a>' : '') +
       (cleanWhatsapp ? '<a class="btn btn-ghost btn-sm" onclick="event.stopPropagation()" target="_blank" href="https://wa.me/' + escapeHtml(cleanWhatsapp) + '">WhatsApp</a>' : '') +
       (item.email ? '<a class="btn btn-ghost btn-sm" onclick="event.stopPropagation()" href="mailto:' + escapeHtml(item.email) + '">אימייל</a>' : '') +
@@ -5863,6 +5899,14 @@ function loadStrategicContacts() {
     grid.innerHTML = '<div class="strategic-contacts-grid">' + items.map(renderStrategicContactCard).join('') + '</div>';
     grid.querySelectorAll('.strategic-contact-card[data-strategic-contact-id]').forEach(function(card) {
       card.addEventListener('click', function() { openStrategicContactModal(parseInt(this.getAttribute('data-strategic-contact-id'))); });
+    });
+    grid.querySelectorAll('.strategic-contact-mark-contacted-btn[data-strategic-contact-id]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var sid = parseInt(this.getAttribute('data-strategic-contact-id'));
+        var item = items.find(function(x) { return Number(x.id) === Number(sid); });
+        if (item) openStrategicContactMarkContactedModal(item);
+      });
     });
   }).catch(function(err) {
     grid.innerHTML = '<div class="dash-empty">שגיאה בטעינת קשרים אסטרטגיים: ' + escapeHtml(err.message || 'שגיאה') + '</div>';

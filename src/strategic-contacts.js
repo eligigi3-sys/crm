@@ -316,6 +316,79 @@ async function createStrategicContactActivity(request, env, tenantCtx, strategic
   return { success: true, activity: mapStrategicContactActivity(created) };
 }
 
+async function markStrategicContactContacted(request, env, tenantCtx, strategicContactId) {
+  const tenantId = tenantCtx.tenant.id;
+  const strategicContact = await getStrategicContactForTenant(env, tenantId, strategicContactId);
+  if (!strategicContact) return json({ error: 'קשר אסטרטגי לא נמצא' }, 404);
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: 'בקשה לא תקינה' }, 400);
+  }
+
+  let payload;
+  const contactedAt = new Date().toISOString().slice(0, 10);
+  try {
+    payload = buildStrategicContactActivityPayload({ ...(body || {}), activity_at: contactedAt });
+  } catch (error) {
+    return json({ error: error.message || 'בקשה לא תקינה' }, 400);
+  }
+  const followupReason = normalizeOptionalText(body && body.followup_reason);
+
+  const result = await env.DB.prepare(
+    `INSERT INTO strategic_contact_activities (
+      tenant_id,
+      strategic_contact_id,
+      activity_type,
+      channel,
+      summary,
+      activity_at,
+      next_contact_at,
+      created_by_user_id,
+      created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
+  ).bind(
+    tenantId,
+    strategicContactId,
+    payload.activity_type,
+    payload.channel,
+    payload.summary,
+    payload.activity_at,
+    payload.next_contact_at,
+    tenantCtx.user.id
+  ).run();
+
+  await env.DB.prepare(
+    `UPDATE strategic_contacts
+     SET last_contact_at = ?,
+         next_contact_at = ?,
+         followup_reason = ?,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = ?
+       AND tenant_id = ?`
+  ).bind(
+    payload.activity_at,
+    payload.next_contact_at,
+    followupReason,
+    strategicContactId,
+    tenantId
+  ).run();
+
+  const activity = await env.DB.prepare(
+    `SELECT *
+     FROM strategic_contact_activities
+     WHERE id = ?
+       AND tenant_id = ?
+       AND strategic_contact_id = ?
+     LIMIT 1`
+  ).bind(result.meta.last_row_id, tenantId, strategicContactId).first();
+  const updated = await getStrategicContactForTenant(env, tenantId, strategicContactId);
+
+  return { success: true, activity: mapStrategicContactActivity(activity), strategic_contact: updated };
+}
+
 async function createStrategicContact(request, env, tenantId) {
   let body;
   try {
@@ -491,6 +564,13 @@ export async function handleStrategicContacts(request, env, path) {
     const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
     if (roleState instanceof Response) return roleState;
     return createStrategicContactActivity(request, env, tenantCtx, Number(activitiesMatch[1]));
+  }
+
+  const markContactedMatch = path.match(/^\/api\/strategic-contacts\/(\d+)\/mark-contacted$/);
+  if (markContactedMatch && method === 'POST') {
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
+    return markStrategicContactContacted(request, env, tenantCtx, Number(markContactedMatch[1]));
   }
 
   const idMatch = path.match(/^\/api\/strategic-contacts\/(\d+)$/);
