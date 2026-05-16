@@ -3379,7 +3379,7 @@ function loadDashboard() {
       document.getElementById(id).textContent = document.getElementById(id).textContent.replace('R','₪');
     });
     var nb = document.getElementById('nav-leads-count');
-    if (d.stats.leads > 0) { nb.textContent = d.stats.leads; nb.style.display = ''; }
+    if (nb) { nb.textContent = ''; nb.style.display = 'none'; }
     var fuEl = document.getElementById('dash-followups');
     fuEl.innerHTML = d.followUps.length ? d.followUps.map(function(l) {
       return '<div class="dash-item" data-id="' + l.id + '"><div><div class="dash-item-name">' + l.name + '</div><div class="dash-item-sub">' + (l.event_type||'') + (l.event_date ? ' - ' + formatDate(l.event_date) : '') + '</div></div>' + statusBadge(l.status) + '</div>';
