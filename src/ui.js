@@ -196,9 +196,19 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .sales-doc-section-sub{font-size:12px;color:var(--text3);line-height:1.5;margin:-4px 0 10px}
 .sales-doc-billing-warning{padding:10px 12px;border-radius:12px;background:var(--yellow-light);color:var(--yellow);font-size:12px;font-weight:800;line-height:1.5;margin-bottom:10px}
 .sales-doc-billing-warning.blocked{background:var(--red-light);color:var(--red)}
-.sales-doc-billing-selector{border:1px solid var(--border);border-radius:12px;background:var(--bg);padding:10px;margin-top:8px}
+.sales-doc-billing-selector{border:1px solid var(--border);border-radius:12px;background:#fff;padding:10px;margin-top:0}
 .sales-doc-billing-selector-title{font-size:12px;font-weight:900;color:var(--text2);margin-bottom:7px}
 .sales-doc-billing-hint{font-size:11px;color:var(--text3);line-height:1.5;margin-top:6px}
+.sales-doc-billing-group{border:1px solid var(--border);border-radius:14px;background:#fafbfc;padding:12px;margin-top:10px}
+.sales-doc-billing-group-title{font-size:13px;font-weight:900;color:var(--text);margin-bottom:3px}
+.sales-doc-billing-group-sub{font-size:11px;color:var(--text3);line-height:1.5;margin-bottom:10px}
+.sales-doc-billing-group-body{display:flex;flex-direction:column;gap:10px}
+.sales-doc-billing-profile-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.sales-doc-billing-profile-item{border:1px solid #edf0f3;border-radius:10px;background:#fff;padding:8px 10px;font-size:12px;line-height:1.5;color:var(--text2)}
+.sales-doc-billing-profile-item strong{display:block;font-size:11px;color:var(--text3);margin-bottom:2px}
+.sales-doc-snapshot-note{padding:10px 12px;border-radius:12px;background:#eef2ff;color:#4338ca;font-size:12px;font-weight:800;line-height:1.5;margin-bottom:10px}
+.sales-doc-snapshot-note.locked{background:#f3f4f6;color:var(--text2)}
+.sales-doc-manual-adjustments{margin-top:10px}
 .sales-doc-grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .sales-doc-line-list{display:flex;flex-direction:column;gap:10px}
 .sales-doc-line-card{border:1px solid var(--border);border-radius:12px;background:var(--bg);padding:10px}
@@ -239,7 +249,10 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 @media (max-width:900px){
   .sales-doc-workspace,.sales-doc-workspace.open{display:flex;flex-direction:column}
   .sales-doc-preview{order:2}.sales-doc-editor{order:1}
-  .sales-doc-grid-2,.sales-doc-line-grid{grid-template-columns:1fr}
+  .sales-doc-grid-2,.sales-doc-line-grid,.sales-doc-billing-profile-grid{grid-template-columns:1fr}
+  .sales-doc-billing-group{padding:10px}
+  .sales-doc-billing-selector{padding:10px}
+  .sales-doc-billing-hint,.sales-doc-billing-group-sub{font-size:11px}
   .sales-doc-actions{width:100%}.sales-doc-actions .btn{flex:1;justify-content:center}
   .sales-doc-table-wrap table{min-width:720px}
   .sales-doc-preview-card{min-height:auto;padding:14px;aspect-ratio:auto}
@@ -4196,21 +4209,61 @@ function loadSalesDocumentBillingForContact(contactId, applyDefaults) {
   });
 }
 
+function getSalesDocumentSnapshotHelper(locked) {
+  return '<div class="sales-doc-snapshot-note ' + (locked ? 'locked' : '') + '">' +
+    (locked ? 'Snapshot היסטורי — פרטים אלה לא מתעדכנים מפרופיל הלקוח.' : 'הפרטים יישמרו כ־Snapshot במסמך בעת שמירה/הפקה.') +
+  '</div>';
+}
+
+function renderSalesDocumentBillingGroup(title, subtitle, body, extraClass) {
+  return '<div class="sales-doc-billing-group ' + (extraClass || '') + '">' +
+    '<div class="sales-doc-billing-group-title">' + escapeHtml(title) + '</div>' +
+    (subtitle ? '<div class="sales-doc-billing-group-sub">' + escapeHtml(subtitle) + '</div>' : '') +
+    '<div class="sales-doc-billing-group-body">' + body + '</div>' +
+  '</div>';
+}
+
+function renderSalesDocumentBillingProfileSummary(doc, state) {
+  var profile = (state && state.profile) || {};
+  var credit = doc.customer_credit_status_snapshot || profile.credit_status || 'normal';
+  var parts = [
+    ['שם לחיוב', doc.customer_billing_name_snapshot || profile.billing_name || '—'],
+    ['נמען', doc.customer_invoice_recipient_name_snapshot || doc.customer_name_snapshot || profile.invoice_recipient_name || '—'],
+    ['רמז מע״מ', getSalesDocumentVatHintText(doc)],
+    ['אשראי', credit === 'blocked' ? 'חסום' : (credit === 'watch' ? 'במעקב' : 'רגיל')]
+  ];
+  return '<div class="sales-doc-billing-profile-grid">' + parts.map(function(part) {
+    return '<div class="sales-doc-billing-profile-item"><strong>' + escapeHtml(part[0]) + '</strong>' + escapeHtml(part[1]) + '</div>';
+  }).join('') + '</div>';
+}
+
 function renderSalesDocumentBillingSelectors(doc, locked) {
   var state = salesDocumentBillingState || {};
-  if (!doc.contact_id) return '<div class="sales-doc-section-sub">בחרו לקוח כדי לטעון פרופיל חיוב, כתובות ואנשי קשר.</div>';
-  if (state.loading && Number(state.contactId) === Number(doc.contact_id)) return '<div class="sales-doc-section-sub">טוען פרופיל חיוב וכתובות...</div>';
-  if (state.error && Number(state.contactId) === Number(doc.contact_id)) return '<div class="sales-doc-billing-warning blocked">' + escapeHtml(state.error) + '</div>';
+  var helper = getSalesDocumentSnapshotHelper(locked);
+  if (!doc.contact_id) {
+    return helper + renderSalesDocumentBillingGroup('פרופיל חיוב', 'בחרו לקוח כדי לטעון פרופיל חיוב, כתובות ואנשי קשר.', '<div class="sales-doc-section-sub" style="margin:0">אפשר עדיין למלא את שדות המסמך ידנית.</div>');
+  }
+  if (state.loading && Number(state.contactId) === Number(doc.contact_id)) {
+    return helper + renderSalesDocumentBillingGroup('פרופיל חיוב', 'טוען נתוני חיוב שמורים ללקוח.', '<div class="sales-doc-section-sub" style="margin:0">טוען פרופיל חיוב, כתובות ואנשי קשר...</div>');
+  }
+  if (state.error && Number(state.contactId) === Number(doc.contact_id)) {
+    return helper + '<div class="sales-doc-billing-warning blocked">' + escapeHtml(state.error) + '</div>';
+  }
   var addresses = state.addresses || [];
   var people = state.people || [];
-  return getSalesDocumentCreditWarning(doc) +
-    '<div class="sales-doc-section-sub">' + escapeHtml(getSalesDocumentVatHintText(doc)) + '</div>' +
-    '<div class="sales-doc-grid-2">' +
-      '<div class="sales-doc-billing-selector"><div class="sales-doc-billing-selector-title">כתובת חיוב</div><select class="form-input sales-doc-billing-select" data-billing-select="billing_address"' + (locked ? ' disabled' : '') + '>' + buildSalesDocumentAddressOptions(addresses, doc.sales_document_billing_address_id || doc.customer_billing_address_id_snapshot) + '</select><div class="sales-doc-billing-hint">נשמרת בשדה כתובת הלקוח במסמך.</div></div>' +
-      '<div class="sales-doc-billing-selector"><div class="sales-doc-billing-selector-title">כתובת שירות/אירוע</div><select class="form-input sales-doc-billing-select" data-billing-select="service_address"' + (locked ? ' disabled' : '') + '>' + buildSalesDocumentAddressOptions(addresses, doc.sales_document_service_address_id || doc.customer_service_address_id_snapshot) + '</select><div class="sales-doc-billing-hint">נשמרת ב-Snapshot הפנימי של המסמך.</div></div>' +
-      '<div class="sales-doc-billing-selector"><div class="sales-doc-billing-selector-title">נמען למסמכים</div><select class="form-input sales-doc-billing-select" data-billing-select="document_contact"' + (locked ? ' disabled' : '') + '>' + buildSalesDocumentPersonOptions(people, doc.sales_document_document_contact_id || doc.customer_document_contact_id_snapshot) + '</select></div>' +
-      '<div class="sales-doc-billing-selector"><div class="sales-doc-billing-selector-title">איש קשר כספים</div><select class="form-input sales-doc-billing-select" data-billing-select="finance_contact"' + (locked ? ' disabled' : '') + '>' + buildSalesDocumentPersonOptions(people, doc.sales_document_finance_contact_id || doc.customer_finance_contact_id_snapshot) + '</select></div>' +
-    '</div>';
+  var profileBody = getSalesDocumentCreditWarning(doc) + renderSalesDocumentBillingProfileSummary(doc, state);
+  var addressBody = '<div class="sales-doc-grid-2">' +
+    '<div class="sales-doc-billing-selector"><div class="sales-doc-billing-selector-title">כתובת חיוב</div><select class="form-input sales-doc-billing-select" data-billing-select="billing_address"' + (locked ? ' disabled' : '') + '>' + buildSalesDocumentAddressOptions(addresses, doc.sales_document_billing_address_id || doc.customer_billing_address_id_snapshot) + '</select><div class="sales-doc-billing-hint">נשמרת בשדה כתובת הלקוח במסמך.</div></div>' +
+    '<div class="sales-doc-billing-selector"><div class="sales-doc-billing-selector-title">כתובת שירות/אירוע</div><select class="form-input sales-doc-billing-select" data-billing-select="service_address"' + (locked ? ' disabled' : '') + '>' + buildSalesDocumentAddressOptions(addresses, doc.sales_document_service_address_id || doc.customer_service_address_id_snapshot) + '</select><div class="sales-doc-billing-hint">נשמרת כ־Snapshot פנימי של המסמך.</div></div>' +
+  '</div>';
+  var peopleBody = '<div class="sales-doc-grid-2">' +
+    '<div class="sales-doc-billing-selector"><div class="sales-doc-billing-selector-title">נמען למסמכים</div><select class="form-input sales-doc-billing-select" data-billing-select="document_contact"' + (locked ? ' disabled' : '') + '>' + buildSalesDocumentPersonOptions(people, doc.sales_document_document_contact_id || doc.customer_document_contact_id_snapshot) + '</select><div class="sales-doc-billing-hint">יכול לעדכן את שם/אימייל/טלפון הנמען בטיוטה.</div></div>' +
+    '<div class="sales-doc-billing-selector"><div class="sales-doc-billing-selector-title">איש קשר כספים</div><select class="form-input sales-doc-billing-select" data-billing-select="finance_contact"' + (locked ? ' disabled' : '') + '>' + buildSalesDocumentPersonOptions(people, doc.sales_document_finance_contact_id || doc.customer_finance_contact_id_snapshot) + '</select><div class="sales-doc-billing-hint">נשמר כהקשר כספים למסמך.</div></div>' +
+  '</div>';
+  return helper +
+    renderSalesDocumentBillingGroup('פרופיל חיוב', 'סיכום נתוני ברירת המחדל מהלקוח. הגדרות העסק עדיין קובעות מע״מ וחישוב.', profileBody) +
+    renderSalesDocumentBillingGroup('כתובות', 'בחר כתובת שמורה או השאר בחירה ידנית.', addressBody) +
+    renderSalesDocumentBillingGroup('אנשי קשר', 'בחר נמען למסמכים ואיש קשר כספים מתוך אנשי הקשר של הלקוח.', peopleBody);
 }
 
 function renderSalesDocumentEditor() {
@@ -4229,20 +4282,21 @@ function renderSalesDocumentEditor() {
       salesDocumentInput(doc.document_type === 'invoice' ? 'due_date' : 'valid_until', doc.document_type === 'invoice' ? 'תאריך לתשלום' : 'בתוקף עד', doc.document_type === 'invoice' ? doc.due_date : doc.valid_until, 'date', locked) +
     '</div></div>' +
     '<div class="sales-doc-section"><div class="sales-doc-section-title">לקוח וחיוב</div>' +
-      '<div class="form-group"><label class="form-label">בחר לקוח קיים</label><select id="sales-document-contact-select" class="form-input"' + (locked ? ' disabled' : '') + '><option value="">' + (salesDocumentContactsLoading ? 'טוען לקוחות...' : 'ללא קישור — מילוי ידני') + '</option></select></div>' +
+      renderSalesDocumentBillingGroup('לקוח', 'קישור ללקוח קיים טוען ברירות מחדל בלבד. ניתן עדיין לבצע התאמות ידניות למסמך.', '<div class="form-group" style="margin-bottom:0"><label class="form-label">בחר לקוח קיים</label><select id="sales-document-contact-select" class="form-input"' + (locked ? ' disabled' : '') + '><option value="">' + (salesDocumentContactsLoading ? 'טוען לקוחות...' : 'ללא קישור — מילוי ידני') + '</option></select></div>') +
       renderSalesDocumentBillingSelectors(doc, locked) +
-      '<div class="sales-doc-grid-2">' +
-      salesDocumentInput('customer_name_snapshot', 'שם/נמען לחשבונית', doc.customer_name_snapshot, 'text', locked) +
-      salesDocumentInput('customer_phone_snapshot', 'טלפון נמען', doc.customer_phone_snapshot, 'tel', locked) +
-      salesDocumentInput('customer_email_snapshot', 'אימייל נמען', doc.customer_email_snapshot, 'email', locked) +
-      salesDocumentInput('customer_tax_id', 'ח.פ / ת.ז', doc.customer_tax_id, 'text', locked) +
-      salesDocumentInput('customer_address_snapshot', 'כתובת חיוב במסמך', doc.customer_address_snapshot, 'text', locked) +
-      salesDocumentInput('customer_service_address_snapshot', 'כתובת שירות/אירוע', doc.customer_service_address_snapshot, 'text', locked) +
-      salesDocumentInput('customer_document_contact_snapshot', 'איש קשר למסמכים', doc.customer_document_contact_snapshot, 'text', locked) +
-      salesDocumentInput('customer_finance_contact_snapshot', 'איש קשר כספים', doc.customer_finance_contact_snapshot, 'text', locked) +
-      salesDocumentInput('customer_default_discount_percent', 'הנחת לקוח % (ידני)', doc.customer_default_discount_percent, 'number', locked) +
-      salesDocumentInput('customer_default_discount_amount', 'הנחת לקוח ₪ (ידני)', doc.customer_default_discount_amount, 'number', locked) +
-    '</div></div>' +
+      renderSalesDocumentBillingGroup('שדות ידניים / התאמות למסמך', 'שדות אלה הם ה־Snapshot שיופיע/יישמר במסמך הנוכחי. שינוי כאן לא משנה את פרופיל הלקוח.', '<div class="sales-doc-grid-2 sales-doc-manual-adjustments">' +
+        salesDocumentInput('customer_name_snapshot', 'שם/נמען לחשבונית', doc.customer_name_snapshot, 'text', locked) +
+        salesDocumentInput('customer_phone_snapshot', 'טלפון נמען', doc.customer_phone_snapshot, 'tel', locked) +
+        salesDocumentInput('customer_email_snapshot', 'אימייל נמען', doc.customer_email_snapshot, 'email', locked) +
+        salesDocumentInput('customer_tax_id', 'ח.פ / ת.ז', doc.customer_tax_id, 'text', locked) +
+        salesDocumentInput('customer_address_snapshot', 'כתובת חיוב במסמך', doc.customer_address_snapshot, 'text', locked) +
+        salesDocumentInput('customer_service_address_snapshot', 'כתובת שירות/אירוע', doc.customer_service_address_snapshot, 'text', locked) +
+        salesDocumentInput('customer_document_contact_snapshot', 'איש קשר למסמכים', doc.customer_document_contact_snapshot, 'text', locked) +
+        salesDocumentInput('customer_finance_contact_snapshot', 'איש קשר כספים', doc.customer_finance_contact_snapshot, 'text', locked) +
+        salesDocumentInput('customer_default_discount_percent', 'הנחת לקוח % (ידני)', doc.customer_default_discount_percent, 'number', locked) +
+        salesDocumentInput('customer_default_discount_amount', 'הנחת לקוח ₪ (ידני)', doc.customer_default_discount_amount, 'number', locked) +
+      '</div>') +
+    '</div>' +
     '<div class="sales-doc-section"><div class="sales-doc-section-title">פרטי העסק במסמך</div><div class="sales-doc-grid-2">' +
       salesDocumentInput('business_name_snapshot', 'שם העסק במסמך', doc.business_name_snapshot, 'text', locked) +
       salesDocumentInput('business_legal_name_snapshot', 'שם משפטי', doc.business_legal_name_snapshot, 'text', locked) +
