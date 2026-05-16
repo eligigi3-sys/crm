@@ -60,7 +60,7 @@ function normalizeOptionalPositiveInteger(value, label) {
 async function getContactForTenant(env, tenantId, contactId) {
   if (!contactId) return null;
   return env.DB.prepare(
-    'SELECT id, name, phone, email, city, area, notes, general_notes FROM contacts WHERE id = ? AND tenant_id = ? LIMIT 1'
+    'SELECT id, name, phone, email, notes, general_notes FROM contacts WHERE id = ? AND tenant_id = ? LIMIT 1'
   ).bind(contactId, tenantId).first();
 }
 
