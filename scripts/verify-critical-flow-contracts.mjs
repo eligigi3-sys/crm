@@ -226,6 +226,7 @@ function verifyStrategicContacts(results) {
   const admin = read('src/admin.js');
   const worker = read('worker.js');
   const ui = read('src/ui.js');
+  const schemaV28 = read('schema_v28.sql');
 
   expect(auth, "'strategic_contacts'", 'auth module allowlist includes strategic_contacts', results);
   expect(admin, "'strategic_contacts'", 'admin module allowlist includes strategic_contacts', results);
@@ -248,6 +249,17 @@ function verifyStrategicContacts(results) {
   expect(ui, 'strategicContactMessageTemplateOptions', 'UI includes predefined message templates', results);
   expect(ui, 'message-template-copy', 'UI includes message template copy button', results);
   expect(ui, 'wa.me', 'UI includes optional WhatsApp template link', results);
+  expect(ui, 'strategic-contacts-value-filter', 'UI includes relationship value filter', results);
+  expect(ui, 'strategicContactRelationshipGradeOptions', 'UI includes relationship grade options', results);
+  expect(ui, 'strategicContactWarmthLevelOptions', 'UI includes warmth level options', results);
+  expect(ui, 'דירוג קשר', 'UI includes relationship grade label', results);
+  expect(ui, 'פוטנציאל שנתי', 'UI includes annual value label', results);
+
+  expect(schemaV28, 'ADD COLUMN relationship_grade TEXT', 'schema v28 adds relationship grade', results);
+  expect(schemaV28, 'ADD COLUMN warmth_level TEXT', 'schema v28 adds warmth level', results);
+  expect(schemaV28, 'ADD COLUMN estimated_annual_value REAL', 'schema v28 adds estimated annual value', results);
+  expect(schemaV28, 'ADD COLUMN potential_events_per_year INTEGER', 'schema v28 adds potential events per year', results);
+  expect(schemaV28, 'ADD COLUMN relevant_services TEXT', 'schema v28 adds relevant services', results);
 
   expectInBlock(strategic, 'export async function handleStrategicContacts', ['return json({ error: \'Strategic contacts route not found\' }, 404);'], [
     'requireTenantContext(request, env)',
@@ -271,6 +283,9 @@ function verifyStrategicContacts(results) {
     'priority = ?',
     'linked_contact_id = ?',
     'tags LIKE ?',
+    "relationship_grade = 'A'",
+    "warmth_level IN ('warm', 'hot')",
+    'estimated_annual_value >= 5000',
     "next_contact_at = date('now')",
     "next_contact_at <= date('now', '+7 days')",
     "next_contact_at < date('now')",
@@ -316,6 +331,11 @@ function verifyStrategicContacts(results) {
     'getStrategicContactForTenant(env, tenantId, id)',
     'validateLinkedContactId(env, tenantId, payload.linked_contact_id)',
     'linked_contact_id = ?',
+    'relationship_grade = ?',
+    'warmth_level = ?',
+    'estimated_annual_value = ?',
+    'potential_events_per_year = ?',
+    'relevant_services = ?',
     'WHERE id = ? AND tenant_id = ?'
   ], 'strategic contacts update is tenant-scoped and validates linked contact', results);
 }

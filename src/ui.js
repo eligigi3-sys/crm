@@ -1602,6 +1602,7 @@ id="customers-search">
           <select class="filter-select" id="strategic-contacts-priority-filter"><option value="">כל העדיפויות</option></select>
           <select class="filter-select" id="strategic-contacts-follow-up-filter"><option value="">כל המעקבים</option></select>
           <select class="filter-select" id="strategic-contacts-seasonal-filter"><option value="">כל העונות</option></select>
+          <select class="filter-select" id="strategic-contacts-value-filter"><option value="">כל ערכי הקשר</option></select>
         </div>
         <div id="strategic-contacts-grid" style="padding:16px"><div class="dash-empty">טוען...</div></div>
       </div>
@@ -2298,7 +2299,7 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   if (navSuperAdmin) navSuperAdmin.addEventListener('click', function() { goTo('super-admin', this); });
   var strategicContactsSearch = document.getElementById('strategic-contacts-search');
   if (strategicContactsSearch) strategicContactsSearch.addEventListener('input', function() { clearTimeout(searchTimer); searchTimer = setTimeout(loadStrategicContacts, 300); });
-  ['strategic-contacts-category-filter','strategic-contacts-status-filter','strategic-contacts-priority-filter','strategic-contacts-follow-up-filter','strategic-contacts-seasonal-filter'].forEach(function(id) { var el = document.getElementById(id); if (el) el.addEventListener('change', loadStrategicContacts); });
+  ['strategic-contacts-category-filter','strategic-contacts-status-filter','strategic-contacts-priority-filter','strategic-contacts-follow-up-filter','strategic-contacts-seasonal-filter','strategic-contacts-value-filter'].forEach(function(id) { var el = document.getElementById(id); if (el) el.addEventListener('change', loadStrategicContacts); });
   var newStrategicContact = document.getElementById('btn-new-strategic-contact');
   if (newStrategicContact) newStrategicContact.addEventListener('click', function() { openStrategicContactModal(); });
   var salesDocumentsSearch = document.getElementById('sales-documents-search');
@@ -5769,6 +5770,23 @@ var strategicContactPriorityOptions = [
   ['normal', 'רגילה'],
   ['high', 'גבוהה']
 ];
+var strategicContactRelationshipGradeOptions = [
+  ['', 'לא צוין'],
+  ['A', 'אסטרטגי מאוד'],
+  ['B', 'כדאי לתחזק'],
+  ['C', 'נמוך']
+];
+var strategicContactWarmthLevelOptions = [
+  ['', 'לא צוין'],
+  ['cold', 'קר'],
+  ['warm', 'חם'],
+  ['hot', 'חם מאוד']
+];
+var strategicContactRelationshipValueFilterOptions = [
+  ['grade_a', 'דירוג A'],
+  ['warm_hot', 'חם / חם מאוד'],
+  ['high_potential', 'פוטנציאל גבוה']
+];
 var strategicContactChannelOptions = [
   ['', 'לא צוין'],
   ['phone', 'טלפון'],
@@ -5830,6 +5848,24 @@ function renderStrategicContactOptions(options, selected, includeAllLabel) {
     return '<option value="' + escapeHtml(item[0]) + '"' + (String(selected || '') === item[0] ? ' selected' : '') + '>' + escapeHtml(item[1]) + '</option>';
   }).join('');
 }
+function formatStrategicContactNumber(value) {
+  if (value === null || value === undefined || value === '') return '';
+  var number = Number(value);
+  if (!isFinite(number)) return '';
+  return number.toLocaleString('he-IL');
+}
+
+function renderStrategicContactRelationshipBadges(item) {
+  item = item || {};
+  var badges = [];
+  if (item.relationship_grade) badges.push('<span class="badge badge-purple">דירוג קשר: ' + escapeHtml(item.relationship_grade + ' · ' + getStrategicContactOptionLabel(strategicContactRelationshipGradeOptions, item.relationship_grade)) + '</span>');
+  if (item.warmth_level) badges.push('<span class="badge badge-orange">רמת חום: ' + escapeHtml(getStrategicContactOptionLabel(strategicContactWarmthLevelOptions, item.warmth_level)) + '</span>');
+  if (item.estimated_annual_value !== null && item.estimated_annual_value !== undefined && item.estimated_annual_value !== '') badges.push('<span class="badge badge-green">פוטנציאל שנתי: ₪' + escapeHtml(formatStrategicContactNumber(item.estimated_annual_value)) + '</span>');
+  if (item.potential_events_per_year !== null && item.potential_events_per_year !== undefined && item.potential_events_per_year !== '') badges.push('<span class="badge badge-blue">אירועים פוטנציאליים בשנה: ' + escapeHtml(formatStrategicContactNumber(item.potential_events_per_year)) + '</span>');
+  if (!badges.length) return '';
+  return '<div class="strategic-contact-meta strategic-contact-value-badges">' + badges.join('') + '</div>';
+}
+
 
 function parseStrategicContactTags(value) {
   if (!value) return [];
@@ -5885,11 +5921,13 @@ function setupStrategicContactFilters() {
   var priority = document.getElementById('strategic-contacts-priority-filter');
   var followUp = document.getElementById('strategic-contacts-follow-up-filter');
   var seasonal = document.getElementById('strategic-contacts-seasonal-filter');
+  var relationshipValue = document.getElementById('strategic-contacts-value-filter');
   if (category && category.options.length <= 1) category.innerHTML = renderStrategicContactOptions(strategicContactCategoryOptions, '', 'כל הקטגוריות');
   if (status && status.options.length <= 1) status.innerHTML = renderStrategicContactOptions(strategicContactStatusOptions, '', 'כל הסטטוסים');
   if (priority && priority.options.length <= 1) priority.innerHTML = renderStrategicContactOptions(strategicContactPriorityOptions, '', 'כל העדיפויות');
   if (followUp && followUp.options.length <= 1) followUp.innerHTML = renderStrategicContactOptions(strategicContactFollowUpFilterOptions, '', 'כל המעקבים');
   if (seasonal && seasonal.options.length <= 1) seasonal.innerHTML = renderStrategicContactOptions(strategicContactSeasonalTagOptions, '', 'כל העונות');
+  if (relationshipValue && relationshipValue.options.length <= 1) relationshipValue.innerHTML = renderStrategicContactOptions(strategicContactRelationshipValueFilterOptions, '', 'כל ערכי הקשר');
 }
 
 function buildStrategicContactsQuery() {
@@ -5900,12 +5938,14 @@ function buildStrategicContactsQuery() {
   var priority = document.getElementById('strategic-contacts-priority-filter');
   var followUp = document.getElementById('strategic-contacts-follow-up-filter');
   var seasonal = document.getElementById('strategic-contacts-seasonal-filter');
+  var relationshipValue = document.getElementById('strategic-contacts-value-filter');
   if (search && search.value.trim()) params.set('search', search.value.trim());
   if (category && category.value) params.set('category', category.value);
   if (status && status.value) params.set('status', status.value);
   if (priority && priority.value) params.set('priority', priority.value);
   if (followUp && followUp.value) params.set('follow_up', followUp.value);
   if (seasonal && seasonal.value) params.set('seasonal_tag', seasonal.value);
+  if (relationshipValue && relationshipValue.value) params.set('relationship_value', relationshipValue.value);
   var query = params.toString();
   return query ? '?' + query : '';
 }
@@ -6051,6 +6091,8 @@ function renderStrategicContactCard(item) {
     '<div class="strategic-contact-meta"><span>קשר אחרון: ' + escapeHtml(formatDate(item.last_contact_at) || '—') + '</span><span>קשר הבא: ' + escapeHtml(formatDate(item.next_contact_at) || '—') + '</span></div>' +
     (item.followup_reason ? '<div class="strategic-contact-meta"><strong>סיבת מעקב:</strong> ' + escapeHtml(item.followup_reason) + '</div>' : '') +
     renderStrategicContactSeasonalBadges(item.tags) +
+    renderStrategicContactRelationshipBadges(item) +
+    (item.relevant_services ? '<div class="strategic-contact-meta"><strong>שירותים רלוונטיים:</strong> ' + escapeHtml(item.relevant_services) + '</div>' : '') +
     (note ? '<div class="strategic-contact-note">' + escapeHtml(note) + (String(item.notes).length > 140 ? '…' : '') + '</div>' : '') +
     (Number(item.active) === 0 ? '<div class="strategic-contact-meta"><span class="badge badge-gray">לא פעיל</span></div>' : '') +
   '</div>';
@@ -6097,7 +6139,8 @@ function loadStrategicContacts() {
 }
 
 function strategicContactInput(field, label, value, type) {
-  return '<div class="form-group" style="margin-bottom:0"><label class="form-label">' + escapeHtml(label) + '</label><input class="form-input strategic-contact-field" data-strategic-contact-field="' + escapeHtml(field) + '" type="' + escapeHtml(type || 'text') + '" value="' + escapeHtml(value || '') + '"></div>';
+  var inputValue = value === undefined || value === null ? '' : value;
+  return '<div class="form-group" style="margin-bottom:0"><label class="form-label">' + escapeHtml(label) + '</label><input class="form-input strategic-contact-field" data-strategic-contact-field="' + escapeHtml(field) + '" type="' + escapeHtml(type || 'text') + '" value="' + escapeHtml(inputValue) + '"></div>';
 }
 
 function strategicContactSelect(field, label, value, options) {
@@ -6194,6 +6237,10 @@ function openStrategicContactModal(id, defaults) {
       strategicContactSelect('category', 'קטגוריה', item.category || 'other', strategicContactCategoryOptions) +
       strategicContactSelect('status', 'סטטוס', item.status || 'new', strategicContactStatusOptions) +
       strategicContactSelect('priority', 'עדיפות', item.priority || 'normal', strategicContactPriorityOptions) +
+      strategicContactSelect('relationship_grade', 'דירוג קשר', item.relationship_grade || '', strategicContactRelationshipGradeOptions) +
+      strategicContactSelect('warmth_level', 'רמת חום', item.warmth_level || '', strategicContactWarmthLevelOptions) +
+      strategicContactInput('estimated_annual_value', 'פוטנציאל שנתי', item.estimated_annual_value, 'number') +
+      strategicContactInput('potential_events_per_year', 'אירועים פוטנציאליים בשנה', item.potential_events_per_year, 'number') +
       strategicContactInput('phone', 'טלפון', item.phone, 'tel') +
       strategicContactInput('whatsapp', 'WhatsApp', item.whatsapp, 'tel') +
       strategicContactInput('email', 'אימייל', item.email, 'email') +
@@ -6209,6 +6256,7 @@ function openStrategicContactModal(id, defaults) {
       strategicContactSelect('active', 'פעיל', String(item.active) === '0' ? '0' : '1', [['1','פעיל'],['0','לא פעיל']]) +
     '</div><div class="strategic-contact-form-grid single" style="margin-top:12px">' +
       strategicContactInput('followup_reason', 'סיבת מעקב', item.followup_reason, 'text') +
+      strategicContactTextarea('relevant_services', 'שירותים רלוונטיים', item.relevant_services) +
       strategicContactTextarea('notes', 'הערות', item.notes) +
     '</div>' + renderStrategicContactActivitiesSection(isEdit ? id : null);
     if (isEdit) {

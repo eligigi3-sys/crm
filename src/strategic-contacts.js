@@ -37,6 +37,9 @@ const CHANNEL_VALUES = new Set(['', 'phone', 'whatsapp', 'email', 'meeting', 'ot
 const ACTIVITY_TYPE_VALUES = new Set(['note', 'call', 'whatsapp', 'email', 'meeting', 'followup', 'other']);
 const FOLLOW_UP_FILTER_VALUES = new Set(['today', 'week', 'overdue', 'high_priority', 'dormant_90']);
 const SEASONAL_TAG_VALUES = new Set(['school_start', 'school_end', 'purim', 'pesach', 'rosh_hashana', 'hanukkah', 'civil_year_end', 'team_building', 'wedding_season', 'summer', 'bar_bat_mitzvah', 'all_year']);
+const RELATIONSHIP_GRADE_VALUES = new Set(['', 'A', 'B', 'C']);
+const WARMTH_LEVEL_VALUES = new Set(['', 'cold', 'warm', 'hot']);
+const RELATIONSHIP_VALUE_FILTER_VALUES = new Set(['grade_a', 'warm_hot', 'high_potential']);
 
 function normalizeEnum(value, allowed, fallback, label) {
   const text = String(value === undefined || value === null ? fallback : value).trim();
@@ -55,6 +58,24 @@ function normalizeOptionalPositiveInteger(value, label) {
   if (value === undefined || value === null || value === '') return null;
   const numberValue = Number(value);
   if (!Number.isInteger(numberValue) || numberValue <= 0) {
+    throw new Error(label + ' לא תקין');
+  }
+  return numberValue;
+}
+
+function normalizeOptionalNonNegativeNumber(value, label) {
+  if (value === undefined || value === null || value === '') return null;
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue) || numberValue < 0) {
+    throw new Error(label + ' לא תקין');
+  }
+  return numberValue;
+}
+
+function normalizeOptionalNonNegativeInteger(value, label) {
+  if (value === undefined || value === null || value === '') return null;
+  const numberValue = Number(value);
+  if (!Number.isInteger(numberValue) || numberValue < 0) {
     throw new Error(label + ' לא תקין');
   }
   return numberValue;
@@ -129,6 +150,11 @@ function mapStrategicContact(row) {
     notes: row.notes || null,
     active: Number(row.active) === 1 ? 1 : 0,
     linked_contact_id: row.linked_contact_id || null,
+    relationship_grade: row.relationship_grade || null,
+    warmth_level: row.warmth_level || null,
+    estimated_annual_value: row.estimated_annual_value === null || row.estimated_annual_value === undefined ? null : Number(row.estimated_annual_value),
+    potential_events_per_year: row.potential_events_per_year === null || row.potential_events_per_year === undefined ? null : Number(row.potential_events_per_year),
+    relevant_services: row.relevant_services || null,
     created_at: row.created_at || null,
     updated_at: row.updated_at || null
   };
@@ -147,6 +173,8 @@ function buildStrategicContactPayload(body, existing = {}) {
   const statusValue = normalizeEnum(next.status, STATUS_VALUES, 'new', 'סטטוס');
   const priorityValue = normalizeEnum(next.priority, PRIORITY_VALUES, 'normal', 'עדיפות');
   const preferredChannel = normalizeEnum(next.preferred_channel || '', CHANNEL_VALUES, '', 'ערוץ מועדף') || null;
+  const relationshipGrade = normalizeEnum(next.relationship_grade || '', RELATIONSHIP_GRADE_VALUES, '', 'דירוג קשר') || null;
+  const warmthLevel = normalizeEnum(next.warmth_level || '', WARMTH_LEVEL_VALUES, '', 'רמת חום') || null;
 
   return {
     organization_name: normalizeRequiredText(next.organization_name, 'שם ארגון'),
@@ -169,7 +197,12 @@ function buildStrategicContactPayload(body, existing = {}) {
     followup_reason: normalizeOptionalText(next.followup_reason),
     notes: normalizeOptionalText(next.notes),
     active: normalizeActive(next.active),
-    linked_contact_id: normalizeOptionalPositiveInteger(next.linked_contact_id, 'לקוח מקושר')
+    linked_contact_id: normalizeOptionalPositiveInteger(next.linked_contact_id, 'לקוח מקושר'),
+    relationship_grade: relationshipGrade,
+    warmth_level: warmthLevel,
+    estimated_annual_value: normalizeOptionalNonNegativeNumber(next.estimated_annual_value, 'פוטנציאל שנתי'),
+    potential_events_per_year: normalizeOptionalNonNegativeInteger(next.potential_events_per_year, 'אירועים פוטנציאליים בשנה'),
+    relevant_services: normalizeOptionalText(next.relevant_services)
   };
 }
 
@@ -183,6 +216,7 @@ async function listStrategicContacts(request, env, tenantId) {
   const linkedContactId = normalizeOptionalPositiveInteger(url.searchParams.get('linked_contact_id'), 'לקוח מקושר');
   const followUp = normalizeOptionalText(url.searchParams.get('follow_up'));
   const seasonalTag = normalizeOptionalText(url.searchParams.get('seasonal_tag'));
+  const relationshipValue = normalizeOptionalText(url.searchParams.get('relationship_value'));
   const due = normalizeOptionalText(url.searchParams.get('next_contact_due')) || normalizeOptionalText(url.searchParams.get('overdue'));
 
   let sql = 'SELECT * FROM strategic_contacts WHERE tenant_id = ?';
@@ -198,10 +232,11 @@ async function listStrategicContacts(request, env, tenantId) {
       OR city LIKE ?
       OR area LIKE ?
       OR tags LIKE ?
+      OR relevant_services LIKE ?
       OR notes LIKE ?
     )`;
     const like = '%' + search + '%';
-    params.push(like, like, like, like, like, like, like, like, like);
+    params.push(like, like, like, like, like, like, like, like, like, like);
   }
 
   if (category) {
@@ -231,6 +266,17 @@ async function listStrategicContacts(request, env, tenantId) {
     if (!SEASONAL_TAG_VALUES.has(seasonalTag)) return json({ error: 'תגית עונתית לא תקינה' }, 400);
     sql += ' AND tags LIKE ?';
     params.push('%' + seasonalTag + '%');
+  }
+
+  if (relationshipValue) {
+    if (!RELATIONSHIP_VALUE_FILTER_VALUES.has(relationshipValue)) return json({ error: 'מסנן ערך קשר לא תקין' }, 400);
+    if (relationshipValue === 'grade_a') {
+      sql += " AND relationship_grade = 'A'";
+    } else if (relationshipValue === 'warm_hot') {
+      sql += " AND warmth_level IN ('warm', 'hot')";
+    } else if (relationshipValue === 'high_potential') {
+      sql += " AND (estimated_annual_value >= 5000 OR potential_events_per_year >= 3)";
+    }
   }
 
   if (active === null) {
@@ -454,9 +500,14 @@ async function createStrategicContact(request, env, tenantId) {
       notes,
       active,
       linked_contact_id,
+      relationship_grade,
+      warmth_level,
+      estimated_annual_value,
+      potential_events_per_year,
+      relevant_services,
       created_at,
       updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
   ).bind(
     tenantId,
     payload.organization_name,
@@ -479,7 +530,12 @@ async function createStrategicContact(request, env, tenantId) {
     payload.followup_reason,
     payload.notes,
     payload.active,
-    payload.linked_contact_id
+    payload.linked_contact_id,
+    payload.relationship_grade,
+    payload.warmth_level,
+    payload.estimated_annual_value,
+    payload.potential_events_per_year,
+    payload.relevant_services
   ).run();
 
   const created = await getStrategicContactForTenant(env, tenantId, result.meta.last_row_id);
@@ -528,6 +584,11 @@ async function updateStrategicContact(request, env, tenantId, id) {
       notes = ?,
       active = ?,
       linked_contact_id = ?,
+      relationship_grade = ?,
+      warmth_level = ?,
+      estimated_annual_value = ?,
+      potential_events_per_year = ?,
+      relevant_services = ?,
       updated_at = CURRENT_TIMESTAMP
      WHERE id = ? AND tenant_id = ?`
   ).bind(
@@ -552,6 +613,11 @@ async function updateStrategicContact(request, env, tenantId, id) {
     payload.notes,
     payload.active,
     payload.linked_contact_id,
+    payload.relationship_grade,
+    payload.warmth_level,
+    payload.estimated_annual_value,
+    payload.potential_events_per_year,
+    payload.relevant_services,
     id,
     tenantId
   ).run();
