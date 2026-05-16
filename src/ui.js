@@ -587,9 +587,15 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .strategic-contact-actions{display:flex;gap:7px;flex-wrap:wrap}
 .strategic-contact-note{font-size:12px;color:var(--text2);line-height:1.5;background:#f8fafc;border-radius:10px;padding:8px}
 .strategic-contact-linked-notice{border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:12px;padding:10px 12px;font-size:12px;font-weight:800;line-height:1.5;margin-bottom:12px}
+.strategic-contact-activities{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
+.strategic-contact-activity-list{display:flex;flex-direction:column;gap:8px;margin:10px 0}
+.strategic-contact-activity-item{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff}
+.strategic-contact-activity-title{font-weight:800;font-size:13px;color:var(--text)}
+.strategic-contact-activity-meta{font-size:12px;color:var(--text3);margin-top:4px}
+.strategic-contact-activity-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:end}
 .strategic-contact-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .strategic-contact-form-grid.single{grid-template-columns:1fr}
-@media (max-width:900px){.strategic-contacts-grid,.strategic-contact-form-grid{grid-template-columns:1fr}.strategic-contact-card{padding:12px}.strategic-contact-actions .btn{flex:1;justify-content:center}}
+@media (max-width:900px){.strategic-contacts-grid,.strategic-contact-form-grid,.strategic-contact-activity-form{grid-template-columns:1fr}.strategic-contact-card{padding:12px}.strategic-contact-actions .btn{flex:1;justify-content:center}}
 .autocomplete-list{position:absolute;top:100%;right:0;left:0;background:var(--white);border:1px solid var(--accent);border-radius:var(--radius-sm);box-shadow:var(--shadow-md);z-index:300;max-height:200px;overflow-y:auto}
 .autocomplete-item{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)}
 .autocomplete-item:last-child{border-bottom:none}
@@ -5766,6 +5772,15 @@ var strategicContactChannelOptions = [
   ['meeting', 'פגישה'],
   ['other', 'אחר']
 ];
+var strategicContactActivityTypeOptions = [
+  ['note', 'הערה'],
+  ['call', 'שיחה'],
+  ['whatsapp', 'WhatsApp'],
+  ['email', 'אימייל'],
+  ['meeting', 'פגישה'],
+  ['followup', 'מעקב'],
+  ['other', 'אחר']
+];
 
 function getStrategicContactOptionLabel(options, value) {
   var found = options.find(function(item) { return item[0] === value; });
@@ -5866,6 +5881,63 @@ function strategicContactTextarea(field, label, value) {
   return '<div class="form-group" style="margin-bottom:0"><label class="form-label">' + escapeHtml(label) + '</label><textarea class="form-textarea strategic-contact-field" data-strategic-contact-field="' + escapeHtml(field) + '">' + escapeHtml(value || '') + '</textarea></div>';
 }
 
+function renderStrategicContactActivitiesSection(strategicContactId) {
+  if (!strategicContactId) return '';
+  return '<div class="strategic-contact-activities">' +
+    '<h3 style="margin:0 0 8px">פעילויות אחרונות</h3>' +
+    '<div id="strategic-contact-activities-list" class="strategic-contact-activity-list"><div class="dash-empty">טוען פעילויות...</div></div>' +
+    '<div class="strategic-contact-activity-form">' +
+      '<div class="form-group" style="margin-bottom:0"><label class="form-label">סוג פעילות</label><select class="form-input" id="strategic-contact-activity-type">' + renderStrategicContactOptions(strategicContactActivityTypeOptions, 'note', '') + '</select></div>' +
+      '<div class="form-group" style="margin-bottom:0"><label class="form-label">ערוץ</label><select class="form-input" id="strategic-contact-activity-channel">' + renderStrategicContactOptions(strategicContactChannelOptions, '', '') + '</select></div>' +
+      '<div class="form-group" style="margin-bottom:0"><label class="form-label">תאריך פעילות</label><input class="form-input" id="strategic-contact-activity-at" type="date"></div>' +
+      '<div class="form-group" style="margin-bottom:0"><label class="form-label">קשר הבא</label><input class="form-input" id="strategic-contact-activity-next" type="date"></div>' +
+      '<div class="form-group" style="grid-column:1/-1;margin-bottom:0"><label class="form-label">סיכום</label><textarea class="form-textarea" id="strategic-contact-activity-summary" placeholder="מה קרה בשיחה / פגישה?"></textarea></div>' +
+      '<div style="grid-column:1/-1"><button class="btn btn-secondary btn-sm" id="strategic-contact-activity-add" type="button">הוסף פעילות</button></div>' +
+    '</div>' +
+  '</div>';
+}
+
+function renderStrategicContactActivityItem(item) {
+  return '<div class="strategic-contact-activity-item">' +
+    '<div class="strategic-contact-activity-title">' + escapeHtml(getStrategicContactOptionLabel(strategicContactActivityTypeOptions, item.activity_type)) + (item.channel ? ' · ' + escapeHtml(getStrategicContactOptionLabel(strategicContactChannelOptions, item.channel)) : '') + '</div>' +
+    '<div class="strategic-contact-activity-meta">' + escapeHtml(formatDate(item.activity_at || item.created_at) || '—') + (item.next_contact_at ? ' · קשר הבא: ' + escapeHtml(formatDate(item.next_contact_at)) : '') + '</div>' +
+    '<div class="strategic-contact-note" style="margin-top:6px">' + escapeHtml(item.summary || '') + '</div>' +
+  '</div>';
+}
+
+function loadStrategicContactActivities(strategicContactId) {
+  var list = document.getElementById('strategic-contact-activities-list');
+  if (!list || !strategicContactId) return;
+  list.innerHTML = '<div class="dash-empty">טוען פעילויות...</div>';
+  apiCall('GET', '/api/strategic-contacts/' + strategicContactId + '/activities').then(function(data) {
+    var activities = data.activities || [];
+    list.innerHTML = activities.length ? activities.map(renderStrategicContactActivityItem).join('') : '<div class="dash-empty">אין עדיין פעילויות</div>';
+  }).catch(function(err) {
+    list.innerHTML = '<div class="dash-empty">שגיאה בטעינת פעילויות: ' + escapeHtml(err.message || 'שגיאה') + '</div>';
+  });
+}
+
+function setupStrategicContactActivityForm(strategicContactId) {
+  var btn = document.getElementById('strategic-contact-activity-add');
+  if (!btn || !strategicContactId) return;
+  btn.addEventListener('click', function() {
+    var summary = document.getElementById('strategic-contact-activity-summary');
+    var payload = {
+      activity_type: document.getElementById('strategic-contact-activity-type').value,
+      channel: document.getElementById('strategic-contact-activity-channel').value,
+      activity_at: document.getElementById('strategic-contact-activity-at').value,
+      next_contact_at: document.getElementById('strategic-contact-activity-next').value,
+      summary: summary ? summary.value : ''
+    };
+    if (!payload.summary || !payload.summary.trim()) { toast('סיכום פעילות חובה', 'error'); return; }
+    apiCall('POST', '/api/strategic-contacts/' + strategicContactId + '/activities', payload).then(function() {
+      toast('הפעילות נשמרה', 'success');
+      if (summary) summary.value = '';
+      loadStrategicContactActivities(strategicContactId);
+    }).catch(function(err) { toast(err.message || 'שגיאה בשמירת פעילות', 'error'); });
+  });
+}
+
 function openStrategicContactModal(id, defaults) {
   var isEdit = !!id;
   defaults = defaults || null;
@@ -5910,7 +5982,11 @@ function openStrategicContactModal(id, defaults) {
     '</div><div class="strategic-contact-form-grid single" style="margin-top:12px">' +
       strategicContactInput('followup_reason', 'סיבת מעקב', item.followup_reason, 'text') +
       strategicContactTextarea('notes', 'הערות', item.notes) +
-    '</div>';
+    '</div>' + renderStrategicContactActivitiesSection(isEdit ? id : null);
+    if (isEdit) {
+      loadStrategicContactActivities(id);
+      setupStrategicContactActivityForm(id);
+    }
   }
 
   function collectPayload() {

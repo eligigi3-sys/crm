@@ -234,6 +234,8 @@ function verifyStrategicContacts(results) {
   expect(ui, 'page-strategic-contacts', 'UI includes strategic contacts page', results);
   expect(ui, 'הוסף לקשרים אסטרטגיים', 'UI includes customer-to-strategic action', results);
   expect(ui, 'לקוח זה כבר מקושר לקשר אסטרטגי', 'UI warns before creating duplicate linked strategic contact', results);
+  expect(ui, 'פעילויות אחרונות', 'UI includes strategic contact activities timeline', results);
+  expect(ui, '/activities', 'UI calls strategic contact activities API', results);
 
   expectInBlock(strategic, 'export async function handleStrategicContacts', ['return json({ error: \'Strategic contacts route not found\' }, 404);'], [
     'requireTenantContext(request, env)',
@@ -241,6 +243,7 @@ function verifyStrategicContacts(results) {
     "path === '/api/strategic-contacts' && method === 'GET'",
     "path === '/api/strategic-contacts' && method === 'POST'",
     "assertTenantRole(tenantCtx, ['owner', 'admin', 'manager'])",
+    "path.match(/^\\/api\\/strategic-contacts\\/(\\d+)\\/activities$/)",
     "path.match(/^\\/api\\/strategic-contacts\\/(\\d+)$/)"
   ], 'strategic contacts routes require tenant context, module guard, and write RBAC', results);
 
@@ -261,6 +264,22 @@ function verifyStrategicContacts(results) {
     'getContactForTenant(env, tenantId, linkedContactId)',
     "throw new Error('הלקוח המקושר לא נמצא')"
   ], 'strategic contacts validate linked_contact_id against same tenant contact', results);
+
+  expectInBlock(strategic, 'async function listStrategicContactActivities', ['async function createStrategicContactActivity'], [
+    'getStrategicContactForTenant(env, tenantId, strategicContactId)',
+    'FROM strategic_contact_activities',
+    'WHERE tenant_id = ?',
+    'AND strategic_contact_id = ?'
+  ], 'strategic contact activities list is tenant-scoped and parent-scoped', results);
+
+  expectInBlock(strategic, 'async function createStrategicContactActivity', ['async function createStrategicContact'], [
+    'getStrategicContactForTenant(env, tenantId, strategicContactId)',
+    'INSERT INTO strategic_contact_activities',
+    'tenantCtx.user.id',
+    'WHERE id = ?',
+    'AND tenant_id = ?',
+    'AND strategic_contact_id = ?'
+  ], 'strategic contact activities create validates parent and records actor', results);
 
   expectInBlock(strategic, 'async function updateStrategicContact', ['export async function handleStrategicContacts'], [
     'getStrategicContactForTenant(env, tenantId, id)',
