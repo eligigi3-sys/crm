@@ -4095,15 +4095,6 @@ function applySalesDocumentCustomerDiscount(doc, profile) {
   if (!doc || !profile) return;
   doc.customer_default_discount_percent = Number(profile.default_discount_percent || 0);
   doc.customer_default_discount_amount = Number(profile.default_discount_amount || 0);
-  if (!doc.items || !doc.items.length) return;
-  var first = doc.items[0];
-  if (Number(first.discount_amount || 0) > 0) return;
-  if (doc.customer_default_discount_amount > 0) {
-    first.discount_amount = doc.customer_default_discount_amount;
-  } else if (doc.customer_default_discount_percent > 0) {
-    var gross = Number(first.quantity || 0) * Number(first.unit_price || 0);
-    if (gross > 0) first.discount_amount = roundSalesMoney(gross * doc.customer_default_discount_percent / 100);
-  }
 }
 
 function applySalesDocumentBillingDefaults(data, options) {
@@ -4122,11 +4113,21 @@ function applySalesDocumentBillingDefaults(data, options) {
   doc.sales_document_service_address_id = serviceAddress ? serviceAddress.id : '';
   doc.sales_document_finance_contact_id = financePerson ? financePerson.id : '';
   doc.sales_document_document_contact_id = documentPerson ? documentPerson.id : '';
+  doc.customer_billing_address_id_snapshot = billingAddress ? billingAddress.id : '';
+  doc.customer_service_address_id_snapshot = serviceAddress ? serviceAddress.id : '';
+  doc.customer_finance_contact_id_snapshot = financePerson ? financePerson.id : '';
+  doc.customer_document_contact_id_snapshot = documentPerson ? documentPerson.id : '';
+  doc.customer_billing_profile_id_snapshot = profile.id || '';
+  doc.customer_billing_name_snapshot = profile.billing_name || '';
+  doc.customer_invoice_recipient_name_snapshot = profile.invoice_recipient_name || (documentPerson && documentPerson.name) || '';
+  doc.customer_invoice_recipient_email_snapshot = profile.invoice_recipient_email || (documentPerson && documentPerson.email) || '';
+  doc.customer_invoice_recipient_phone_snapshot = profile.invoice_recipient_phone || (documentPerson && documentPerson.phone) || '';
   doc.customer_name_snapshot = profile.invoice_recipient_name || (documentPerson && documentPerson.name) || profile.billing_name || contact.name || doc.customer_name_snapshot || '';
   doc.customer_email_snapshot = profile.invoice_recipient_email || (documentPerson && documentPerson.email) || contact.email || doc.customer_email_snapshot || '';
   doc.customer_phone_snapshot = profile.invoice_recipient_phone || (documentPerson && documentPerson.phone) || contact.phone || doc.customer_phone_snapshot || '';
   doc.customer_tax_id = profile.tax_id || doc.customer_tax_id || '';
   doc.customer_address_snapshot = formatSalesDocumentAddress(billingAddress) || doc.customer_address_snapshot || '';
+  doc.customer_billing_address_snapshot = doc.customer_address_snapshot;
   doc.customer_service_address_snapshot = formatSalesDocumentAddress(serviceAddress) || doc.customer_service_address_snapshot || '';
   doc.customer_finance_contact_snapshot = formatSalesDocumentPerson(financePerson) || doc.customer_finance_contact_snapshot || '';
   doc.customer_document_contact_snapshot = formatSalesDocumentPerson(documentPerson) || doc.customer_document_contact_snapshot || '';
@@ -4170,10 +4171,10 @@ function renderSalesDocumentBillingSelectors(doc, locked) {
   return getSalesDocumentCreditWarning(doc) +
     '<div class="sales-doc-section-sub">' + escapeHtml(getSalesDocumentVatHintText(doc)) + '</div>' +
     '<div class="sales-doc-grid-2">' +
-      '<div class="sales-doc-billing-selector"><div class="sales-doc-billing-selector-title">כתובת חיוב</div><select class="form-input sales-doc-billing-select" data-billing-select="billing_address"' + (locked ? ' disabled' : '') + '>' + buildSalesDocumentAddressOptions(addresses, doc.sales_document_billing_address_id) + '</select><div class="sales-doc-billing-hint">נשמרת בשדה כתובת הלקוח במסמך.</div></div>' +
-      '<div class="sales-doc-billing-selector"><div class="sales-doc-billing-selector-title">כתובת שירות/אירוע</div><select class="form-input sales-doc-billing-select" data-billing-select="service_address"' + (locked ? ' disabled' : '') + '>' + buildSalesDocumentAddressOptions(addresses, doc.sales_document_service_address_id) + '</select><div class="sales-doc-billing-hint">נשמרת ב-Snapshot הפנימי של המסמך.</div></div>' +
-      '<div class="sales-doc-billing-selector"><div class="sales-doc-billing-selector-title">נמען למסמכים</div><select class="form-input sales-doc-billing-select" data-billing-select="document_contact"' + (locked ? ' disabled' : '') + '>' + buildSalesDocumentPersonOptions(people, doc.sales_document_document_contact_id) + '</select></div>' +
-      '<div class="sales-doc-billing-selector"><div class="sales-doc-billing-selector-title">איש קשר כספים</div><select class="form-input sales-doc-billing-select" data-billing-select="finance_contact"' + (locked ? ' disabled' : '') + '>' + buildSalesDocumentPersonOptions(people, doc.sales_document_finance_contact_id) + '</select></div>' +
+      '<div class="sales-doc-billing-selector"><div class="sales-doc-billing-selector-title">כתובת חיוב</div><select class="form-input sales-doc-billing-select" data-billing-select="billing_address"' + (locked ? ' disabled' : '') + '>' + buildSalesDocumentAddressOptions(addresses, doc.sales_document_billing_address_id || doc.customer_billing_address_id_snapshot) + '</select><div class="sales-doc-billing-hint">נשמרת בשדה כתובת הלקוח במסמך.</div></div>' +
+      '<div class="sales-doc-billing-selector"><div class="sales-doc-billing-selector-title">כתובת שירות/אירוע</div><select class="form-input sales-doc-billing-select" data-billing-select="service_address"' + (locked ? ' disabled' : '') + '>' + buildSalesDocumentAddressOptions(addresses, doc.sales_document_service_address_id || doc.customer_service_address_id_snapshot) + '</select><div class="sales-doc-billing-hint">נשמרת ב-Snapshot הפנימי של המסמך.</div></div>' +
+      '<div class="sales-doc-billing-selector"><div class="sales-doc-billing-selector-title">נמען למסמכים</div><select class="form-input sales-doc-billing-select" data-billing-select="document_contact"' + (locked ? ' disabled' : '') + '>' + buildSalesDocumentPersonOptions(people, doc.sales_document_document_contact_id || doc.customer_document_contact_id_snapshot) + '</select></div>' +
+      '<div class="sales-doc-billing-selector"><div class="sales-doc-billing-selector-title">איש קשר כספים</div><select class="form-input sales-doc-billing-select" data-billing-select="finance_contact"' + (locked ? ' disabled' : '') + '>' + buildSalesDocumentPersonOptions(people, doc.sales_document_finance_contact_id || doc.customer_finance_contact_id_snapshot) + '</select></div>' +
     '</div>';
 }
 
@@ -4277,13 +4278,17 @@ function bindSalesDocumentBillingControls() {
       var people = state.people || [];
       if (kind === 'billing_address') {
         currentSalesDocumentDraft.sales_document_billing_address_id = value || '';
+        currentSalesDocumentDraft.customer_billing_address_id_snapshot = value || '';
         currentSalesDocumentDraft.customer_address_snapshot = formatSalesDocumentAddress(findDefaultSalesDocumentAddress(addresses, value, 'is_default_billing', ['billing'])) || '';
+        currentSalesDocumentDraft.customer_billing_address_snapshot = currentSalesDocumentDraft.customer_address_snapshot;
       } else if (kind === 'service_address') {
         currentSalesDocumentDraft.sales_document_service_address_id = value || '';
+        currentSalesDocumentDraft.customer_service_address_id_snapshot = value || '';
         currentSalesDocumentDraft.customer_service_address_snapshot = formatSalesDocumentAddress(findDefaultSalesDocumentAddress(addresses, value, 'is_default_service', ['service', 'event'])) || '';
       } else if (kind === 'document_contact') {
         var documentPerson = findDefaultSalesDocumentPerson(people, value, 'is_document_recipient', ['main', 'finance']);
         currentSalesDocumentDraft.sales_document_document_contact_id = value || '';
+        currentSalesDocumentDraft.customer_document_contact_id_snapshot = value || '';
         currentSalesDocumentDraft.customer_document_contact_snapshot = formatSalesDocumentPerson(documentPerson) || '';
         if (documentPerson) {
           currentSalesDocumentDraft.customer_name_snapshot = documentPerson.name || currentSalesDocumentDraft.customer_name_snapshot;
@@ -4292,6 +4297,7 @@ function bindSalesDocumentBillingControls() {
         }
       } else if (kind === 'finance_contact') {
         currentSalesDocumentDraft.sales_document_finance_contact_id = value || '';
+        currentSalesDocumentDraft.customer_finance_contact_id_snapshot = value || '';
         currentSalesDocumentDraft.customer_finance_contact_snapshot = formatSalesDocumentPerson(findDefaultSalesDocumentPerson(people, value, 'is_finance', ['finance'])) || '';
       }
       renderSalesDocumentEditor();
@@ -4453,6 +4459,8 @@ function renderSalesDocumentPreview() {
     '<div class="sales-doc-preview-mobile-items">' + mobileItems + '</div>' +
     renderSalesDocumentTotalsHtml(totals, vatExempt, getSalesDocumentDefaultVatRate(doc)) +
     renderSalesDocumentTextBlock('כתובת שירות/אירוע', doc.customer_service_address_snapshot) +
+    renderSalesDocumentTextBlock('נמען למסמכים', doc.customer_document_contact_snapshot) +
+    renderSalesDocumentTextBlock('איש קשר כספים', doc.customer_finance_contact_snapshot) +
     renderSalesDocumentTextBlock('הערות', doc.notes) +
     (template.show_payment_terms ? renderSalesDocumentTextBlock('תנאי תשלום', doc.payment_terms_snapshot) : '') +
     (template.show_cancellation_policy ? renderSalesDocumentTextBlock('מדיניות ביטול', doc.cancellation_policy_snapshot) : '') +
@@ -4602,6 +4610,24 @@ function buildSalesDocumentPayload() {
     customer_email_snapshot: doc.customer_email_snapshot || null,
     customer_address_snapshot: doc.customer_address_snapshot || null,
     customer_tax_id: doc.customer_tax_id || null,
+    customer_billing_profile_id_snapshot: doc.customer_billing_profile_id_snapshot || null,
+    customer_billing_name_snapshot: doc.customer_billing_name_snapshot || null,
+    customer_invoice_recipient_name_snapshot: doc.customer_invoice_recipient_name_snapshot || doc.customer_name_snapshot || null,
+    customer_invoice_recipient_email_snapshot: doc.customer_invoice_recipient_email_snapshot || doc.customer_email_snapshot || null,
+    customer_invoice_recipient_phone_snapshot: doc.customer_invoice_recipient_phone_snapshot || doc.customer_phone_snapshot || null,
+    customer_billing_address_id_snapshot: doc.customer_billing_address_id_snapshot || doc.sales_document_billing_address_id || null,
+    customer_billing_address_snapshot: doc.customer_billing_address_snapshot || doc.customer_address_snapshot || null,
+    customer_service_address_id_snapshot: doc.customer_service_address_id_snapshot || doc.sales_document_service_address_id || null,
+    customer_service_address_snapshot: doc.customer_service_address_snapshot || null,
+    customer_document_contact_id_snapshot: doc.customer_document_contact_id_snapshot || doc.sales_document_document_contact_id || null,
+    customer_document_contact_snapshot: doc.customer_document_contact_snapshot || null,
+    customer_finance_contact_id_snapshot: doc.customer_finance_contact_id_snapshot || doc.sales_document_finance_contact_id || null,
+    customer_finance_contact_snapshot: doc.customer_finance_contact_snapshot || null,
+    customer_vat_treatment_hint: doc.customer_vat_treatment_hint || null,
+    customer_credit_status_snapshot: doc.customer_credit_status_snapshot || null,
+    customer_credit_notes_snapshot: doc.customer_credit_notes_snapshot || null,
+    customer_default_discount_percent: Number(doc.customer_default_discount_percent || 0),
+    customer_default_discount_amount: Number(doc.customer_default_discount_amount || 0),
     business_name_snapshot: doc.business_name_snapshot || null,
     business_phone_snapshot: doc.business_phone_snapshot || null,
     business_email_snapshot: doc.business_email_snapshot || null,
