@@ -595,6 +595,7 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .strategic-contact-activity-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:end}
 .strategic-contact-seasonal-tags{display:flex;flex-wrap:wrap;gap:8px}
 .strategic-contact-seasonal-tags label{display:flex;align-items:center;gap:5px;font-size:12px;border:1px solid var(--line);border-radius:999px;padding:6px 9px;background:#fff}
+.strategic-contact-template-textarea{min-height:190px;direction:rtl}
 .strategic-contact-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .strategic-contact-form-grid.single{grid-template-columns:1fr}
 @media (max-width:900px){.strategic-contacts-grid,.strategic-contact-form-grid,.strategic-contact-activity-form{grid-template-columns:1fr}.strategic-contact-card{padding:12px}.strategic-contact-actions .btn{flex:1;justify-content:center}}
@@ -5806,6 +5807,17 @@ var strategicContactSeasonalTagOptions = [
   ['bar_bat_mitzvah', 'בר/בת מצווה'],
   ['all_year', 'כל השנה']
 ];
+var strategicContactMessageTemplateOptions = [
+  ['school_end', 'סוף שנה / מסיבות סיום'],
+  ['school_start', 'תחילת שנה'],
+  ['purim', 'פורים'],
+  ['pesach', 'פסח'],
+  ['rosh_hashana', 'ראש השנה'],
+  ['hr_welfare_holiday', 'רווחה / חג לעובדים'],
+  ['dj_collaboration', 'שיתוף פעולה עם דיג׳יי'],
+  ['hall_collaboration', 'שיתוף פעולה עם אולם'],
+  ['general_followup', 'מעקב כללי']
+];
 
 function getStrategicContactOptionLabel(options, value) {
   var found = options.find(function(item) { return item[0] === value; });
@@ -5898,6 +5910,86 @@ function buildStrategicContactsQuery() {
   return query ? '?' + query : '';
 }
 
+function buildStrategicContactMessageTemplate(item, templateKey) {
+  item = item || {};
+  var contactName = item.contact_person_name || item.organization_name || 'שלום';
+  var organization = item.organization_name || 'הארגון שלכם';
+  var category = getStrategicContactOptionLabel(strategicContactCategoryOptions, item.category);
+  var seasonalTags = getStrategicContactSeasonalTags(item.tags).map(function(tag) { return getStrategicContactOptionLabel(strategicContactSeasonalTagOptions, tag); });
+  var seasonText = seasonalTags.length ? seasonalTags.join(', ') : 'התקופה הקרובה';
+  var lines = [];
+  lines.push('שלום ' + contactName + ',');
+  if (templateKey === 'school_end') {
+    lines.push('לקראת סוף השנה ומסיבות הסיום, רציתי להציע פעילות חווייתית של קומיקס ואמנות ל־' + organization + '.');
+  } else if (templateKey === 'school_start') {
+    lines.push('לקראת תחילת השנה, יש לנו פעילות פתיחה קלילה ומגבשת שמתאימה ל־' + organization + '.');
+  } else if (templateKey === 'purim') {
+    lines.push('לקראת פורים, יש לנו פעילות קומיקס צבעונית שמתאימה לאווירת חג ולחוויה קבוצתית.');
+  } else if (templateKey === 'pesach') {
+    lines.push('לקראת פסח, רציתי להציע פעילות חווייתית ומגבשת שיכולה להתאים ל־' + organization + '.');
+  } else if (templateKey === 'rosh_hashana') {
+    lines.push('לקראת ראש השנה, יש לנו פעילות פתיחת שנה יצירתית שמתאימה לצוותים ולקבוצות.');
+  } else if (templateKey === 'hr_welfare_holiday') {
+    lines.push('אני פונה אליכם סביב ' + seasonText + ' עם רעיון לפעילות רווחה/גיבוש יצירתית לעובדים.');
+  } else if (templateKey === 'dj_collaboration') {
+    lines.push('חשבתי שיכול להיות שיתוף פעולה מעניין בינינו באירועים — אתם מביאים מוזיקה ואווירה, ואנחנו מוסיפים חוויית קומיקס לאורחים.');
+  } else if (templateKey === 'hall_collaboration') {
+    lines.push('רציתי לבדוק אפשרות לשיתוף פעולה עם ' + organization + ' סביב אירועים, משפחות וחוויות תוכן משלימות לאורחים.');
+  } else {
+    lines.push('רציתי לחזור אליכם בהמשך לשיחה/עניין קודם ולבדוק אם פעילות קומיקס יצירתית יכולה להתאים לכם בקרוב.');
+  }
+  lines.push('ראיתי שזה יכול להתאים במיוחד לקטגוריה: ' + category + (seasonalTags.length ? ', סביב: ' + seasonText : '') + '.');
+  lines.push('אשמח לשלוח פרטים קצרים ולבדוק יחד אם זה רלוונטי.');
+  lines.push('אלי');
+  return lines.join(String.fromCharCode(10) + String.fromCharCode(10));
+}
+
+function openStrategicContactMessageTemplateModal(item) {
+  if (!item || !item.id) return;
+  var phone = item.whatsapp || item.phone || '';
+  var cleanWhatsapp = String(phone).replace(/[^0-9]/g, '').replace(/^0/, '972');
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'strategic-contact-message-template-modal';
+  overlay.innerHTML = '<div class="modal"><div class="modal-header"><h2>הכן הודעה</h2><button class="modal-close" id="message-template-close">✕</button></div><div class="modal-body">' +
+    '<div class="strategic-contact-form-grid single">' +
+      '<div class="form-group" style="margin-bottom:0"><label class="form-label">תבנית</label><select class="form-input" id="message-template-select">' + renderStrategicContactOptions(strategicContactMessageTemplateOptions, 'general_followup', '') + '</select></div>' +
+      '<div class="form-group" style="margin-bottom:0"><label class="form-label">טקסט הודעה</label><textarea class="form-textarea strategic-contact-template-textarea" id="message-template-text"></textarea></div>' +
+    '</div>' +
+    '</div><div class="modal-footer"><button class="btn btn-secondary" id="message-template-cancel">סגור</button><button class="btn btn-primary" id="message-template-copy">העתק</button>' +
+    (cleanWhatsapp ? '<a class="btn btn-success" id="message-template-whatsapp" target="_blank" rel="noopener">פתח WhatsApp</a>' : '') +
+    '</div></div>';
+  document.body.appendChild(overlay);
+  function close() { overlay.remove(); }
+  function updateText() {
+    var select = document.getElementById('message-template-select');
+    var textarea = document.getElementById('message-template-text');
+    if (textarea && select) textarea.value = buildStrategicContactMessageTemplate(item, select.value);
+    updateWhatsappLink();
+  }
+  function updateWhatsappLink() {
+    var link = document.getElementById('message-template-whatsapp');
+    var textarea = document.getElementById('message-template-text');
+    if (link && textarea) link.href = 'https://wa.me/' + cleanWhatsapp + '?text=' + encodeURIComponent(textarea.value || '');
+  }
+  document.getElementById('message-template-close').onclick = close;
+  document.getElementById('message-template-cancel').onclick = close;
+  document.getElementById('message-template-select').addEventListener('change', updateText);
+  document.getElementById('message-template-text').addEventListener('input', updateWhatsappLink);
+  document.getElementById('message-template-copy').onclick = function() {
+    var textarea = document.getElementById('message-template-text');
+    var text = textarea ? textarea.value : '';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function() { toast('ההודעה הועתקה', 'success'); }).catch(function() {
+        if (textarea) { textarea.focus(); textarea.select(); document.execCommand('copy'); toast('ההודעה הועתקה', 'success'); }
+      });
+    } else if (textarea) {
+      textarea.focus(); textarea.select(); document.execCommand('copy'); toast('ההודעה הועתקה', 'success');
+    }
+  };
+  updateText();
+}
+
 function openStrategicContactMarkContactedModal(item) {
   if (!item || !item.id) return;
   var overlay = document.createElement('div');
@@ -5951,6 +6043,7 @@ function renderStrategicContactCard(item) {
     '<div class="strategic-contact-meta"><span>' + escapeHtml([item.city, item.area].filter(Boolean).join(' · ') || 'אזור לא צוין') + '</span></div>' +
     '<div class="strategic-contact-actions">' +
       '<button class="btn btn-primary btn-sm strategic-contact-mark-contacted-btn" data-strategic-contact-id="' + item.id + '" onclick="event.stopPropagation()">סמן שפניתי</button>' +
+      '<button class="btn btn-secondary btn-sm strategic-contact-message-template-btn" data-strategic-contact-id="' + item.id + '" onclick="event.stopPropagation()">הכן הודעה</button>' +
       (phone ? '<a class="btn btn-ghost btn-sm" onclick="event.stopPropagation()" href="tel:' + escapeHtml(phone) + '">טלפון</a>' : '') +
       (cleanWhatsapp ? '<a class="btn btn-ghost btn-sm" onclick="event.stopPropagation()" target="_blank" href="https://wa.me/' + escapeHtml(cleanWhatsapp) + '">WhatsApp</a>' : '') +
       (item.email ? '<a class="btn btn-ghost btn-sm" onclick="event.stopPropagation()" href="mailto:' + escapeHtml(item.email) + '">אימייל</a>' : '') +
@@ -5988,6 +6081,14 @@ function loadStrategicContacts() {
         var sid = parseInt(this.getAttribute('data-strategic-contact-id'));
         var item = items.find(function(x) { return Number(x.id) === Number(sid); });
         if (item) openStrategicContactMarkContactedModal(item);
+      });
+    });
+    grid.querySelectorAll('.strategic-contact-message-template-btn[data-strategic-contact-id]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var sid = parseInt(this.getAttribute('data-strategic-contact-id'));
+        var item = items.find(function(x) { return Number(x.id) === Number(sid); });
+        if (item) openStrategicContactMessageTemplateModal(item);
       });
     });
   }).catch(function(err) {

@@ -244,6 +244,10 @@ function verifyStrategicContacts(results) {
   expect(ui, 'strategic-contacts-seasonal-filter', 'UI includes seasonal tag filter', results);
   expect(ui, 'strategic-contact-seasonal-field', 'UI includes seasonal tag checklist', results);
   expect(ui, 'תחילת שנה', 'UI includes seasonal Hebrew labels', results);
+  expect(ui, 'הכן הודעה', 'UI includes strategic contact message template action', results);
+  expect(ui, 'strategicContactMessageTemplateOptions', 'UI includes predefined message templates', results);
+  expect(ui, 'message-template-copy', 'UI includes message template copy button', results);
+  expect(ui, 'wa.me', 'UI includes optional WhatsApp template link', results);
 
   expectInBlock(strategic, 'export async function handleStrategicContacts', ['return json({ error: \'Strategic contacts route not found\' }, 404);'], [
     'requireTenantContext(request, env)',
