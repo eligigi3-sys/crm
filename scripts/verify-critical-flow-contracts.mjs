@@ -260,6 +260,9 @@ function verifyStrategicContacts(results) {
   expect(ui, '/api/strategic-contacts/attributions?contact_id=', 'UI loads customer strategic source', results);
   expect(ui, '/api/strategic-contacts/attributions?lead_id=', 'UI loads lead strategic source', results);
   expect(ui, 'מקור אסטרטגי', 'UI includes strategic source label', results);
+  expect(ui, 'סיכום עסקי', 'UI includes strategic contact business summary section', results);
+  expect(ui, '/business-summary', 'UI loads strategic contact business summary API', results);
+  expect(ui, 'הכנסה משויכת', 'UI includes attributed revenue label', results);
 
   expect(schemaV28, 'ADD COLUMN relationship_grade TEXT', 'schema v28 adds relationship grade', results);
   expect(schemaV28, 'ADD COLUMN warmth_level TEXT', 'schema v28 adds warmth level', results);
@@ -278,6 +281,7 @@ function verifyStrategicContacts(results) {
     "path === '/api/strategic-contacts' && method === 'GET'",
     "path === '/api/strategic-contacts' && method === 'POST'",
     "assertTenantRole(tenantCtx, ['owner', 'admin', 'manager'])",
+    "path.match(/^\\/api\\/strategic-contacts\\/(\\d+)\\/business-summary$/)",
     "path.match(/^\\/api\\/strategic-contacts\\/(\\d+)\\/attributions$/)",
     "path.match(/^\\/api\\/strategic-contacts\\/(\\d+)\\/attributions\\/(\\d+)$/)",
     "path.match(/^\\/api\\/strategic-contacts\\/(\\d+)\\/activities$/)",
@@ -311,6 +315,18 @@ function verifyStrategicContacts(results) {
     'getContactForTenant(env, tenantId, linkedContactId)',
     "throw new Error('הלקוח המקושר לא נמצא')"
   ], 'strategic contacts validate linked_contact_id against same tenant contact', results);
+
+  expectInBlock(strategic, 'async function getStrategicContactBusinessSummary', ['async function listStrategicContactAttributions'], [
+    'getStrategicContactForTenant(env, tenantId, strategicContactId)',
+    'FROM strategic_contact_attributions',
+    'FROM sales_documents sd',
+    'sd.tenant_id = ?',
+    'sca.tenant_id = sd.tenant_id',
+    'sd.contact_id = sca.contact_id',
+    'sd.lead_id = sca.lead_id',
+    "sd.status IN ('issued', 'paid', 'partially_paid')",
+    "sd.status IN ('sent', 'issued', 'partially_paid')"
+  ], 'strategic contact business summary is read-only and tenant-scoped', results);
 
   expectInBlock(strategic, 'async function listStrategicContactAttributions', ['async function createStrategicContactAttribution'], [
     'WHERE sca.tenant_id = ?',

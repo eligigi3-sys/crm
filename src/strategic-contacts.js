@@ -149,6 +149,31 @@ function mapStrategicContactAttribution(row) {
   };
 }
 
+function moneyNumber(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function mapStrategicContactBusinessSummary(row) {
+  row = row || {};
+  return {
+    attribution_count: Number(row.attribution_count || 0),
+    linked_customers_count: Number(row.linked_customers_count || 0),
+    linked_leads_count: Number(row.linked_leads_count || 0),
+    linked_events_count: Number(row.linked_events_count || 0),
+    quotes_count: Number(row.quotes_count || 0),
+    invoices_count: Number(row.invoices_count || 0),
+    issued_invoices_total: moneyNumber(row.issued_invoices_total),
+    open_unpaid_amount: moneyNumber(row.open_unpaid_amount),
+    computed_from: 'strategic_contact_attributions_sales_documents_read_only',
+    limitations: [
+      'מבוסס רק על שיוכי Strategic Contact קיימים',
+      'לא משנה מסמכי מכירה, חשבוניות או סיכומים פיננסיים קיימים',
+      'מסמך שקשור גם ללקוח וגם לליד נספר פעם אחת בלבד'
+    ]
+  };
+}
+
+
 function buildStrategicContactAttributionPayload(body, strategicContactId) {
   const next = body || {};
   return {
@@ -389,6 +414,48 @@ function strategicContactAttributionSelectSql() {
     LEFT JOIN contacts c ON c.id = sca.contact_id AND c.tenant_id = sca.tenant_id
     LEFT JOIN leads l ON l.id = sca.lead_id AND l.tenant_id = sca.tenant_id
     LEFT JOIN leads e ON e.id = sca.event_id AND e.tenant_id = sca.tenant_id`;
+}
+
+async function getStrategicContactBusinessSummary(env, tenantId, strategicContactId) {
+  const strategicContact = await getStrategicContactForTenant(env, tenantId, strategicContactId);
+  if (!strategicContact) return json({ error: 'קשר אסטרטגי לא נמצא' }, 404);
+
+  const attributionCounts = await env.DB.prepare(
+    `SELECT
+       COUNT(*) AS attribution_count,
+       COUNT(DISTINCT contact_id) AS linked_customers_count,
+       COUNT(DISTINCT lead_id) AS linked_leads_count,
+       COUNT(DISTINCT event_id) AS linked_events_count
+     FROM strategic_contact_attributions
+     WHERE tenant_id = ?
+       AND strategic_contact_id = ?`
+  ).bind(tenantId, strategicContactId).first();
+
+  const salesSummary = await env.DB.prepare(
+    `SELECT
+       COUNT(DISTINCT CASE WHEN sd.document_type = 'quote' THEN sd.id END) AS quotes_count,
+       COUNT(DISTINCT CASE WHEN sd.document_type = 'invoice' THEN sd.id END) AS invoices_count,
+       COALESCE(SUM(CASE WHEN sd.document_type = 'invoice' AND sd.status IN ('issued', 'paid', 'partially_paid') THEN sd.total_amount ELSE 0 END), 0) AS issued_invoices_total,
+       COALESCE(SUM(CASE WHEN sd.document_type = 'invoice' AND sd.status IN ('sent', 'issued', 'partially_paid') THEN sd.balance_amount ELSE 0 END), 0) AS open_unpaid_amount
+     FROM sales_documents sd
+     WHERE sd.tenant_id = ?
+       AND EXISTS (
+         SELECT 1
+         FROM strategic_contact_attributions sca
+         WHERE sca.tenant_id = sd.tenant_id
+           AND sca.strategic_contact_id = ?
+           AND (
+             (sca.contact_id IS NOT NULL AND sd.contact_id = sca.contact_id)
+             OR (sca.lead_id IS NOT NULL AND sd.lead_id = sca.lead_id)
+             OR (sca.event_id IS NOT NULL AND sd.lead_id = sca.event_id)
+           )
+       )`
+  ).bind(tenantId, strategicContactId).first();
+
+  return {
+    strategic_contact_id: strategicContactId,
+    summary: mapStrategicContactBusinessSummary({ ...(attributionCounts || {}), ...(salesSummary || {}) })
+  };
 }
 
 async function listStrategicContactAttributions(request, env, tenantId, strategicContactId) {
@@ -803,6 +870,11 @@ export async function handleStrategicContacts(request, env, path) {
 
   if (path === '/api/strategic-contacts/attributions' && method === 'GET') {
     return listStrategicContactAttributions(request, env, tenantId, null);
+  }
+
+  const businessSummaryMatch = path.match(/^\/api\/strategic-contacts\/(\d+)\/business-summary$/);
+  if (businessSummaryMatch && method === 'GET') {
+    return getStrategicContactBusinessSummary(env, tenantId, Number(businessSummaryMatch[1]));
   }
 
   const attributionCollectionMatch = path.match(/^\/api\/strategic-contacts\/(\d+)\/attributions$/);

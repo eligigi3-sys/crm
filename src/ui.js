@@ -6272,9 +6272,43 @@ function setupStrategicContactAttributionForm(strategicContactId) {
       toast('השיוך נשמר', 'success');
       ['strategic-contact-attribution-contact-id','strategic-contact-attribution-lead-id','strategic-contact-attribution-event-id','strategic-contact-attribution-notes'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
       loadStrategicContactAttributions(strategicContactId);
+      loadStrategicContactBusinessSummary(strategicContactId);
     }).catch(function(err) { toast(err.message || 'שגיאה בשמירת שיוך', 'error'); });
   });
 }
+
+function renderStrategicContactBusinessSummarySection(strategicContactId) {
+  if (!strategicContactId) return '';
+  return '<div class="strategic-contact-activities strategic-contact-business-summary">' +
+    '<h3 style="margin:0 0 8px">סיכום עסקי</h3>' +
+    '<div id="strategic-contact-business-summary" class="dashboard-grid"><div class="dash-empty">טוען סיכום עסקי...</div></div>' +
+  '</div>';
+}
+
+function strategicContactSummaryCard(label, value) {
+  return '<div class="kpi-card" style="min-height:auto"><div class="kpi-label">' + escapeHtml(label) + '</div><div class="kpi-value" style="font-size:20px">' + escapeHtml(value) + '</div></div>';
+}
+
+function renderStrategicContactBusinessSummary(summary) {
+  summary = summary || {};
+  var linkedCount = Number(summary.attribution_count || 0) + ' שיוכים · ' + Number(summary.linked_customers_count || 0) + ' לקוחות · ' + Number(summary.linked_leads_count || 0) + ' לידים/אירועים';
+  return strategicContactSummaryCard('שיוכים', linkedCount) +
+    strategicContactSummaryCard('חשבוניות', Number(summary.invoices_count || 0) + ' חשבוניות · ' + Number(summary.quotes_count || 0) + ' הצעות') +
+    strategicContactSummaryCard('הכנסה משויכת', '₪' + formatStrategicContactNumber(summary.issued_invoices_total || 0)) +
+    strategicContactSummaryCard('יתרה פתוחה', '₪' + formatStrategicContactNumber(summary.open_unpaid_amount || 0));
+}
+
+function loadStrategicContactBusinessSummary(strategicContactId) {
+  var box = document.getElementById('strategic-contact-business-summary');
+  if (!box || !strategicContactId) return;
+  box.innerHTML = '<div class="dash-empty">טוען סיכום עסקי...</div>';
+  apiCall('GET', '/api/strategic-contacts/' + strategicContactId + '/business-summary').then(function(data) {
+    box.innerHTML = renderStrategicContactBusinessSummary(data.summary || {});
+  }).catch(function(err) {
+    box.innerHTML = '<div class="dash-empty">שגיאה בטעינת סיכום עסקי: ' + escapeHtml(err.message || 'שגיאה') + '</div>';
+  });
+}
+
 
 function renderStrategicSourceAttributions(items) {
   items = items || [];
@@ -6354,8 +6388,9 @@ function openStrategicContactModal(id, defaults) {
       strategicContactInput('followup_reason', 'סיבת מעקב', item.followup_reason, 'text') +
       strategicContactTextarea('relevant_services', 'שירותים רלוונטיים', item.relevant_services) +
       strategicContactTextarea('notes', 'הערות', item.notes) +
-    '</div>' + renderStrategicContactActivitiesSection(isEdit ? id : null) + renderStrategicContactAttributionsSection(isEdit ? id : null);
+    '</div>' + renderStrategicContactBusinessSummarySection(isEdit ? id : null) + renderStrategicContactActivitiesSection(isEdit ? id : null) + renderStrategicContactAttributionsSection(isEdit ? id : null);
     if (isEdit) {
+      loadStrategicContactBusinessSummary(id);
       loadStrategicContactActivities(id);
       setupStrategicContactActivityForm(id);
       loadStrategicContactAttributions(id);
