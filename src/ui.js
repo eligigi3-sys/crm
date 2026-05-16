@@ -593,6 +593,8 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .strategic-contact-activity-title{font-weight:800;font-size:13px;color:var(--text)}
 .strategic-contact-activity-meta{font-size:12px;color:var(--text3);margin-top:4px}
 .strategic-contact-activity-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:end}
+.strategic-contact-seasonal-tags{display:flex;flex-wrap:wrap;gap:8px}
+.strategic-contact-seasonal-tags label{display:flex;align-items:center;gap:5px;font-size:12px;border:1px solid var(--line);border-radius:999px;padding:6px 9px;background:#fff}
 .strategic-contact-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .strategic-contact-form-grid.single{grid-template-columns:1fr}
 @media (max-width:900px){.strategic-contacts-grid,.strategic-contact-form-grid,.strategic-contact-activity-form{grid-template-columns:1fr}.strategic-contact-card{padding:12px}.strategic-contact-actions .btn{flex:1;justify-content:center}}
@@ -1598,6 +1600,7 @@ id="customers-search">
           <select class="filter-select" id="strategic-contacts-status-filter"><option value="">כל הסטטוסים</option></select>
           <select class="filter-select" id="strategic-contacts-priority-filter"><option value="">כל העדיפויות</option></select>
           <select class="filter-select" id="strategic-contacts-follow-up-filter"><option value="">כל המעקבים</option></select>
+          <select class="filter-select" id="strategic-contacts-seasonal-filter"><option value="">כל העונות</option></select>
         </div>
         <div id="strategic-contacts-grid" style="padding:16px"><div class="dash-empty">טוען...</div></div>
       </div>
@@ -2294,7 +2297,7 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   if (navSuperAdmin) navSuperAdmin.addEventListener('click', function() { goTo('super-admin', this); });
   var strategicContactsSearch = document.getElementById('strategic-contacts-search');
   if (strategicContactsSearch) strategicContactsSearch.addEventListener('input', function() { clearTimeout(searchTimer); searchTimer = setTimeout(loadStrategicContacts, 300); });
-  ['strategic-contacts-category-filter','strategic-contacts-status-filter','strategic-contacts-priority-filter','strategic-contacts-follow-up-filter'].forEach(function(id) { var el = document.getElementById(id); if (el) el.addEventListener('change', loadStrategicContacts); });
+  ['strategic-contacts-category-filter','strategic-contacts-status-filter','strategic-contacts-priority-filter','strategic-contacts-follow-up-filter','strategic-contacts-seasonal-filter'].forEach(function(id) { var el = document.getElementById(id); if (el) el.addEventListener('change', loadStrategicContacts); });
   var newStrategicContact = document.getElementById('btn-new-strategic-contact');
   if (newStrategicContact) newStrategicContact.addEventListener('click', function() { openStrategicContactModal(); });
   var salesDocumentsSearch = document.getElementById('sales-documents-search');
@@ -5789,6 +5792,20 @@ var strategicContactFollowUpFilterOptions = [
   ['high_priority', 'עדיפות גבוהה'],
   ['dormant_90', 'לא פניתי מעל 90 יום']
 ];
+var strategicContactSeasonalTagOptions = [
+  ['school_start', 'תחילת שנה'],
+  ['school_end', 'סוף שנה / מסיבות סיום'],
+  ['purim', 'פורים'],
+  ['pesach', 'פסח'],
+  ['rosh_hashana', 'ראש השנה'],
+  ['hanukkah', 'חנוכה'],
+  ['civil_year_end', 'סוף שנה אזרחית'],
+  ['team_building', 'ימי גיבוש'],
+  ['wedding_season', 'עונת חתונות'],
+  ['summer', 'קיץ'],
+  ['bar_bat_mitzvah', 'בר/בת מצווה'],
+  ['all_year', 'כל השנה']
+];
 
 function getStrategicContactOptionLabel(options, value) {
   var found = options.find(function(item) { return item[0] === value; });
@@ -5802,15 +5819,65 @@ function renderStrategicContactOptions(options, selected, includeAllLabel) {
   }).join('');
 }
 
+function parseStrategicContactTags(value) {
+  if (!value) return [];
+  var text = String(value || '').trim();
+  if (!text) return [];
+  try {
+    var parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) return parsed.map(function(tag) { return String(tag || '').trim(); }).filter(Boolean);
+  } catch (e) {}
+  return text.split(/[,،\\n]+/).map(function(tag) { return String(tag || '').trim(); }).filter(Boolean);
+}
+
+function dedupeStrategicContactTags(tags) {
+  var seen = {};
+  return (tags || []).filter(function(tag) {
+    tag = String(tag || '').trim();
+    if (!tag || seen[tag]) return false;
+    seen[tag] = true;
+    return true;
+  });
+}
+
+function isStrategicContactSeasonalTag(tag) {
+  return strategicContactSeasonalTagOptions.some(function(item) { return item[0] === tag; });
+}
+
+function getStrategicContactSeasonalTags(value) {
+  return parseStrategicContactTags(value).filter(isStrategicContactSeasonalTag);
+}
+
+function getStrategicContactFreeTags(value) {
+  return parseStrategicContactTags(value).filter(function(tag) { return !isStrategicContactSeasonalTag(tag); });
+}
+
+function renderStrategicContactSeasonalBadges(value) {
+  var tags = getStrategicContactSeasonalTags(value);
+  if (!tags.length) return '';
+  return '<div class="strategic-contact-meta">' + tags.map(function(tag) {
+    return '<span class="badge badge-green">' + escapeHtml(getStrategicContactOptionLabel(strategicContactSeasonalTagOptions, tag)) + '</span>';
+  }).join('') + '</div>';
+}
+
+function renderStrategicContactSeasonalChecklist(value) {
+  var selected = getStrategicContactSeasonalTags(value);
+  return '<div class="form-group" style="grid-column:1/-1;margin-bottom:0"><label class="form-label">תגיות עונתיות</label><div class="strategic-contact-seasonal-tags">' + strategicContactSeasonalTagOptions.map(function(item) {
+    return '<label><input type="checkbox" class="strategic-contact-seasonal-field" value="' + escapeHtml(item[0]) + '"' + (selected.indexOf(item[0]) !== -1 ? ' checked' : '') + '> ' + escapeHtml(item[1]) + '</label>';
+  }).join('') + '</div></div>';
+}
+
 function setupStrategicContactFilters() {
   var category = document.getElementById('strategic-contacts-category-filter');
   var status = document.getElementById('strategic-contacts-status-filter');
   var priority = document.getElementById('strategic-contacts-priority-filter');
   var followUp = document.getElementById('strategic-contacts-follow-up-filter');
+  var seasonal = document.getElementById('strategic-contacts-seasonal-filter');
   if (category && category.options.length <= 1) category.innerHTML = renderStrategicContactOptions(strategicContactCategoryOptions, '', 'כל הקטגוריות');
   if (status && status.options.length <= 1) status.innerHTML = renderStrategicContactOptions(strategicContactStatusOptions, '', 'כל הסטטוסים');
   if (priority && priority.options.length <= 1) priority.innerHTML = renderStrategicContactOptions(strategicContactPriorityOptions, '', 'כל העדיפויות');
   if (followUp && followUp.options.length <= 1) followUp.innerHTML = renderStrategicContactOptions(strategicContactFollowUpFilterOptions, '', 'כל המעקבים');
+  if (seasonal && seasonal.options.length <= 1) seasonal.innerHTML = renderStrategicContactOptions(strategicContactSeasonalTagOptions, '', 'כל העונות');
 }
 
 function buildStrategicContactsQuery() {
@@ -5820,11 +5887,13 @@ function buildStrategicContactsQuery() {
   var status = document.getElementById('strategic-contacts-status-filter');
   var priority = document.getElementById('strategic-contacts-priority-filter');
   var followUp = document.getElementById('strategic-contacts-follow-up-filter');
+  var seasonal = document.getElementById('strategic-contacts-seasonal-filter');
   if (search && search.value.trim()) params.set('search', search.value.trim());
   if (category && category.value) params.set('category', category.value);
   if (status && status.value) params.set('status', status.value);
   if (priority && priority.value) params.set('priority', priority.value);
   if (followUp && followUp.value) params.set('follow_up', followUp.value);
+  if (seasonal && seasonal.value) params.set('seasonal_tag', seasonal.value);
   var query = params.toString();
   return query ? '?' + query : '';
 }
@@ -5888,6 +5957,7 @@ function renderStrategicContactCard(item) {
     '</div>' +
     '<div class="strategic-contact-meta"><span>קשר אחרון: ' + escapeHtml(formatDate(item.last_contact_at) || '—') + '</span><span>קשר הבא: ' + escapeHtml(formatDate(item.next_contact_at) || '—') + '</span></div>' +
     (item.followup_reason ? '<div class="strategic-contact-meta"><strong>סיבת מעקב:</strong> ' + escapeHtml(item.followup_reason) + '</div>' : '') +
+    renderStrategicContactSeasonalBadges(item.tags) +
     (note ? '<div class="strategic-contact-note">' + escapeHtml(note) + (String(item.notes).length > 140 ? '…' : '') + '</div>' : '') +
     (Number(item.active) === 0 ? '<div class="strategic-contact-meta"><span class="badge badge-gray">לא פעיל</span></div>' : '') +
   '</div>';
@@ -6031,7 +6101,8 @@ function openStrategicContactModal(id, defaults) {
       strategicContactInput('area', 'אזור', item.area, 'text') +
       strategicContactSelect('preferred_channel', 'ערוץ מועדף', item.preferred_channel || '', strategicContactChannelOptions) +
       strategicContactInput('source', 'מקור', item.source, 'text') +
-      strategicContactInput('tags', 'תגיות', item.tags, 'text') +
+      strategicContactInput('tags', 'תגיות חופשיות', getStrategicContactFreeTags(item.tags).join(', '), 'text') +
+      renderStrategicContactSeasonalChecklist(item.tags) +
       strategicContactInput('last_contact_at', 'קשר אחרון', item.last_contact_at, 'date') +
       strategicContactInput('next_contact_at', 'קשר הבא', item.next_contact_at, 'date') +
       strategicContactSelect('active', 'פעיל', String(item.active) === '0' ? '0' : '1', [['1','פעיל'],['0','לא פעיל']]) +
@@ -6051,6 +6122,9 @@ function openStrategicContactModal(id, defaults) {
       payload[input.getAttribute('data-strategic-contact-field')] = input.value;
     });
     if (!payload.organization_name || !payload.organization_name.trim()) throw new Error('שם ארגון חובה');
+    var seasonalTags = [];
+    overlay.querySelectorAll('.strategic-contact-seasonal-field:checked').forEach(function(input) { seasonalTags.push(input.value); });
+    payload.tags = dedupeStrategicContactTags(getStrategicContactFreeTags(payload.tags).concat(seasonalTags)).join(', ');
     payload.active = payload.active === '0' ? 0 : 1;
     return payload;
   }

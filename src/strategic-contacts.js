@@ -36,6 +36,7 @@ const PRIORITY_VALUES = new Set(['low', 'normal', 'high']);
 const CHANNEL_VALUES = new Set(['', 'phone', 'whatsapp', 'email', 'meeting', 'other']);
 const ACTIVITY_TYPE_VALUES = new Set(['note', 'call', 'whatsapp', 'email', 'meeting', 'followup', 'other']);
 const FOLLOW_UP_FILTER_VALUES = new Set(['today', 'week', 'overdue', 'high_priority', 'dormant_90']);
+const SEASONAL_TAG_VALUES = new Set(['school_start', 'school_end', 'purim', 'pesach', 'rosh_hashana', 'hanukkah', 'civil_year_end', 'team_building', 'wedding_season', 'summer', 'bar_bat_mitzvah', 'all_year']);
 
 function normalizeEnum(value, allowed, fallback, label) {
   const text = String(value === undefined || value === null ? fallback : value).trim();
@@ -181,6 +182,7 @@ async function listStrategicContacts(request, env, tenantId) {
   const active = normalizeOptionalText(url.searchParams.get('active'));
   const linkedContactId = normalizeOptionalPositiveInteger(url.searchParams.get('linked_contact_id'), 'לקוח מקושר');
   const followUp = normalizeOptionalText(url.searchParams.get('follow_up'));
+  const seasonalTag = normalizeOptionalText(url.searchParams.get('seasonal_tag'));
   const due = normalizeOptionalText(url.searchParams.get('next_contact_due')) || normalizeOptionalText(url.searchParams.get('overdue'));
 
   let sql = 'SELECT * FROM strategic_contacts WHERE tenant_id = ?';
@@ -223,6 +225,12 @@ async function listStrategicContacts(request, env, tenantId) {
   if (linkedContactId) {
     sql += ' AND linked_contact_id = ?';
     params.push(linkedContactId);
+  }
+
+  if (seasonalTag) {
+    if (!SEASONAL_TAG_VALUES.has(seasonalTag)) return json({ error: 'תגית עונתית לא תקינה' }, 400);
+    sql += ' AND tags LIKE ?';
+    params.push('%' + seasonalTag + '%');
   }
 
   if (active === null) {

@@ -241,6 +241,9 @@ function verifyStrategicContacts(results) {
   expect(ui, 'strategic-contacts-follow-up-filter', 'UI includes strategic contacts follow-up filter', results);
   expect(ui, 'צריך פנייה היום', 'UI includes today follow-up filter option', results);
   expect(ui, 'לא פניתי מעל 90 יום', 'UI includes dormant follow-up filter option', results);
+  expect(ui, 'strategic-contacts-seasonal-filter', 'UI includes seasonal tag filter', results);
+  expect(ui, 'strategic-contact-seasonal-field', 'UI includes seasonal tag checklist', results);
+  expect(ui, 'תחילת שנה', 'UI includes seasonal Hebrew labels', results);
 
   expectInBlock(strategic, 'export async function handleStrategicContacts', ['return json({ error: \'Strategic contacts route not found\' }, 404);'], [
     'requireTenantContext(request, env)',
@@ -263,6 +266,7 @@ function verifyStrategicContacts(results) {
     'status = ?',
     'priority = ?',
     'linked_contact_id = ?',
+    'tags LIKE ?',
     "next_contact_at = date('now')",
     "next_contact_at <= date('now', '+7 days')",
     "next_contact_at < date('now')",
