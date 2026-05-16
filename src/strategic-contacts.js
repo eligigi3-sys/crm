@@ -40,6 +40,7 @@ const SEASONAL_TAG_VALUES = new Set(['school_start', 'school_end', 'purim', 'pes
 const RELATIONSHIP_GRADE_VALUES = new Set(['', 'A', 'B', 'C']);
 const WARMTH_LEVEL_VALUES = new Set(['', 'cold', 'warm', 'hot']);
 const RELATIONSHIP_VALUE_FILTER_VALUES = new Set(['grade_a', 'warm_hot', 'high_potential']);
+const ATTRIBUTION_TYPE_VALUES = new Set(['referral', 'repeat_business', 'partner', 'school_cycle', 'campaign_response']);
 
 function normalizeEnum(value, allowed, fallback, label) {
   const text = String(value === undefined || value === null ? fallback : value).trim();
@@ -123,6 +124,63 @@ function buildStrategicContactActivityPayload(body) {
     next_contact_at: normalizeOptionalText(next.next_contact_at)
   };
 }
+
+function mapStrategicContactAttribution(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    tenant_id: row.tenant_id,
+    strategic_contact_id: row.strategic_contact_id,
+    strategic_contact_name: row.strategic_contact_name || null,
+    contact_id: row.contact_id || null,
+    contact_name: row.contact_name || null,
+    lead_id: row.lead_id || null,
+    lead_num: row.lead_num || null,
+    lead_name: row.lead_name || null,
+    event_id: row.event_id || null,
+    event_num: row.event_num || null,
+    event_name: row.event_name || null,
+    event_date: row.event_date || null,
+    attribution_type: row.attribution_type || 'referral',
+    notes: row.notes || null,
+    created_by_user_id: row.created_by_user_id || null,
+    created_at: row.created_at || null,
+    updated_at: row.updated_at || null
+  };
+}
+
+function buildStrategicContactAttributionPayload(body, strategicContactId) {
+  const next = body || {};
+  return {
+    strategic_contact_id: strategicContactId || normalizeOptionalPositiveInteger(next.strategic_contact_id, 'קשר אסטרטגי'),
+    contact_id: normalizeOptionalPositiveInteger(next.contact_id, 'לקוח'),
+    lead_id: normalizeOptionalPositiveInteger(next.lead_id, 'ליד'),
+    event_id: normalizeOptionalPositiveInteger(next.event_id, 'אירוע'),
+    attribution_type: normalizeEnum(next.attribution_type, ATTRIBUTION_TYPE_VALUES, 'referral', 'סוג שיוך'),
+    notes: normalizeOptionalText(next.notes)
+  };
+}
+
+async function validateStrategicContactAttributionPayload(env, tenantId, payload) {
+  const strategicContact = await getStrategicContactForTenant(env, tenantId, payload.strategic_contact_id);
+  if (!strategicContact) throw new Error('קשר אסטרטגי לא נמצא');
+  if (!payload.contact_id && !payload.lead_id && !payload.event_id) throw new Error('יש לבחור לקוח או ליד/אירוע לשיוך');
+
+  if (payload.contact_id) {
+    const contact = await env.DB.prepare('SELECT id FROM contacts WHERE id = ? AND tenant_id = ? LIMIT 1').bind(payload.contact_id, tenantId).first();
+    if (!contact) throw new Error('הלקוח לשיוך לא נמצא');
+  }
+  if (payload.lead_id) {
+    const lead = await env.DB.prepare('SELECT id FROM leads WHERE id = ? AND tenant_id = ? LIMIT 1').bind(payload.lead_id, tenantId).first();
+    if (!lead) throw new Error('הליד לשיוך לא נמצא');
+  }
+  if (payload.event_id) {
+    const event = await env.DB.prepare('SELECT id FROM leads WHERE id = ? AND tenant_id = ? LIMIT 1').bind(payload.event_id, tenantId).first();
+    if (!event) throw new Error('האירוע לשיוך לא נמצא');
+  }
+  return payload;
+}
+
 
 function mapStrategicContact(row) {
   if (!row) return null;
@@ -315,6 +373,103 @@ async function listStrategicContacts(request, env, tenantId) {
 
   const { results } = await env.DB.prepare(sql).bind(...params).all();
   return { strategic_contacts: (results || []).map(mapStrategicContact) };
+}
+
+function strategicContactAttributionSelectSql() {
+  return `SELECT sca.*,
+      sc.organization_name AS strategic_contact_name,
+      c.name AS contact_name,
+      l.lead_num AS lead_num,
+      l.name AS lead_name,
+      e.lead_num AS event_num,
+      e.name AS event_name,
+      e.event_date AS event_date
+    FROM strategic_contact_attributions sca
+    JOIN strategic_contacts sc ON sc.id = sca.strategic_contact_id AND sc.tenant_id = sca.tenant_id
+    LEFT JOIN contacts c ON c.id = sca.contact_id AND c.tenant_id = sca.tenant_id
+    LEFT JOIN leads l ON l.id = sca.lead_id AND l.tenant_id = sca.tenant_id
+    LEFT JOIN leads e ON e.id = sca.event_id AND e.tenant_id = sca.tenant_id`;
+}
+
+async function listStrategicContactAttributions(request, env, tenantId, strategicContactId) {
+  const url = new URL(request.url);
+  const params = [tenantId];
+  let sql = strategicContactAttributionSelectSql() + ' WHERE sca.tenant_id = ?';
+
+  if (strategicContactId) {
+    const strategicContact = await getStrategicContactForTenant(env, tenantId, strategicContactId);
+    if (!strategicContact) return json({ error: 'קשר אסטרטגי לא נמצא' }, 404);
+    sql += ' AND sca.strategic_contact_id = ?';
+    params.push(strategicContactId);
+  }
+
+  const contactId = normalizeOptionalPositiveInteger(url.searchParams.get('contact_id'), 'לקוח');
+  const leadId = normalizeOptionalPositiveInteger(url.searchParams.get('lead_id'), 'ליד');
+  const eventId = normalizeOptionalPositiveInteger(url.searchParams.get('event_id'), 'אירוע');
+  if (contactId) { sql += ' AND sca.contact_id = ?'; params.push(contactId); }
+  if (leadId) { sql += ' AND sca.lead_id = ?'; params.push(leadId); }
+  if (eventId) { sql += ' AND sca.event_id = ?'; params.push(eventId); }
+
+  sql += ' ORDER BY sca.created_at DESC, sca.id DESC LIMIT 100';
+  const { results } = await env.DB.prepare(sql).bind(...params).all();
+  return { attributions: (results || []).map(mapStrategicContactAttribution) };
+}
+
+async function createStrategicContactAttribution(request, env, tenantCtx, strategicContactId) {
+  const tenantId = tenantCtx.tenant.id;
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'בקשה לא תקינה' }, 400); }
+  let payload;
+  try {
+    payload = await validateStrategicContactAttributionPayload(env, tenantId, buildStrategicContactAttributionPayload(body || {}, strategicContactId));
+  } catch (error) {
+    return json({ error: error.message || 'בקשה לא תקינה' }, 400);
+  }
+
+  const result = await env.DB.prepare(
+    `INSERT INTO strategic_contact_attributions (
+      tenant_id, strategic_contact_id, contact_id, lead_id, event_id,
+      attribution_type, notes, created_by_user_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+  ).bind(
+    tenantId,
+    payload.strategic_contact_id,
+    payload.contact_id,
+    payload.lead_id,
+    payload.event_id,
+    payload.attribution_type,
+    payload.notes,
+    tenantCtx.user.id
+  ).run();
+
+  const row = await env.DB.prepare(strategicContactAttributionSelectSql() + ' WHERE sca.id = ? AND sca.tenant_id = ? LIMIT 1').bind(result.meta.last_row_id, tenantId).first();
+  return { success: true, attribution: mapStrategicContactAttribution(row) };
+}
+
+async function updateStrategicContactAttribution(request, env, tenantCtx, strategicContactId, attributionId) {
+  const tenantId = tenantCtx.tenant.id;
+  const existing = await env.DB.prepare(
+    'SELECT * FROM strategic_contact_attributions WHERE id = ? AND tenant_id = ? AND strategic_contact_id = ? LIMIT 1'
+  ).bind(attributionId, tenantId, strategicContactId).first();
+  if (!existing) return json({ error: 'שיוך לא נמצא' }, 404);
+
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'בקשה לא תקינה' }, 400); }
+  let payload;
+  try {
+    payload = await validateStrategicContactAttributionPayload(env, tenantId, buildStrategicContactAttributionPayload({ ...existing, ...(body || {}) }, strategicContactId));
+  } catch (error) {
+    return json({ error: error.message || 'בקשה לא תקינה' }, 400);
+  }
+
+  await env.DB.prepare(
+    `UPDATE strategic_contact_attributions
+     SET contact_id = ?, lead_id = ?, event_id = ?, attribution_type = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE id = ? AND tenant_id = ? AND strategic_contact_id = ?`
+  ).bind(payload.contact_id, payload.lead_id, payload.event_id, payload.attribution_type, payload.notes, attributionId, tenantId, strategicContactId).run();
+
+  const row = await env.DB.prepare(strategicContactAttributionSelectSql() + ' WHERE sca.id = ? AND sca.tenant_id = ? LIMIT 1').bind(attributionId, tenantId).first();
+  return { success: true, attribution: mapStrategicContactAttribution(row) };
 }
 
 async function listStrategicContactActivities(env, tenantId, strategicContactId) {
@@ -644,6 +799,28 @@ export async function handleStrategicContacts(request, env, path) {
     const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
     if (roleState instanceof Response) return roleState;
     return createStrategicContact(request, env, tenantId);
+  }
+
+  if (path === '/api/strategic-contacts/attributions' && method === 'GET') {
+    return listStrategicContactAttributions(request, env, tenantId, null);
+  }
+
+  const attributionCollectionMatch = path.match(/^\/api\/strategic-contacts\/(\d+)\/attributions$/);
+  if (attributionCollectionMatch && method === 'GET') {
+    return listStrategicContactAttributions(request, env, tenantId, Number(attributionCollectionMatch[1]));
+  }
+
+  if (attributionCollectionMatch && method === 'POST') {
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
+    return createStrategicContactAttribution(request, env, tenantCtx, Number(attributionCollectionMatch[1]));
+  }
+
+  const attributionItemMatch = path.match(/^\/api\/strategic-contacts\/(\d+)\/attributions\/(\d+)$/);
+  if (attributionItemMatch && method === 'PUT') {
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
+    return updateStrategicContactAttribution(request, env, tenantCtx, Number(attributionItemMatch[1]), Number(attributionItemMatch[2]));
   }
 
   const activitiesMatch = path.match(/^\/api\/strategic-contacts\/(\d+)\/activities$/);

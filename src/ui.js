@@ -5461,10 +5461,11 @@ function renderDrawer(l, notes) {
   html += '<div class="info-row"><span class="info-label">קשר אחרון</span><span class="info-value">' + (l.last_contact?formatDate(l.last_contact):'—') + '</span></div>';
   html += '<div class="info-row"><span class="info-label">קשר הבא</span><span class="info-value" style="' + (isOverdue(l.next_contact)?'color:var(--red);font-weight:700':'') + '">' + (l.next_contact?formatDate(l.next_contact):'—') + '</span></div>';
   if (l.notes) html += '<div class="info-row"><span class="info-label">הערות</span><span class="info-value">' + l.notes + '</span></div>';
-  html += '</div><div class="info-section"><div class="info-section-title">יומן הערות (' + notes.length + ')</div>';
+  html += '</div><div class="info-section"><div class="info-section-title">מקור אסטרטגי</div><div id="lead-strategic-source-list"><div class="dash-empty">טוען מקור אסטרטגי...</div></div></div><div class="info-section"><div class="info-section-title">יומן הערות (' + notes.length + ')</div>';
   html += notes.length ? notes.map(function(n) { return '<div class="note-item">' + n.note + '<div class="note-date">' + fmtDT(n.created_at) + '</div></div>'; }).join('') : '<div style="color:var(--text3);font-size:13px">אין הערות עדיין</div>';
   html += '</div>';
   document.getElementById('drawer-body').innerHTML = html;
+  loadLeadStrategicSource(l.id);
 }
 
 function closeDrawer() {
@@ -5835,6 +5836,13 @@ var strategicContactMessageTemplateOptions = [
   ['dj_collaboration', 'שיתוף פעולה עם דיג׳יי'],
   ['hall_collaboration', 'שיתוף פעולה עם אולם'],
   ['general_followup', 'מעקב כללי']
+];
+var strategicContactAttributionTypeOptions = [
+  ['referral', 'הפניה'],
+  ['repeat_business', 'עבודה חוזרת'],
+  ['partner', 'שותף / ספק מפנה'],
+  ['school_cycle', 'מחזור פעילות קבוע'],
+  ['campaign_response', 'תגובה לפנייה']
 ];
 
 function getStrategicContactOptionLabel(options, value) {
@@ -6208,6 +6216,94 @@ function setupStrategicContactActivityForm(strategicContactId) {
   });
 }
 
+function renderStrategicContactAttributionsSection(strategicContactId) {
+  if (!strategicContactId) return '';
+  return '<div class="strategic-contact-activities strategic-contact-attributions">' +
+    '<h3 style="margin:0 0 8px">לידים / אירועים משויכים</h3>' +
+    '<div id="strategic-contact-attributions-list" class="strategic-contact-activity-list"><div class="dash-empty">טוען שיוכים...</div></div>' +
+    '<div class="strategic-contact-activity-form">' +
+      '<div class="form-group" style="margin-bottom:0"><label class="form-label">סוג שיוך</label><select class="form-input" id="strategic-contact-attribution-type">' + renderStrategicContactOptions(strategicContactAttributionTypeOptions, 'referral', '') + '</select></div>' +
+      '<div class="form-group" style="margin-bottom:0"><label class="form-label">מספר לקוח</label><input class="form-input" id="strategic-contact-attribution-contact-id" type="number" placeholder="ID לקוח קיים"></div>' +
+      '<div class="form-group" style="margin-bottom:0"><label class="form-label">מספר ליד</label><input class="form-input" id="strategic-contact-attribution-lead-id" type="number" placeholder="ID ליד קיים"></div>' +
+      '<div class="form-group" style="margin-bottom:0"><label class="form-label">מספר אירוע</label><input class="form-input" id="strategic-contact-attribution-event-id" type="number" placeholder="ID אירוע קיים"></div>' +
+      '<div class="form-group" style="grid-column:1/-1;margin-bottom:0"><label class="form-label">הערות שיוך</label><textarea class="form-textarea" id="strategic-contact-attribution-notes" placeholder="למשל: הגיע דרך מנהלת הרווחה / ספק מפנה"></textarea></div>' +
+      '<div style="grid-column:1/-1"><button class="btn btn-secondary btn-sm" id="strategic-contact-attribution-add" type="button">הוסף שיוך</button></div>' +
+    '</div>' +
+  '</div>';
+}
+
+function renderStrategicContactAttributionItem(item) {
+  var target = [];
+  if (item.contact_id) target.push('לקוח #' + item.contact_id + (item.contact_name ? ' · ' + item.contact_name : ''));
+  if (item.lead_id) target.push('ליד #' + (item.lead_num || item.lead_id) + (item.lead_name ? ' · ' + item.lead_name : ''));
+  if (item.event_id) target.push('אירוע #' + (item.event_num || item.event_id) + (item.event_name ? ' · ' + item.event_name : '') + (item.event_date ? ' · ' + formatDate(item.event_date) : ''));
+  return '<div class="strategic-contact-activity-item strategic-contact-attribution-item">' +
+    '<div class="strategic-contact-activity-title">' + escapeHtml(getStrategicContactOptionLabel(strategicContactAttributionTypeOptions, item.attribution_type)) + '</div>' +
+    '<div class="strategic-contact-activity-meta">' + escapeHtml(target.join(' | ') || 'ללא יעד') + '</div>' +
+    (item.notes ? '<div class="strategic-contact-note" style="margin-top:6px">' + escapeHtml(item.notes) + '</div>' : '') +
+  '</div>';
+}
+
+function loadStrategicContactAttributions(strategicContactId) {
+  var list = document.getElementById('strategic-contact-attributions-list');
+  if (!list || !strategicContactId) return;
+  list.innerHTML = '<div class="dash-empty">טוען שיוכים...</div>';
+  apiCall('GET', '/api/strategic-contacts/' + strategicContactId + '/attributions').then(function(data) {
+    var attributions = data.attributions || [];
+    list.innerHTML = attributions.length ? attributions.map(renderStrategicContactAttributionItem).join('') : '<div class="dash-empty">אין עדיין לידים / אירועים משויכים</div>';
+  }).catch(function(err) {
+    list.innerHTML = '<div class="dash-empty">שגיאה בטעינת שיוכים: ' + escapeHtml(err.message || 'שגיאה') + '</div>';
+  });
+}
+
+function setupStrategicContactAttributionForm(strategicContactId) {
+  var btn = document.getElementById('strategic-contact-attribution-add');
+  if (!btn || !strategicContactId) return;
+  btn.addEventListener('click', function() {
+    var payload = {
+      attribution_type: document.getElementById('strategic-contact-attribution-type').value,
+      contact_id: document.getElementById('strategic-contact-attribution-contact-id').value,
+      lead_id: document.getElementById('strategic-contact-attribution-lead-id').value,
+      event_id: document.getElementById('strategic-contact-attribution-event-id').value,
+      notes: document.getElementById('strategic-contact-attribution-notes').value
+    };
+    if (!payload.contact_id && !payload.lead_id && !payload.event_id) { toast('יש לבחור לקוח או ליד/אירוע לשיוך', 'error'); return; }
+    apiCall('POST', '/api/strategic-contacts/' + strategicContactId + '/attributions', payload).then(function() {
+      toast('השיוך נשמר', 'success');
+      ['strategic-contact-attribution-contact-id','strategic-contact-attribution-lead-id','strategic-contact-attribution-event-id','strategic-contact-attribution-notes'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
+      loadStrategicContactAttributions(strategicContactId);
+    }).catch(function(err) { toast(err.message || 'שגיאה בשמירת שיוך', 'error'); });
+  });
+}
+
+function renderStrategicSourceAttributions(items) {
+  items = items || [];
+  if (!items.length) return '<div class="dash-empty">אין מקור אסטרטגי משויך</div>';
+  return items.map(function(item) {
+    return '<div class="strategic-contact-activity-item">' +
+      '<div class="strategic-contact-activity-title">' + escapeHtml(item.strategic_contact_name || 'קשר אסטרטגי') + ' · ' + escapeHtml(getStrategicContactOptionLabel(strategicContactAttributionTypeOptions, item.attribution_type)) + '</div>' +
+      (item.notes ? '<div class="strategic-contact-note" style="margin-top:6px">' + escapeHtml(item.notes) + '</div>' : '') +
+    '</div>';
+  }).join('');
+}
+
+function loadCustomerStrategicSource(contactId) {
+  var box = document.getElementById('customer-strategic-source-list');
+  if (!box || !contactId) return;
+  apiCall('GET', '/api/strategic-contacts/attributions?contact_id=' + encodeURIComponent(contactId)).then(function(data) {
+    box.innerHTML = renderStrategicSourceAttributions(data.attributions || []);
+  }).catch(function() { box.innerHTML = '<div class="dash-empty">אין מקור אסטרטגי משויך</div>'; });
+}
+
+function loadLeadStrategicSource(leadId) {
+  var box = document.getElementById('lead-strategic-source-list');
+  if (!box || !leadId) return;
+  apiCall('GET', '/api/strategic-contacts/attributions?lead_id=' + encodeURIComponent(leadId)).then(function(data) {
+    box.innerHTML = renderStrategicSourceAttributions(data.attributions || []);
+  }).catch(function() { box.innerHTML = '<div class="dash-empty">אין מקור אסטרטגי משויך</div>'; });
+}
+
+
 function openStrategicContactModal(id, defaults) {
   var isEdit = !!id;
   defaults = defaults || null;
@@ -6258,10 +6354,12 @@ function openStrategicContactModal(id, defaults) {
       strategicContactInput('followup_reason', 'סיבת מעקב', item.followup_reason, 'text') +
       strategicContactTextarea('relevant_services', 'שירותים רלוונטיים', item.relevant_services) +
       strategicContactTextarea('notes', 'הערות', item.notes) +
-    '</div>' + renderStrategicContactActivitiesSection(isEdit ? id : null);
+    '</div>' + renderStrategicContactActivitiesSection(isEdit ? id : null) + renderStrategicContactAttributionsSection(isEdit ? id : null);
     if (isEdit) {
       loadStrategicContactActivities(id);
       setupStrategicContactActivityForm(id);
+      loadStrategicContactAttributions(id);
+      setupStrategicContactAttributionForm(id);
     }
   }
 
@@ -10024,6 +10122,7 @@ function openCustomerCard(id) {
     html += '<div>';
     html += getCustomerBillingShell(c.id);
     html += getCustomerFinancialSummaryShell(c.id);
+    html += '<div class="info-section"><div class="info-section-title">מקור אסטרטגי</div><div id="customer-strategic-source-list"><div class="dash-empty">טוען מקור אסטרטגי...</div></div></div>';
 
     html += '<div class="table-card"><div class="table-toolbar" style="justify-content:space-between"><strong>אירועים של הלקוח</strong><span class="badge badge-gray">' + leads.length + ' אירועים</span></div>';
     if (!leads.length) { html += '<div class="dash-empty">אין אירועים ללקוח הזה</div>'; }
@@ -10058,6 +10157,7 @@ function openCustomerCard(id) {
     grid.innerHTML = html;
     initCustomerBillingUI(c.id);
     loadCustomerFinancialSummary(c.id);
+    loadCustomerStrategicSource(c.id);
 
     // force-event-modal-from-customer-card
     setTimeout(function() {

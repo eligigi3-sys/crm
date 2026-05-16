@@ -227,6 +227,7 @@ function verifyStrategicContacts(results) {
   const worker = read('worker.js');
   const ui = read('src/ui.js');
   const schemaV28 = read('schema_v28.sql');
+  const schemaV29 = read('schema_v29.sql');
 
   expect(auth, "'strategic_contacts'", 'auth module allowlist includes strategic_contacts', results);
   expect(admin, "'strategic_contacts'", 'admin module allowlist includes strategic_contacts', results);
@@ -254,12 +255,22 @@ function verifyStrategicContacts(results) {
   expect(ui, 'strategicContactWarmthLevelOptions', 'UI includes warmth level options', results);
   expect(ui, 'דירוג קשר', 'UI includes relationship grade label', results);
   expect(ui, 'פוטנציאל שנתי', 'UI includes annual value label', results);
+  expect(ui, 'לידים / אירועים משויכים', 'UI includes strategic contact attribution section', results);
+  expect(ui, 'strategicContactAttributionTypeOptions', 'UI includes attribution type options', results);
+  expect(ui, '/api/strategic-contacts/attributions?contact_id=', 'UI loads customer strategic source', results);
+  expect(ui, '/api/strategic-contacts/attributions?lead_id=', 'UI loads lead strategic source', results);
+  expect(ui, 'מקור אסטרטגי', 'UI includes strategic source label', results);
 
   expect(schemaV28, 'ADD COLUMN relationship_grade TEXT', 'schema v28 adds relationship grade', results);
   expect(schemaV28, 'ADD COLUMN warmth_level TEXT', 'schema v28 adds warmth level', results);
   expect(schemaV28, 'ADD COLUMN estimated_annual_value REAL', 'schema v28 adds estimated annual value', results);
   expect(schemaV28, 'ADD COLUMN potential_events_per_year INTEGER', 'schema v28 adds potential events per year', results);
   expect(schemaV28, 'ADD COLUMN relevant_services TEXT', 'schema v28 adds relevant services', results);
+  expect(schemaV29, 'CREATE TABLE IF NOT EXISTS strategic_contact_attributions', 'schema v29 adds attribution table', results);
+  expect(schemaV29, 'strategic_contact_id INTEGER NOT NULL', 'schema v29 links strategic contact', results);
+  expect(schemaV29, 'contact_id INTEGER', 'schema v29 links contact', results);
+  expect(schemaV29, 'lead_id INTEGER', 'schema v29 links lead', results);
+  expect(schemaV29, 'event_id INTEGER', 'schema v29 links event', results);
 
   expectInBlock(strategic, 'export async function handleStrategicContacts', ['return json({ error: \'Strategic contacts route not found\' }, 404);'], [
     'requireTenantContext(request, env)',
@@ -267,6 +278,8 @@ function verifyStrategicContacts(results) {
     "path === '/api/strategic-contacts' && method === 'GET'",
     "path === '/api/strategic-contacts' && method === 'POST'",
     "assertTenantRole(tenantCtx, ['owner', 'admin', 'manager'])",
+    "path.match(/^\\/api\\/strategic-contacts\\/(\\d+)\\/attributions$/)",
+    "path.match(/^\\/api\\/strategic-contacts\\/(\\d+)\\/attributions\\/(\\d+)$/)",
     "path.match(/^\\/api\\/strategic-contacts\\/(\\d+)\\/activities$/)",
     "path.match(/^\\/api\\/strategic-contacts\\/(\\d+)\\/mark-contacted$/)",
     "path.match(/^\\/api\\/strategic-contacts\\/(\\d+)$/)"
@@ -299,6 +312,32 @@ function verifyStrategicContacts(results) {
     "throw new Error('הלקוח המקושר לא נמצא')"
   ], 'strategic contacts validate linked_contact_id against same tenant contact', results);
 
+  expectInBlock(strategic, 'async function listStrategicContactAttributions', ['async function createStrategicContactAttribution'], [
+    'WHERE sca.tenant_id = ?',
+    'sca.strategic_contact_id = ?',
+    'sca.contact_id = ?',
+    'sca.lead_id = ?',
+    'sca.event_id = ?'
+  ], 'strategic contact attributions list is tenant-scoped and filterable', results);
+
+  expectInBlock(strategic, 'async function validateStrategicContactAttributionPayload', ['function strategicContactAttributionSelectSql'], [
+    'getStrategicContactForTenant(env, tenantId, payload.strategic_contact_id)',
+    'FROM contacts WHERE id = ? AND tenant_id = ?',
+    'FROM leads WHERE id = ? AND tenant_id = ?'
+  ], 'strategic contact attribution validates same-tenant linked entities', results);
+
+  expectInBlock(strategic, 'async function createStrategicContactAttribution', ['async function updateStrategicContactAttribution'], [
+    'validateStrategicContactAttributionPayload(env, tenantId',
+    'INSERT INTO strategic_contact_attributions',
+    'tenantCtx.user.id'
+  ], 'strategic contact attribution create validates and records actor', results);
+
+  expectInBlock(strategic, 'async function updateStrategicContactAttribution', ['async function listStrategicContactActivities'], [
+    'WHERE id = ? AND tenant_id = ? AND strategic_contact_id = ?',
+    'validateStrategicContactAttributionPayload(env, tenantId',
+    'UPDATE strategic_contact_attributions'
+  ], 'strategic contact attribution update is tenant-scoped', results);
+
   expectInBlock(strategic, 'async function listStrategicContactActivities', ['async function createStrategicContactActivity'], [
     'getStrategicContactForTenant(env, tenantId, strategicContactId)',
     'FROM strategic_contact_activities',
@@ -327,7 +366,7 @@ function verifyStrategicContacts(results) {
     'tenantCtx.user.id'
   ], 'strategic contact mark contacted creates activity and updates parent tenant-scoped fields', results);
 
-  expectInBlock(strategic, 'async function updateStrategicContact', ['export async function handleStrategicContacts'], [
+  expectInBlock(strategic, 'async function updateStrategicContact(request', ['export async function handleStrategicContacts'], [
     'getStrategicContactForTenant(env, tenantId, id)',
     'validateLinkedContactId(env, tenantId, payload.linked_contact_id)',
     'linked_contact_id = ?',
