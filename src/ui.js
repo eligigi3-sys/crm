@@ -541,6 +541,29 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .customer-billing-chip.muted{background:#f3f4f6;color:var(--text3)}
 .customer-billing-chip.green{background:#dcfce7;color:#166534}
 .customer-billing-chip.orange{background:#ffedd5;color:#c2410c}
+.customer-financial-panel{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
+.customer-financial-header{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#f8fafc}
+.customer-financial-title{font-size:16px;font-weight:900;color:var(--text)}
+.customer-financial-subtitle{font-size:12px;color:var(--text3);line-height:1.5;margin-top:4px}
+.customer-financial-content{padding:16px;display:flex;flex-direction:column;gap:14px}
+.customer-financial-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.customer-financial-card{border:1px solid var(--border);border-radius:12px;background:#fff;padding:12px;min-width:0}
+.customer-financial-label{font-size:11px;font-weight:900;color:var(--text3);line-height:1.4}
+.customer-financial-value{font-size:20px;font-weight:900;color:var(--text);margin-top:4px;word-break:break-word}
+.customer-financial-note{font-size:11px;color:var(--text3);line-height:1.5;margin-top:4px}
+.customer-financial-section{border:1px solid var(--border);border-radius:12px;background:#fff;padding:13px}
+.customer-financial-section-title{font-size:13px;font-weight:900;color:var(--text);margin-bottom:9px}
+.customer-financial-list{display:flex;flex-direction:column;gap:8px}
+.customer-financial-row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;border-bottom:1px solid #f1f5f9;padding-bottom:8px;font-size:12px;color:var(--text2);line-height:1.5}
+.customer-financial-row:last-child{border-bottom:none;padding-bottom:0}
+.customer-financial-row-main{font-weight:800;color:var(--text)}
+.customer-financial-row-meta{color:var(--text3);font-size:11px;margin-top:2px}
+.customer-financial-row-amount{font-weight:900;color:var(--accent);white-space:nowrap}
+.customer-financial-status-grid{display:flex;gap:7px;flex-wrap:wrap}
+.customer-financial-status-chip{display:inline-flex;gap:5px;align-items:center;border:1px solid var(--border);border-radius:999px;padding:5px 8px;font-size:11px;font-weight:800;background:#fff;color:var(--text2)}
+.customer-financial-warning{padding:10px 12px;border-radius:12px;background:var(--yellow-light);color:var(--yellow);font-size:12px;font-weight:800;line-height:1.5}
+.customer-financial-warning.blocked{background:var(--red-light);color:var(--red)}
+.customer-financial-empty{padding:16px;border:1px dashed var(--border);border-radius:12px;background:#f8fafc;color:var(--text3);text-align:center;font-size:13px;line-height:1.6}
 .autocomplete-list{position:absolute;top:100%;right:0;left:0;background:var(--white);border:1px solid var(--accent);border-radius:var(--radius-sm);box-shadow:var(--shadow-md);z-index:300;max-height:200px;overflow-y:auto}
 .autocomplete-item{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)}
 .autocomplete-item:last-child{border-bottom:none}
@@ -737,6 +760,18 @@ tr:hover td{background:#fafbfc;cursor:pointer}
   .customer-billing-card-actions,
   .customer-billing-actions .btn {
     width: 100%;
+  }
+
+  .customer-financial-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .customer-financial-row {
+    flex-direction: column;
+  }
+
+  .customer-financial-row-amount {
+    white-space: normal;
   }
 
   .customer-billing-card-actions .btn {
@@ -9056,6 +9091,115 @@ function bindCustomerBillingUI() {
   });
 }
 
+function getCustomerFinancialSummaryShell(customerId) {
+  return '<div class="customer-financial-panel" id="customer-financial-summary" data-customer-financial-summary data-contact-id="' + customerId + '">' +
+    '<div class="customer-financial-header">' +
+      '<div><div class="customer-financial-title">סיכום פיננסי</div><div class="customer-financial-subtitle">תצוגה לקריאה בלבד — מחושב ממסמכים קיימים, לידים ואירועים מקושרים.</div></div>' +
+      '<span class="badge badge-gray">מחושב ממסמכים קיימים</span>' +
+    '</div>' +
+    '<div class="customer-financial-content" id="customer-financial-content"><div class="customer-financial-empty">טוען סיכום פיננסי...</div></div>' +
+  '</div>';
+}
+
+function customerFinancialMoney(value, currency) {
+  return (currency || '₪') + fmtMoney(value || 0);
+}
+
+function renderCustomerFinancialCard(label, value, note, cls) {
+  return '<div class="customer-financial-card ' + (cls || '') + '">' +
+    '<div class="customer-financial-label">' + escapeHtml(label) + '</div>' +
+    '<div class="customer-financial-value">' + escapeHtml(value) + '</div>' +
+    (note ? '<div class="customer-financial-note">' + escapeHtml(note) + '</div>' : '') +
+  '</div>';
+}
+
+function getFinancialStatusLabel(status) {
+  var labels = {
+    draft: 'טיוטה',
+    sent: 'נשלח',
+    issued: 'הונפק',
+    paid: 'שולם',
+    partially_paid: 'שולם חלקית',
+    cancelled: 'בוטל',
+    void: 'מבוטל'
+  };
+  return labels[status] || getSalesDocumentStatusLabel(status);
+}
+
+function renderCustomerFinancialDocument(doc) {
+  var title = (doc.document_number || ('#' + doc.id)) + ' · ' + getSalesDocumentTypeLabel(doc.document_type);
+  var meta = getSalesDocumentStatusLabel(doc.status) + (doc.issue_date ? ' · ' + formatDate(doc.issue_date) : '') + (doc.due_date ? ' · לתשלום עד ' + formatDate(doc.due_date) : '');
+  if (doc.lead_name) meta += ' · ' + doc.lead_name;
+  return '<div class="customer-financial-row">' +
+    '<div><div class="customer-financial-row-main">' + escapeHtml(title) + '</div><div class="customer-financial-row-meta">' + escapeHtml(meta) + '</div></div>' +
+    '<div class="customer-financial-row-amount">₪' + fmtMoney(doc.total_amount || 0) + '</div>' +
+  '</div>';
+}
+
+function renderCustomerFinancialEvent(event) {
+  var title = 'אירוע #' + escapeHtml(event.lead_num || event.id || '') + (event.event_type ? ' · ' + escapeHtml(event.event_type) : '');
+  var meta = (event.event_date ? formatDate(event.event_date) : 'ללא תאריך') + (event.venue ? ' · ' + event.venue : '') + (event.status ? ' · ' + event.status : '');
+  return '<div class="customer-financial-row">' +
+    '<div><div class="customer-financial-row-main">' + title + '</div><div class="customer-financial-row-meta">' + escapeHtml(meta) + '</div></div>' +
+    '<div class="customer-financial-row-amount">' + (event.price ? '₪' + fmtMoney(event.price) : '—') + '</div>' +
+  '</div>';
+}
+
+function renderCustomerFinancialSummary(data) {
+  var content = document.getElementById('customer-financial-content');
+  if (!content) return;
+  var summary = data.summary || {};
+  var credit = data.credit || { status: 'normal' };
+  var breakdown = data.invoice_status_breakdown || {};
+  var docs = data.recent_sales_documents || [];
+  var events = data.recent_events || [];
+  var html = '';
+
+  if (credit.status === 'watch' || credit.status === 'blocked') {
+    html += '<div class="customer-financial-warning ' + (credit.status === 'blocked' ? 'blocked' : '') + '">' +
+      (credit.status === 'blocked' ? 'סטטוס אשראי חסום בפרופיל החיוב — אזהרה בלבד.' : 'סטטוס אשראי במעקב בפרופיל החיוב — מומלץ לבדוק לפני חיוב נוסף.') +
+      (credit.notes ? '<br>' + escapeHtml(credit.notes) : '') +
+    '</div>';
+  }
+
+  html += '<div class="customer-financial-grid">' +
+    renderCustomerFinancialCard('סה״כ הכנסות', customerFinancialMoney(summary.total_revenue), 'מחשבוניות שהונפקו/שולמו') +
+    renderCustomerFinancialCard('יתרה פתוחה', customerFinancialMoney(summary.open_balance), 'חשבוניות פתוחות בלבד') +
+    renderCustomerFinancialCard('יתרה באיחור', customerFinancialMoney(summary.overdue_balance), 'לפי תאריך לתשלום') +
+    renderCustomerFinancialCard('מספר חשבוניות', String(summary.invoice_count || 0), 'כולל טיוטות ופתוחות') +
+    renderCustomerFinancialCard('אירועים / עבודות', String(summary.total_events || 0), 'לידים המקושרים ללקוח') +
+    renderCustomerFinancialCard('ממוצע חשבונית', customerFinancialMoney(summary.average_invoice_value), 'מחושב מחשבוניות מוכרות') +
+  '</div>';
+
+  html += '<div class="customer-financial-section"><div class="customer-financial-section-title">סטטוס חשבוניות</div><div class="customer-financial-status-grid">' +
+    ['draft', 'sent', 'issued', 'paid', 'partially_paid', 'cancelled', 'void'].map(function(status) {
+      return '<span class="customer-financial-status-chip">' + escapeHtml(getFinancialStatusLabel(status)) + ': ' + escapeHtml(String(breakdown[status] || 0)) + '</span>';
+    }).join('') +
+  '</div><div class="customer-financial-note">הספירה מחושבת ממסמכי invoice קיימים שמקושרים ישירות ללקוח או דרך ליד/אירוע.</div></div>';
+
+  html += '<div class="customer-financial-section"><div class="customer-financial-section-title">מסמכים אחרונים</div>' +
+    (docs.length ? '<div class="customer-financial-list">' + docs.map(renderCustomerFinancialDocument).join('') + '</div>' : '<div class="customer-financial-empty">אין עדיין מסמכי מכירה מקושרים ללקוח הזה.</div>') +
+  '</div>';
+
+  html += '<div class="customer-financial-section"><div class="customer-financial-section-title">אירועים / עבודות אחרונות</div>' +
+    (events.length ? '<div class="customer-financial-list">' + events.map(renderCustomerFinancialEvent).join('') + '</div>' : '<div class="customer-financial-empty">אין אירועים או עבודות מקושרים ללקוח הזה.</div>') +
+  '</div>';
+
+  html += '<div class="customer-financial-note">מגבלות החישוב: עדיין אין טבלת קישור חשבונית↔אירועים ואין הקצאת תשלומים מלאה, לכן זה סיכום קשר לקוח בטוח — לא ספר חשבונות.</div>';
+  content.innerHTML = html;
+}
+
+function loadCustomerFinancialSummary(customerId) {
+  var content = document.getElementById('customer-financial-content');
+  if (content) content.innerHTML = '<div class="customer-financial-empty">טוען סיכום פיננסי...</div>';
+  apiCall('GET', '/api/contacts/' + customerId + '/financial-summary').then(function(data) {
+    renderCustomerFinancialSummary(data || {});
+  }).catch(function(err) {
+    var target = document.getElementById('customer-financial-content');
+    if (target) target.innerHTML = '<div class="customer-financial-empty">שגיאה בטעינת הסיכום הפיננסי: ' + escapeHtml(err.message || 'שגיאה') + '</div>';
+  });
+}
+
 function openCustomerCard(id) {
   Promise.all([
     apiCall('GET', '/api/contacts/' + id),
@@ -9151,6 +9295,7 @@ function openCustomerCard(id) {
 
     html += '<div>';
     html += getCustomerBillingShell(c.id);
+    html += getCustomerFinancialSummaryShell(c.id);
 
     html += '<div class="table-card"><div class="table-toolbar" style="justify-content:space-between"><strong>אירועים של הלקוח</strong><span class="badge badge-gray">' + leads.length + ' אירועים</span></div>';
     if (!leads.length) { html += '<div class="dash-empty">אין אירועים ללקוח הזה</div>'; }
@@ -9184,6 +9329,7 @@ function openCustomerCard(id) {
 
     grid.innerHTML = html;
     initCustomerBillingUI(c.id);
+    loadCustomerFinancialSummary(c.id);
 
     // force-event-modal-from-customer-card
     setTimeout(function() {
