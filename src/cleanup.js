@@ -270,8 +270,9 @@ async function getCleanupCandidates(env) {
     ORDER BY id
   `).all();
   for (const row of tenants.results || []) {
-    const candidate = await buildTenantCandidate(env, row);
-    if (candidate.allowed || hasTestMarker([row.name, row.slug, row.contact_name, row.contact_email]) || Number(row.id) === 1) candidates.push(candidate);
+    if (Number(row.id) === 1) continue;
+    if (!hasTestMarker([row.name, row.slug, row.contact_name, row.contact_email])) continue;
+    candidates.push(await buildTenantCandidate(env, row));
   }
 
   const issuedDocs = await env.DB.prepare(`
