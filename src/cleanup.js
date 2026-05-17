@@ -39,8 +39,13 @@ async function countRows(env, tableName, whereSql, binds) {
   return Number(row && row.count ? row.count : 0);
 }
 
+const DEPENDENCY_ID_COLUMNS = {
+  counters: 'name'
+};
+
 async function listIds(env, tableName, whereSql, binds, limit = 12) {
-  const result = await env.DB.prepare(`SELECT id FROM ${tableName} ${whereSql} ORDER BY id LIMIT ?`).bind(...(binds || []), limit).all();
+  const idColumn = DEPENDENCY_ID_COLUMNS[tableName] || 'id';
+  const result = await env.DB.prepare(`SELECT ${idColumn} AS id FROM ${tableName} ${whereSql} ORDER BY ${idColumn} LIMIT ?`).bind(...(binds || []), limit).all();
   return formatIds(result.results || []);
 }
 
