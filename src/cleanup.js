@@ -110,14 +110,15 @@ async function buildTenantCandidate(env, row) {
     allowed: deleteBlocked.length === 0,
     blocked_reason: summarizeBlockedReasons(deleteBlocked),
     dependencies: deps.all,
-    owner_email: row.owner_email || row.contact_email || null,
-    owner_user_id: row.owner_user_id || null,
-    locked_sales_documents_count: lockedDocs ? lockedDocs.count : 0,
     actions: [
       mkAction('archive', 'Suspend', Number(row.id) !== 1 && row.status !== 'suspended', Number(row.id) === 1 ? 'tenant 1 cannot be suspended' : 'already suspended'),
       mkAction('reactivate', 'Reactivate', row.status === 'suspended', 'tenant is already active'),
       mkAction('delete', 'Delete Tenant', deleteBlocked.length === 0, summarizeBlockedReasons(deleteBlocked), { requires_delete: true, requires_name: row.name || '' })
     ]
+  }, {
+    owner_email: row.owner_email || row.contact_email || null,
+    owner_user_id: row.owner_user_id || null,
+    locked_sales_documents_count: lockedDocs ? lockedDocs.count : 0
   });
 }
 
