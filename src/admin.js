@@ -172,6 +172,8 @@ function mapTenantRow(row) {
     contact_name: row.contact_name || null,
     contact_phone: row.contact_phone || null,
     contact_email: row.contact_email || null,
+    owner_email: row.owner_email || null,
+    owner_user_id: row.owner_user_id || null,
     created_at: row.created_at,
     updated_at: row.updated_at
   };
@@ -334,9 +336,13 @@ export async function handleAdmin(request, env, path) {
 
   if (path === '/api/admin/tenants' && method === 'GET') {
     const result = await env.DB.prepare(`
-      SELECT id, name, slug, status, timezone, currency, locale, contact_name, contact_phone, contact_email, created_at, updated_at
-      FROM tenants
-      ORDER BY created_at DESC, id DESC
+      SELECT t.id, t.name, t.slug, t.status, t.timezone, t.currency, t.locale, t.contact_name, t.contact_phone, t.contact_email,
+             u.email AS owner_email, u.id AS owner_user_id, t.created_at, t.updated_at
+      FROM tenants t
+      LEFT JOIN tenant_memberships tm ON tm.tenant_id = t.id AND tm.role = 'owner'
+      LEFT JOIN users u ON u.id = tm.user_id
+      GROUP BY t.id
+      ORDER BY t.created_at DESC, t.id DESC
     `).all();
 
     return {
@@ -578,6 +584,7 @@ export async function handleAdmin(request, env, path) {
     const tenantId = Number(tenantSuspendMatch[1]);
     const tenant = await getTenantById(tenantId, env);
     if (!tenant) throw new Error('Tenant not found');
+    if (tenantId === 1) throw new Error('tenant 1 cannot be suspended');
 
     await env.DB.prepare(`
       UPDATE tenants

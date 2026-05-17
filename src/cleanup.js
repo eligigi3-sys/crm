@@ -5,7 +5,7 @@ const TEST_MARKERS = [
 const LOCKED_SALES_STATUSES = new Set(['issued', 'paid', 'partially_paid', 'void']);
 const TENANT_LOW_RISK_DELETE_TABLES = [
   'strategic_contact_attributions', 'strategic_contact_activities', 'strategic_contacts',
-  'sales_document_counters', 'tenant_business_settings', 'tenant_modules', 'tenant_memberships'
+  'sales_document_counters', 'counters', 'tenant_business_settings', 'tenant_modules', 'tenant_memberships'
 ];
 const TENANT_PROTECTED_TABLES = [
   'contacts', 'contact_notes', 'customer_billing_profiles', 'customer_addresses', 'customer_contact_people',
@@ -93,24 +93,25 @@ async function tenantDependencies(env, tenantId) {
 
 async function buildTenantCandidate(env, row) {
   const deps = await tenantDependencies(env, row.id);
-  const protectedNonZero = deps.protectedDeps.filter(function(dep) { return dep.count > 0; });
+  const lockedDocs = deps.protectedDeps.find(function(dep) { return dep.table === 'sales_documents'; });
   const deleteBlocked = [];
   if (Number(row.id) === 1) deleteBlocked.push('tenant 1 cannot be hard-deleted');
-  if (row.status !== 'suspended') deleteBlocked.push('tenant must be suspended before hard delete');
-  if (protectedNonZero.length) deleteBlocked.push('protected business/financial/inventory data exists: ' + protectedNonZero.map(function(dep) { return dep.table + '=' + dep.count; }).join(', '));
   return candidate('tenant', {
     id: row.id,
     tenant_id: row.id,
     label: (row.name || 'Tenant') + ' / ' + (row.slug || ('#' + row.id)),
     status: row.status,
-    reason: Number(row.id) === 1 ? 'tenant 1 protected' : 'tenant controls',
+    reason: Number(row.id) === 1 ? 'tenant 1 protected' : 'tenant dependency preview',
     allowed: deleteBlocked.length === 0,
     blocked_reason: summarizeBlockedReasons(deleteBlocked),
     dependencies: deps.all,
+    owner_email: row.owner_email || row.contact_email || null,
+    owner_user_id: row.owner_user_id || null,
+    locked_sales_documents_count: lockedDocs ? lockedDocs.count : 0,
     actions: [
-      mkAction('archive', 'Suspend', Number(row.id) !== 1 && row.status !== 'suspended', Number(row.id) === 1 ? 'tenant 1 cannot be suspended in this phase' : 'already suspended'),
+      mkAction('archive', 'Suspend', Number(row.id) !== 1 && row.status !== 'suspended', Number(row.id) === 1 ? 'tenant 1 cannot be suspended' : 'already suspended'),
       mkAction('reactivate', 'Reactivate', row.status === 'suspended', 'tenant is already active'),
-      mkAction('delete', 'Hard Delete', deleteBlocked.length === 0, summarizeBlockedReasons(deleteBlocked), { requires_delete: true, requires_name: row.name || '' })
+      mkAction('delete', 'Delete Tenant', deleteBlocked.length === 0, summarizeBlockedReasons(deleteBlocked), { requires_delete: true, requires_name: row.name || '' })
     ]
   });
 }
@@ -293,8 +294,16 @@ async function listCleanupCandidates(env, entity, search) {
   const want = function(name) { return !entity || entity === 'all' || entity === name; };
 
   if (want('tenants')) {
-    const rows = await env.DB.prepare('SELECT id, name, slug, status, contact_name, contact_email FROM tenants ORDER BY id LIMIT 100').all();
-    for (const row of rows.results || []) if (textLike(row, ['id', 'name', 'slug', 'contact_email'], search)) candidates.push(await buildTenantCandidate(env, row));
+    const rows = await env.DB.prepare(`
+      SELECT t.id, t.name, t.slug, t.status, t.contact_name, t.contact_email, u.email AS owner_email, u.id AS owner_user_id
+      FROM tenants t
+      LEFT JOIN tenant_memberships tm ON tm.tenant_id = t.id AND tm.role = 'owner'
+      LEFT JOIN users u ON u.id = tm.user_id
+      GROUP BY t.id
+      ORDER BY t.id
+      LIMIT 100
+    `).all();
+    for (const row of rows.results || []) if (textLike(row, ['id', 'name', 'slug', 'contact_email', 'owner_email'], search)) candidates.push(await buildTenantCandidate(env, row));
   }
 
   if (want('users')) {
@@ -374,7 +383,14 @@ async function listCleanupCandidates(env, entity, search) {
 
 async function getCandidateByTypeAndId(env, type, id) {
   if (type === 'tenant') {
-    const row = await env.DB.prepare('SELECT id, name, slug, status, contact_name, contact_email FROM tenants WHERE id = ?').bind(id).first();
+    const row = await env.DB.prepare(`
+      SELECT t.id, t.name, t.slug, t.status, t.contact_name, t.contact_email, u.email AS owner_email, u.id AS owner_user_id
+      FROM tenants t
+      LEFT JOIN tenant_memberships tm ON tm.tenant_id = t.id AND tm.role = 'owner'
+      LEFT JOIN users u ON u.id = tm.user_id
+      WHERE t.id = ?
+      GROUP BY t.id
+    `).bind(id).first();
     return row ? buildTenantCandidate(env, row) : null;
   }
   if (type === 'user') {
@@ -496,22 +512,36 @@ async function runReactivateAction(env, actor, candidate) {
 async function runDeleteAction(env, actor, candidate) {
   const s = [];
   if (candidate.type === 'tenant') {
+    if (Number(candidate.id) === 1) throw new Error('tenant 1 cannot be hard-deleted');
     s.push(env.DB.prepare('DELETE FROM strategic_contact_attributions WHERE tenant_id = ?').bind(candidate.id));
     s.push(env.DB.prepare('DELETE FROM strategic_contact_activities WHERE tenant_id = ?').bind(candidate.id));
     s.push(env.DB.prepare('DELETE FROM strategic_contacts WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM sales_document_items WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM sales_documents WHERE tenant_id = ?').bind(candidate.id));
     s.push(env.DB.prepare('DELETE FROM sales_document_counters WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM customer_contact_people WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM customer_addresses WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM customer_billing_profiles WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM contact_notes WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM lead_employees WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM lead_notes WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM event_inventory_actions WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM event_product_allocations WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM product_stock_movements WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM product_purchases WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM shopping_purchase_items WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM shopping_purchases WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM shopping_items WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM shopping_lists WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM leads WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM contacts WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM employees WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM products WHERE tenant_id = ?').bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM counters WHERE tenant_id = ?').bind(candidate.id));
     s.push(env.DB.prepare('DELETE FROM tenant_business_settings WHERE tenant_id = ?').bind(candidate.id));
     s.push(env.DB.prepare('DELETE FROM tenant_modules WHERE tenant_id = ?').bind(candidate.id));
     s.push(env.DB.prepare('DELETE FROM tenant_memberships WHERE tenant_id = ?').bind(candidate.id));
-    s.push(env.DB.prepare(`
-      DELETE FROM tenants
-      WHERE id = ? AND id <> 1 AND status = 'suspended'
-        AND NOT EXISTS (SELECT 1 FROM contacts WHERE tenant_id = tenants.id)
-        AND NOT EXISTS (SELECT 1 FROM leads WHERE tenant_id = tenants.id)
-        AND NOT EXISTS (SELECT 1 FROM products WHERE tenant_id = tenants.id)
-        AND NOT EXISTS (SELECT 1 FROM product_stock_movements WHERE tenant_id = tenants.id)
-        AND NOT EXISTS (SELECT 1 FROM sales_documents WHERE tenant_id = tenants.id)
-    `).bind(candidate.id));
+    s.push(env.DB.prepare('DELETE FROM tenants WHERE id = ? AND id <> 1').bind(candidate.id));
   } else if (candidate.type === 'user') {
     s.push(env.DB.prepare("DELETE FROM users WHERE id = ? AND lower(COALESCE(role,'')) <> 'super_admin' AND NOT EXISTS (SELECT 1 FROM tenant_memberships WHERE user_id = users.id)").bind(candidate.id));
   } else if (candidate.type === 'contact') {

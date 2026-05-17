@@ -3139,11 +3139,14 @@ function loadSuperAdminTenants() {
     }
     body.innerHTML = tenants.map(function(t) {
       var isSuspended = t.status === 'suspended';
-      var actionBtn = isSuspended
-        ? '<button class="btn btn-secondary btn-sm" data-tenant-activate="' + t.id + '">הפעל</button>'
-        : '<button class="btn btn-danger btn-sm" data-tenant-suspend="' + t.id + '">השהה</button>';
+      var isTenantOne = Number(t.id) === 1;
+      var actionBtn = isTenantOne
+        ? '<button class="btn btn-secondary btn-sm" disabled title="tenant 1 protected">מוגן</button>'
+        : (isSuspended
+          ? '<button class="btn btn-secondary btn-sm" data-tenant-activate="' + t.id + '">הפעל</button>'
+          : '<button class="btn btn-danger btn-sm" data-tenant-suspend="' + t.id + '">השהה</button>');
       var statusBadge = '<span class="super-admin-list-status ' + (isSuspended ? 'suspended' : 'active') + '">' + escapeHtml(isSuspended ? 'מושהה' : 'פעיל') + '</span>';
-      return '<tr data-tenant-id="' + t.id + '"><td>' + t.id + '</td><td class="bold">' + escapeHtml(t.name || '—') + '</td><td>' + escapeHtml(t.slug || '—') + '</td><td>' + statusBadge + '</td><td>' + escapeHtml(formatDate(t.created_at) || '—') + '</td><td>' + actionBtn + '</td></tr>';
+      return '<tr data-tenant-id="' + t.id + '"><td>' + t.id + '</td><td class="bold">' + escapeHtml(t.name || '—') + '<div class="text-muted">' + escapeHtml(t.owner_email || t.contact_email || '—') + '</div></td><td>' + escapeHtml(t.slug || '—') + '</td><td>' + statusBadge + '</td><td>' + escapeHtml(formatDate(t.created_at) || '—') + '</td><td>' + actionBtn + '</td></tr>';
     }).join('');
     body.querySelectorAll('tr[data-tenant-id]').forEach(function(row) {
       row.addEventListener('click', function() {
@@ -3183,7 +3186,7 @@ function cleanupActionButtons(c) {
     var danger = a.action === 'delete';
     var label = escapeHtml(a.label || a.action);
     if (!a.allowed) return '<button class="btn btn-secondary btn-sm" disabled title="' + escapeHtml(a.blocked_reason || 'חסום') + '">' + label + '</button>';
-    return '<button class="btn ' + (danger ? 'btn-danger' : 'btn-secondary') + ' btn-sm" data-cleanup-action="' + escapeHtml([c.type, c.id, a.action].join(':')) + '" data-cleanup-name="' + escapeHtml(a.requires_name || '') + '">' + label + '</button>';
+    return '<button class="btn ' + (danger ? 'btn-danger' : 'btn-secondary') + ' btn-sm" data-cleanup-action="' + escapeHtml([c.type, c.id, a.action].join(':')) + '" data-cleanup-name="' + escapeHtml(a.requires_name || '') + '" data-cleanup-preview="' + escapeHtml(formatCleanupDependencies(c.dependencies)) + '">' + label + '</button>';
   }).join(' ');
 }
 
@@ -3204,7 +3207,7 @@ function loadSuperAdminCleanupCandidates() {
       var blocked = c.blocked_reason || c.reason || '—';
       return '<tr>' +
         '<td>' + escapeHtml(c.type || '—') + '</td>' +
-        '<td><strong>' + escapeHtml(c.label || ('#' + c.id)) + '</strong><div class="text-muted">tenant ' + escapeHtml(c.tenant_id || '—') + ' · id ' + escapeHtml(c.id || '—') + '</div></td>' +
+        '<td><strong>' + escapeHtml(c.label || ('#' + c.id)) + '</strong><div class="text-muted">tenant ' + escapeHtml(c.tenant_id || '—') + ' · id ' + escapeHtml(c.id || '—') + (c.owner_email ? ' · owner ' + escapeHtml(c.owner_email) : '') + '</div></td>' +
         '<td>' + escapeHtml(c.status || '—') + '</td>' +
         '<td style="max-width:300px;white-space:normal">' + escapeHtml(formatCleanupDependencies(c.dependencies)) + '</td>' +
         '<td style="max-width:280px;white-space:normal">' + escapeHtml(blocked) + '</td>' +
@@ -3214,7 +3217,7 @@ function loadSuperAdminCleanupCandidates() {
     body.querySelectorAll('[data-cleanup-action]').forEach(function(btn) {
       btn.addEventListener('click', function() {
         var parts = String(this.getAttribute('data-cleanup-action') || '').split(':');
-        runCleanupAction(parts[0], Number(parts[1]), parts[2], this.getAttribute('data-cleanup-name') || '');
+        runCleanupAction(parts[0], Number(parts[1]), parts[2], this.getAttribute('data-cleanup-name') || '', this.getAttribute('data-cleanup-preview') || '');
       });
     });
   }).catch(function(err) {
@@ -3222,10 +3225,11 @@ function loadSuperAdminCleanupCandidates() {
   });
 }
 
-function runCleanupAction(type, id, action, requiredName) {
+function runCleanupAction(type, id, action, requiredName, dependencyPreview) {
   var body = { type: type, id: id, action: action };
   if (action === 'delete') {
-    var confirmation = window.prompt('מחיקה מלאה — לא ניתן לשחזר. להקליד DELETE כדי למחוק קשיח');
+    var previewText = dependencyPreview || 'אין';
+    var confirmation = window.prompt('Dependency preview / תצוגת תלותים לפני מחיקה:\n' + previewText + '\n\nמחיקה מלאה — לא ניתן לשחזר. להקליד DELETE כדי למחוק קשיח');
     if (confirmation === null) return;
     if (confirmation !== 'DELETE') { toast('אישור לא תואם — המחיקה בוטלה', 'error'); return; }
     body.confirmation = confirmation;
