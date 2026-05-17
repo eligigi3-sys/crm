@@ -3229,7 +3229,7 @@ function runCleanupAction(type, id, action, requiredName, dependencyPreview) {
   var body = { type: type, id: id, action: action };
   if (action === 'delete') {
     var previewText = dependencyPreview || 'אין';
-    var confirmation = window.prompt('Dependency preview / תצוגת תלותים לפני מחיקה:\n' + previewText + '\n\nמחיקה מלאה — לא ניתן לשחזר. להקליד DELETE כדי למחוק קשיח');
+    var confirmation = window.prompt('Dependency preview / תצוגת תלותים לפני מחיקה:\\n' + previewText + '\\n\\nמחיקה מלאה — לא ניתן לשחזר. להקליד DELETE כדי למחוק קשיח');
     if (confirmation === null) return;
     if (confirmation !== 'DELETE') { toast('אישור לא תואם — המחיקה בוטלה', 'error'); return; }
     body.confirmation = confirmation;
