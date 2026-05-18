@@ -1471,10 +1471,34 @@ tr:hover td{background:#fafbfc;cursor:pointer}
   body.crm-shell #main{padding-top:66px!important;padding-bottom:92px!important}
   body.crm-shell #sidebar{overflow-x:auto;overflow-y:hidden;justify-content:stretch;box-shadow:0 -2px 14px rgba(15,23,42,.08)}
   body.crm-shell #sidebar .nav-item.mobile-bottom-hidden{display:none!important}
-  body.crm-shell #sidebar .nav-item.mobile-bottom-visible{min-width:72px;max-width:96px}
+  body.crm-shell #sidebar .nav-item.mobile-bottom-visible{flex:1 1 0!important;min-width:0;max-width:none}
   body.crm-shell #sidebar .nav-badge{display:none!important}
   body.crm-shell #sidebar .nav-item.mobile-bottom-visible .nav-label{font-size:0}
   body.crm-shell #sidebar .nav-item.mobile-bottom-visible .nav-label::after{content:attr(data-mobile);font-size:11px;line-height:1.1;display:block;white-space:normal;text-align:center}
+  body.crm-shell #page-business-settings .page-header{gap:8px!important;margin-bottom:10px!important}
+  body.crm-shell #page-business-settings .page-title{font-size:18px!important;line-height:1.25}
+  body.crm-shell #page-business-settings .page-title small{font-size:11px!important;line-height:1.4}
+  body.crm-shell #page-business-settings .page-header .btn{width:100%;justify-content:center;min-height:40px}
+  body.crm-shell #page-business-settings .business-settings-layout{display:block;width:100%;max-width:100%;overflow:visible}
+  body.crm-shell #page-business-settings .business-settings-card{border-radius:14px;overflow:visible;max-width:100%}
+  body.crm-shell #page-business-settings .business-settings-head{padding:12px;flex-direction:column;align-items:stretch!important;gap:8px}
+  body.crm-shell #page-business-settings .business-settings-title{font-size:14px;line-height:1.35}
+  body.crm-shell #page-business-settings .business-settings-sub{font-size:11px;line-height:1.45}
+  body.crm-shell #page-business-settings .business-settings-body{padding:10px}
+  body.crm-shell #page-business-settings .business-settings-section{padding:12px;border-radius:12px;margin-bottom:10px;max-width:100%;overflow:hidden}
+  body.crm-shell #page-business-settings .business-settings-section-title{font-size:13px;line-height:1.35}
+  body.crm-shell #page-business-settings .business-settings-section-sub{font-size:11px;line-height:1.45}
+  body.crm-shell #page-business-settings .business-settings-grid{grid-template-columns:1fr!important;gap:10px}
+  body.crm-shell #page-business-settings .business-logo-upload{display:grid;grid-template-columns:1fr;gap:10px;padding:10px}
+  body.crm-shell #page-business-settings .business-logo-preview{width:100%;height:92px}
+  body.crm-shell #page-business-settings .business-logo-actions{display:grid;grid-template-columns:1fr;gap:8px;width:100%}
+  body.crm-shell #page-business-settings .business-logo-actions .btn{width:100%;justify-content:center}
+  body.crm-shell #page-business-settings .mobile-settings-grid{grid-template-columns:1fr!important;gap:8px}
+  body.crm-shell #page-business-settings .mobile-settings-toggle{width:100%;min-width:0;padding:12px;gap:8px;align-items:center}
+  body.crm-shell #page-business-settings .mobile-settings-toggle span{min-width:0;overflow-wrap:anywhere;line-height:1.25}
+  body.crm-shell #page-business-settings .business-settings-footer{position:sticky;bottom:68px;z-index:10005;padding:10px 12px;align-items:stretch;flex-direction:column;background:rgba(255,255,255,.98);box-shadow:0 -4px 14px rgba(15,23,42,.08)}
+  body.crm-shell #page-business-settings .business-settings-footer .btn{width:100%;justify-content:center;min-height:42px}
+  body.crm-shell #page-business-settings .business-settings-status{text-align:center;font-size:11px}
   body.crm-shell #sidebar::-webkit-scrollbar{display:none}
 }
 
