@@ -1473,6 +1473,8 @@ tr:hover td{background:#fafbfc;cursor:pointer}
   body.crm-shell #sidebar .nav-item.mobile-bottom-hidden{display:none!important}
   body.crm-shell #sidebar .nav-item.mobile-bottom-visible{min-width:72px;max-width:96px}
   body.crm-shell #sidebar .nav-badge{display:none!important}
+  body.crm-shell #sidebar .nav-item.mobile-bottom-visible .nav-label{font-size:0}
+  body.crm-shell #sidebar .nav-item.mobile-bottom-visible .nav-label::after{content:attr(data-mobile);font-size:11px;line-height:1.1;display:block;white-space:normal;text-align:center}
   body.crm-shell #sidebar::-webkit-scrollbar{display:none}
 }
 
@@ -1524,18 +1526,18 @@ tr:hover td{background:#fafbfc;cursor:pointer}
       </div>
     </div>
     <div class="nav-section">תפריט</div>
-    <div class="nav-item active" id="nav-dashboard"><span class="nav-icon">📊</span> דאשבורד</div>
-    <div class="nav-item" id="nav-leads"><span class="nav-icon">👥</span> לקוחות <span class="nav-badge" id="nav-leads-count" style="display:none">0</span></div>
-    <div class="nav-item" id="nav-employees"><span class="nav-icon">🧑‍💼</span> עובדים</div>
-    <div class="nav-item" id="nav-team" style="display:none"><span class="nav-icon">👤</span> צוות</div>
-    <div class="nav-item" id="nav-products"><span class="nav-icon">📦</span> מוצרים</div>
-    <div class="nav-item" id="nav-shopping"><span class="nav-icon">🛒</span> רשימות קניות</div>
-    <div class="nav-item" id="nav-strategic-contacts"><span class="nav-icon">🤝</span> קשרים אסטרטגיים</div>
-    <div class="nav-item" id="nav-sales-documents"><span class="nav-icon">🧾</span> מסמכי מכירה</div>
-    <div class="nav-item" id="nav-business-settings"><span class="nav-icon">⚙️</span> הגדרות עסק</div>
-    <div class="nav-item" id="nav-calendar"><span class="nav-icon">📅</span> יומן אירועים</div>
-    <div class="nav-item" id="nav-archive"><span class="nav-icon">🗂️</span> ארכיון אירועים</div>
-    <div class="nav-item" id="nav-super-admin" style="display:none"><span class="nav-icon">🛠️</span> Super Admin</div>
+    <div class="nav-item active" id="nav-dashboard"><span class="nav-icon">📊</span> <span class="nav-label" data-mobile="דאשבורד">דאשבורד</span></div>
+    <div class="nav-item" id="nav-leads"><span class="nav-icon">👥</span> <span class="nav-label" data-mobile="לקוחות">לקוחות</span> <span class="nav-badge" id="nav-leads-count" style="display:none">0</span></div>
+    <div class="nav-item" id="nav-employees"><span class="nav-icon">🧑‍💼</span> <span class="nav-label" data-mobile="עובדים">עובדים</span></div>
+    <div class="nav-item" id="nav-team" style="display:none"><span class="nav-icon">👤</span> <span class="nav-label" data-mobile="צוות">צוות</span></div>
+    <div class="nav-item" id="nav-products"><span class="nav-icon">📦</span> <span class="nav-label" data-mobile="מוצרים">מוצרים</span></div>
+    <div class="nav-item" id="nav-shopping"><span class="nav-icon">🛒</span> <span class="nav-label" data-mobile="רשימת קניות">רשימות קניות</span></div>
+    <div class="nav-item" id="nav-strategic-contacts"><span class="nav-icon">🤝</span> <span class="nav-label" data-mobile="קשרים">קשרים אסטרטגיים</span></div>
+    <div class="nav-item" id="nav-sales-documents"><span class="nav-icon">🧾</span> <span class="nav-label" data-mobile="מסמכים">מסמכי מכירה</span></div>
+    <div class="nav-item" id="nav-business-settings"><span class="nav-icon">⚙️</span> <span class="nav-label" data-mobile="הגדרות">הגדרות עסק</span></div>
+    <div class="nav-item" id="nav-calendar"><span class="nav-icon">📅</span> <span class="nav-label" data-mobile="יומן אירועים">יומן אירועים</span></div>
+    <div class="nav-item" id="nav-archive"><span class="nav-icon">🗂️</span> <span class="nav-label" data-mobile="ארכיון">ארכיון אירועים</span></div>
+    <div class="nav-item" id="nav-super-admin" style="display:none"><span class="nav-icon">🛠️</span> <span class="nav-label" data-mobile="Admin">Super Admin</span></div>
     <div id="gcal-status" style="margin:8px;padding:10px 12px;border-radius:8px;font-size:12px;display:none"></div>
     <div class="sidebar-bottom">
       <div id="shell-switcher" style="display:none;flex-direction:column;gap:8px;margin:0 8px 12px 8px">
