@@ -3944,7 +3944,7 @@ function businessSettingsLogoControl(value, disabled) {
         '<input id="business-logo-file" class="business-logo-file-input" type="file" accept="image/*"' + (disabled ? ' disabled' : '') + '>' +
         '<button type="button" class="btn btn-ghost btn-sm" id="business-logo-clear"' + (disabled || !hasLogo ? ' disabled' : '') + '>הסר לוגו</button>' +
       '</div>' +
-      '<div class="business-logo-help">אפשר להעלות PNG/JPG/WebP/GIF עד 8MB. הלוגו יישמר במערכת וישמש במסמכים חדשים.</div>' +
+      '<div class="business-logo-help">אפשר לבחור תמונה עד 8MB. המערכת תדחוס אותה אוטומטית ללוגו קל למסמכים חדשים.</div>' +
     '</div>' +
   '</div>';
 }
@@ -3999,13 +3999,54 @@ function handleBusinessLogoFile(event) {
     input.value = '';
     return;
   }
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    setBusinessLogoValue(e.target.result || '');
-    toast('הלוגו נטען — לא לשכוח לשמור הגדרות', 'success');
-  };
-  reader.onerror = function() { toast('שגיאה בקריאת קובץ הלוגו', 'error'); };
-  reader.readAsDataURL(file);
+  optimizeBusinessLogoFile(file).then(function(dataUrl) {
+    setBusinessLogoValue(dataUrl || '');
+    toast('הלוגו עבר אופטימיזציה — לא לשכוח לשמור הגדרות', 'success');
+  }).catch(function() {
+    toast('שגיאה בעיבוד קובץ הלוגו', 'error');
+    input.value = '';
+  });
+}
+
+function optimizeBusinessLogoFile(file) {
+  return new Promise(function(resolve, reject) {
+    var objectUrl = URL.createObjectURL(file);
+    var image = new Image();
+    image.onload = function() {
+      try {
+        var maxWidth = 1200;
+        var maxHeight = 600;
+        var ratio = Math.min(1, maxWidth / image.width, maxHeight / image.height);
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(image.width * ratio));
+        canvas.height = Math.max(1, Math.round(image.height * ratio));
+        var ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(objectUrl);
+        var dataUrl = canvas.toDataURL('image/webp', 0.82);
+        if (!dataUrl || dataUrl.indexOf('data:image/webp') !== 0) dataUrl = canvas.toDataURL('image/png');
+        if (dataUrl.length > 750000) {
+          var smaller = document.createElement('canvas');
+          var scale = Math.sqrt(750000 / dataUrl.length) * 0.9;
+          smaller.width = Math.max(1, Math.round(canvas.width * scale));
+          smaller.height = Math.max(1, Math.round(canvas.height * scale));
+          smaller.getContext('2d').drawImage(canvas, 0, 0, smaller.width, smaller.height);
+          dataUrl = smaller.toDataURL('image/webp', 0.72);
+        }
+        if (dataUrl.length > 900000) throw new Error('optimized logo too large');
+        resolve(dataUrl);
+      } catch (err) {
+        URL.revokeObjectURL(objectUrl);
+        reject(err);
+      }
+    };
+    image.onerror = function(err) {
+      URL.revokeObjectURL(objectUrl);
+      reject(err);
+    };
+    image.src = objectUrl;
+  });
 }
 
 function clearBusinessLogo() {
