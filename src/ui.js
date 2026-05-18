@@ -1446,6 +1446,36 @@ tr:hover td{background:#fafbfc;cursor:pointer}
   .super-admin-section{padding:12px}
 }
 
+
+
+/* ===== CRM Mobile Navigation ===== */
+.mobile-crm-topbar{display:none}
+.mobile-nav-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.38);z-index:10020}
+.mobile-nav-overlay.open{display:block}
+.mobile-nav-drawer{position:fixed;top:0;right:0;bottom:0;width:min(86vw,340px);background:var(--white);box-shadow:-8px 0 24px rgba(15,23,42,.18);z-index:10030;transform:translateX(110%);transition:transform .22s ease;display:flex;flex-direction:column}
+.mobile-nav-drawer.open{transform:translateX(0)}
+.mobile-nav-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;border-bottom:1px solid var(--border);background:#fafbfc}
+.mobile-nav-title{font-size:16px;font-weight:900;color:var(--text)}
+.mobile-nav-list{padding:10px;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+.mobile-nav-link{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;border-radius:12px;padding:12px 12px;font-family:var(--font);font-size:14px;font-weight:800;color:var(--text2);cursor:pointer;text-align:right}
+.mobile-nav-link:hover,.mobile-nav-link.active{background:var(--accent-light);color:var(--accent)}
+.mobile-settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.mobile-settings-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:#fff;cursor:pointer;font-weight:800;color:var(--text2)}
+.mobile-settings-toggle.checked{border-color:rgba(124,58,237,.35);background:var(--accent-light);color:var(--accent)}
+.mobile-settings-toggle input{display:none}
+.mobile-settings-hint{font-size:12px;color:var(--text3);line-height:1.5;margin-top:10px}
+@media (max-width:768px){
+  body.crm-shell .mobile-crm-topbar{display:flex;position:fixed;top:0;right:0;left:0;height:54px;background:rgba(255,255,255,.96);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);z-index:10010;align-items:center;justify-content:space-between;padding:8px 12px;box-shadow:0 1px 8px rgba(15,23,42,.06)}
+  body.crm-shell .mobile-menu-btn{width:40px;height:40px;border:1px solid var(--border);border-radius:12px;background:#fff;color:var(--text);font-size:22px;line-height:1;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+  body.crm-shell .mobile-crm-title{font-size:14px;font-weight:900;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100vw - 120px)}
+  body.crm-shell #main{padding-top:66px!important;padding-bottom:92px!important}
+  body.crm-shell #sidebar{overflow-x:auto;overflow-y:hidden;justify-content:stretch;box-shadow:0 -2px 14px rgba(15,23,42,.08)}
+  body.crm-shell #sidebar .nav-item.mobile-bottom-hidden{display:none!important}
+  body.crm-shell #sidebar .nav-item.mobile-bottom-visible{min-width:72px;max-width:96px}
+  body.crm-shell #sidebar .nav-badge{display:none!important}
+  body.crm-shell #sidebar::-webkit-scrollbar{display:none}
+}
+
 </style>
 </head>
 <body>
@@ -1476,6 +1506,16 @@ tr:hover td{background:#fafbfc;cursor:pointer}
   </div>
 </div>
 <div id="app" style="display:none">
+  <div id="mobile-crm-topbar" class="mobile-crm-topbar">
+    <button type="button" class="mobile-menu-btn" id="mobile-nav-open" aria-label="פתח תפריט">☰</button>
+    <div class="mobile-crm-title" id="mobile-crm-title">Comics Events CRM</div>
+    <span style="width:40px"></span>
+  </div>
+  <div class="mobile-nav-overlay" id="mobile-nav-overlay"></div>
+  <div class="mobile-nav-drawer" id="mobile-nav-drawer" aria-hidden="true">
+    <div class="mobile-nav-head"><div class="mobile-nav-title">כל המודולים</div><button type="button" class="modal-close" id="mobile-nav-close">✕</button></div>
+    <div class="mobile-nav-list" id="mobile-nav-list"></div>
+  </div>
   <div id="sidebar">
     <div class="sidebar-logo">
       <div class="logo-row">
@@ -1983,6 +2023,21 @@ var currentCustomerBillingState = null;
 var allLeadsCache = [];
 var calYear, calMonth;
 var currentTenantContext = null;
+
+var CRM_MOBILE_NAV_ITEMS = [
+  { navId: 'nav-dashboard', page: 'dashboard', label: 'דאשבורד', icon: '📊' },
+  { navId: 'nav-calendar', page: 'calendar', label: 'יומן אירועים', icon: '📅', moduleKey: 'leads' },
+  { navId: 'nav-leads', page: 'customers', label: 'לקוחות', icon: '👥', moduleKey: 'contacts' },
+  { navId: 'nav-employees', page: 'employees', label: 'עובדים', icon: '🧑💼', moduleKey: 'employees' },
+  { navId: 'nav-team', page: 'team', label: 'צוות', icon: '👤', teamOnly: true },
+  { navId: 'nav-products', page: 'products', label: 'מוצרים', icon: '📦', moduleKey: 'products' },
+  { navId: 'nav-shopping', page: 'shopping', label: 'רשימות קניות', icon: '🛒', moduleKey: 'shopping' },
+  { navId: 'nav-sales-documents', page: 'sales-documents', label: 'מסמכים', icon: '🧾', moduleKey: 'sales_documents' },
+  { navId: 'nav-strategic-contacts', page: 'strategic-contacts', label: 'קשרים אסטרטגיים', icon: '🤝', moduleKey: 'strategic_contacts' },
+  { navId: 'nav-archive', page: 'archive', label: 'ארכיון אירועים', icon: '🗂️', moduleKey: 'leads' },
+  { navId: 'nav-business-settings', page: 'business-settings', label: 'הגדרות', icon: '⚙️' }
+];
+var DEFAULT_MOBILE_BOTTOM_NAV = ['nav-calendar', 'nav-leads', 'nav-shopping', 'nav-sales-documents', 'nav-business-settings'];
 var currentTeamMembers = [];
 var currentSuperAdminTenantDetail = null;
 var tenantOwnerSetupStep = 0;
@@ -2124,6 +2179,101 @@ function getModuleSortOrder(moduleKey, fallback) {
   return item && item.sort_order !== undefined && item.sort_order !== null ? Number(item.sort_order) : fallback;
 }
 
+
+function getAvailableCrmMobileNavItems() {
+  return CRM_MOBILE_NAV_ITEMS.filter(function(item) {
+    if (item.teamOnly && !isTeamManagerAllowed()) return false;
+    if (item.moduleKey && !isModuleEnabled(item.moduleKey)) return false;
+    return true;
+  });
+}
+
+function getMobileBottomNavStorageKey() {
+  var tenantId = currentTenantContext && currentTenantContext.tenant ? currentTenantContext.tenant.id : 'tenant';
+  var userId = currentUser && currentUser.id ? currentUser.id : 'user';
+  return 'crm_mobile_bottom_nav_v1_' + tenantId + '_' + userId;
+}
+
+function getMobileBottomNavSelection() {
+  var validIds = getAvailableCrmMobileNavItems().map(function(item) { return item.navId; });
+  var selected = null;
+  try {
+    selected = JSON.parse(localStorage.getItem(getMobileBottomNavStorageKey()) || 'null');
+  } catch (e) {
+    selected = null;
+  }
+  if (!Array.isArray(selected) || !selected.length) selected = DEFAULT_MOBILE_BOTTOM_NAV.slice();
+  selected = selected.filter(function(id, idx) { return validIds.indexOf(id) !== -1 && selected.indexOf(id) === idx; });
+  if (!selected.length) selected = DEFAULT_MOBILE_BOTTOM_NAV.filter(function(id) { return validIds.indexOf(id) !== -1; });
+  return selected.length ? selected : validIds.slice(0, 5);
+}
+
+function saveMobileBottomNavSelection(selected) {
+  var validIds = getAvailableCrmMobileNavItems().map(function(item) { return item.navId; });
+  selected = (selected || []).filter(function(id, idx) { return validIds.indexOf(id) !== -1 && selected.indexOf(id) === idx; });
+  if (!selected.length) selected = DEFAULT_MOBILE_BOTTOM_NAV.filter(function(id) { return validIds.indexOf(id) !== -1; });
+  localStorage.setItem(getMobileBottomNavStorageKey(), JSON.stringify(selected));
+  applyMobileNavigationPreferences();
+}
+
+function renderMobileNavigationDrawer() {
+  var list = document.getElementById('mobile-nav-list');
+  if (!list) return;
+  list.innerHTML = getAvailableCrmMobileNavItems().map(function(item) {
+    return '<button type="button" class="mobile-nav-link" data-mobile-nav-id="' + escapeHtml(item.navId) + '"><span class="nav-icon">' + escapeHtml(item.icon) + '</span><span>' + escapeHtml(item.label) + '</span></button>';
+  }).join('');
+  list.querySelectorAll('[data-mobile-nav-id]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var item = CRM_MOBILE_NAV_ITEMS.find(function(x) { return x.navId === btn.getAttribute('data-mobile-nav-id'); });
+      if (!item) return;
+      closeMobileNavigationDrawer();
+      goTo(item.page, document.getElementById(item.navId));
+    });
+  });
+  syncMobileNavigationState();
+}
+
+function applyMobileNavigationPreferences() {
+  var selected = getMobileBottomNavSelection();
+  CRM_MOBILE_NAV_ITEMS.forEach(function(item) {
+    var el = document.getElementById(item.navId);
+    if (!el) return;
+    el.classList.toggle('mobile-bottom-visible', selected.indexOf(item.navId) !== -1);
+    el.classList.toggle('mobile-bottom-hidden', selected.indexOf(item.navId) === -1);
+  });
+  renderMobileNavigationDrawer();
+  syncMobileNavigationState();
+}
+
+function getActivePageName() {
+  var active = document.querySelector('.page.active');
+  return active && active.id ? active.id.replace(/^page-/, '') : '';
+}
+
+function syncMobileNavigationState(page) {
+  page = page || getActivePageName();
+  var activeItem = CRM_MOBILE_NAV_ITEMS.find(function(item) { return item.page === page; });
+  var title = document.getElementById('mobile-crm-title');
+  if (title && activeItem) title.textContent = activeItem.label;
+  document.querySelectorAll('.mobile-nav-link').forEach(function(btn) {
+    btn.classList.toggle('active', activeItem && btn.getAttribute('data-mobile-nav-id') === activeItem.navId);
+  });
+}
+
+function openMobileNavigationDrawer() {
+  var drawer = document.getElementById('mobile-nav-drawer');
+  var overlay = document.getElementById('mobile-nav-overlay');
+  if (drawer) { drawer.classList.add('open'); drawer.setAttribute('aria-hidden', 'false'); }
+  if (overlay) overlay.classList.add('open');
+}
+
+function closeMobileNavigationDrawer() {
+  var drawer = document.getElementById('mobile-nav-drawer');
+  var overlay = document.getElementById('mobile-nav-overlay');
+  if (drawer) { drawer.classList.remove('open'); drawer.setAttribute('aria-hidden', 'true'); }
+  if (overlay) overlay.classList.remove('open');
+}
+
 function applySidebarModuleOrder() {
   var orderedNav = [
     { module_key: 'contacts', ids: ['nav-leads'], fallback: 20 },
@@ -2249,6 +2399,8 @@ function applyShellVisibility() {
   var shellMode = getShellMode();
   var isAdminShell = shellMode === 'admin';
   var isCrmShell = shellMode === 'crm';
+  document.body.classList.toggle('crm-shell', isCrmShell);
+  document.body.classList.toggle('admin-shell', isAdminShell);
   var isAdminUser = isSuperAdmin();
   var crmNavIds = ['nav-dashboard', 'nav-leads', 'nav-employees', 'nav-team', 'nav-products', 'nav-shopping', 'nav-strategic-contacts', 'nav-sales-documents', 'nav-business-settings', 'nav-calendar', 'nav-archive'];
   var logoTitle = document.getElementById('shell-logo-title');
@@ -2281,6 +2433,7 @@ function applyShellVisibility() {
   if (mobileSwitcher) mobileSwitcher.style.display = isAdminUser && isMobileViewport ? 'block' : 'none';
   if (enterCrmMobile) enterCrmMobile.style.display = isAdminUser && isMobileViewport && isAdminShell ? 'inline-flex' : 'none';
   if (backPlatformMobile) backPlatformMobile.style.display = isAdminUser && isMobileViewport && isCrmShell ? 'inline-flex' : 'none';
+  applyMobileNavigationPreferences();
 }
 
 function loadModuleStates() {
@@ -2330,6 +2483,12 @@ function init() {
   document.getElementById('force-password-btn').addEventListener('click', submitForcedPasswordChange);
   document.getElementById('logout-btn').addEventListener('click', logout);
   document.getElementById('logout-btn-mobile').addEventListener('click', logout);
+  var mobileNavOpen = document.getElementById('mobile-nav-open');
+  if (mobileNavOpen) mobileNavOpen.addEventListener('click', openMobileNavigationDrawer);
+  var mobileNavClose = document.getElementById('mobile-nav-close');
+  if (mobileNavClose) mobileNavClose.addEventListener('click', closeMobileNavigationDrawer);
+  var mobileNavOverlay = document.getElementById('mobile-nav-overlay');
+  if (mobileNavOverlay) mobileNavOverlay.addEventListener('click', closeMobileNavigationDrawer);
 document.getElementById('btn-new-lead').addEventListener('click', function() {
   goTo('customers', document.getElementById('nav-leads'));
 });
@@ -2435,7 +2594,7 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   var teamRoleFilter = document.getElementById('team-role-filter');
   if (teamRoleFilter) teamRoleFilter.addEventListener('change', loadTeamMembers);
   document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') { closeLeadModal(); closeDrawer(); closeCustomerModal(); skipTenantOwnerSetup(); closeSuperAdminCreateModal(); closeSuperAdminTenantModal(); }
+    if (e.key === 'Escape') { closeLeadModal(); closeDrawer(); closeCustomerModal(); closeMobileNavigationDrawer(); skipTenantOwnerSetup(); closeSuperAdminCreateModal(); closeSuperAdminTenantModal(); }
   });
   window.addEventListener('storage', function(e) {
     if (e.key !== 'crm_token' && e.key !== 'crm_user') return;
@@ -2530,6 +2689,7 @@ function goTo(page, el) {
   if (page === 'products') loadProducts();
   if (page === 'archive') loadEventArchive();
   if (page === 'super-admin') { loadSuperAdminTenants(); loadSuperAdminCleanupCandidates(); }
+  syncMobileNavigationState(page);
 }
 
 function resetSessionState() {
@@ -3915,8 +4075,10 @@ function renderBusinessSettingsForm() {
       businessSettingsTextarea('default_cancellation_policy', 'מדיניות ביטול', s.default_cancellation_policy, disabled) +
       businessSettingsTextarea('default_document_footer', 'Footer קבוע למסמך', s.default_document_footer, disabled) +
       businessSettingsTextarea('default_notes', 'הערות ברירת מחדל', s.default_notes, disabled) +
-    '</div></div>';
+    '</div></div>' +
+    businessSettingsMobileNavControl();
   bindBusinessSettingsForm();
+  bindMobileNavSettings();
   if (footer) {
     footer.style.display = 'flex';
     footer.innerHTML = '<div class="business-settings-status">' + (canEdit ? 'השינויים ישפיעו על מסמכים חדשים בלבד.' : 'מצב צפייה בלבד') + '</div>' +
@@ -3924,6 +4086,34 @@ function renderBusinessSettingsForm() {
     var saveBtn = document.getElementById('business-settings-save');
     if (saveBtn) saveBtn.addEventListener('click', saveBusinessSettings);
   }
+}
+
+
+function businessSettingsMobileNavControl() {
+  var selected = getMobileBottomNavSelection();
+  var options = getAvailableCrmMobileNavItems().map(function(item) {
+    var checked = selected.indexOf(item.navId) !== -1;
+    return '<label class="mobile-settings-toggle' + (checked ? ' checked' : '') + '"><span><span class="nav-icon">' + escapeHtml(item.icon) + '</span> ' + escapeHtml(item.label) + '</span><input type="checkbox" data-mobile-bottom-nav="' + escapeHtml(item.navId) + '"' + (checked ? ' checked' : '') + '><span>' + (checked ? 'מוצג' : 'מוסתר') + '</span></label>';
+  }).join('');
+  return '<div class="business-settings-section"><div class="business-settings-section-title">ה. הגדרות בנייד</div><div class="business-settings-section-sub">בחר אילו מודולים יופיעו בתפריט התחתון בנייד. כל המודולים זמינים תמיד דרך תפריט ההמבורגר למעלה.</div><div class="mobile-settings-grid" id="mobile-bottom-nav-settings">' + options + '</div><div class="mobile-settings-hint">ההגדרה נשמרת למכשיר/משתמש הזה ולא משנה את הרשאות המודולים של העסק.</div></div>';
+}
+
+function bindMobileNavSettings() {
+  var container = document.getElementById('mobile-bottom-nav-settings');
+  if (!container) return;
+  container.querySelectorAll('input[data-mobile-bottom-nav]').forEach(function(input) {
+    input.addEventListener('change', function() {
+      var selected = Array.prototype.slice.call(container.querySelectorAll('input[data-mobile-bottom-nav]:checked')).map(function(el) { return el.getAttribute('data-mobile-bottom-nav'); });
+      if (!selected.length) {
+        input.checked = true;
+        toast('צריך להשאיר לפחות מודול אחד בתפריט התחתון', 'error');
+        return;
+      }
+      saveMobileBottomNavSelection(selected);
+      renderBusinessSettingsForm();
+      toast('הגדרות התפריט בנייד נשמרו', 'success');
+    });
+  });
 }
 
 function businessSettingsInput(field, label, value, disabled, type, step) {
