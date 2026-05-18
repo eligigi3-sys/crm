@@ -3944,7 +3944,7 @@ function businessSettingsLogoControl(value, disabled) {
         '<input id="business-logo-file" class="business-logo-file-input" type="file" accept="image/*"' + (disabled ? ' disabled' : '') + '>' +
         '<button type="button" class="btn btn-ghost btn-sm" id="business-logo-clear"' + (disabled || !hasLogo ? ' disabled' : '') + '>הסר לוגו</button>' +
       '</div>' +
-      '<div class="business-logo-help">אפשר להעלות PNG/JPG/WebP/GIF עד 700KB. הלוגו יישמר במערכת וישמש במסמכים חדשים.</div>' +
+      '<div class="business-logo-help">אפשר להעלות PNG/JPG/WebP/GIF עד 8MB. הלוגו יישמר במערכת וישמש במסמכים חדשים.</div>' +
     '</div>' +
   '</div>';
 }
@@ -3994,8 +3994,8 @@ function handleBusinessLogoFile(event) {
     input.value = '';
     return;
   }
-  if (file.size > 700 * 1024) {
-    toast('הלוגו גדול מדי. עד 700KB', 'error');
+  if (file.size > 8 * 1024 * 1024) {
+    toast('הלוגו גדול מדי. עד 8MB', 'error');
     input.value = '';
     return;
   }

@@ -20,7 +20,7 @@ function normalizeOptionalText(value) {
 function normalizeLogoValue(value) {
   const text = normalizeOptionalText(value);
   if (!text) return null;
-  if (text.length > 950000) throw new Error('קובץ הלוגו גדול מדי');
+  if (text.length > 12 * 1024 * 1024) throw new Error('קובץ הלוגו גדול מדי. עד 8MB');
   if (text.startsWith('data:')) {
     if (!/^data:image\/(png|jpeg|jpg|webp|gif);base64,/i.test(text)) throw new Error('קובץ לוגו לא תקין');
     return text;
