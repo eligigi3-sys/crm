@@ -4014,8 +4014,9 @@ function optimizeBusinessLogoFile(file) {
     var image = new Image();
     image.onload = function() {
       try {
-        var maxWidth = 1200;
-        var maxHeight = 600;
+        var targetBytes = 420000;
+        var maxWidth = 700;
+        var maxHeight = 350;
         var ratio = Math.min(1, maxWidth / image.width, maxHeight / image.height);
         var canvas = document.createElement('canvas');
         canvas.width = Math.max(1, Math.round(image.width * ratio));
@@ -4024,17 +4025,29 @@ function optimizeBusinessLogoFile(file) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
         URL.revokeObjectURL(objectUrl);
-        var dataUrl = canvas.toDataURL('image/webp', 0.82);
-        if (!dataUrl || dataUrl.indexOf('data:image/webp') !== 0) dataUrl = canvas.toDataURL('image/png');
-        if (dataUrl.length > 750000) {
+
+        var dataUrl = '';
+        var qualities = [0.82, 0.68, 0.54, 0.42, 0.32, 0.24];
+        for (var attempt = 0; attempt < 8; attempt++) {
+          for (var q = 0; q < qualities.length; q++) {
+            dataUrl = canvas.toDataURL('image/webp', qualities[q]);
+            if (!dataUrl || dataUrl.indexOf('data:image/webp') !== 0) dataUrl = canvas.toDataURL('image/jpeg', qualities[q]);
+            if (dataUrl.length <= targetBytes) {
+              resolve(dataUrl);
+              return;
+            }
+          }
           var smaller = document.createElement('canvas');
-          var scale = Math.sqrt(750000 / dataUrl.length) * 0.9;
-          smaller.width = Math.max(1, Math.round(canvas.width * scale));
-          smaller.height = Math.max(1, Math.round(canvas.height * scale));
-          smaller.getContext('2d').drawImage(canvas, 0, 0, smaller.width, smaller.height);
-          dataUrl = smaller.toDataURL('image/webp', 0.72);
+          smaller.width = Math.max(1, Math.round(canvas.width * 0.75));
+          smaller.height = Math.max(1, Math.round(canvas.height * 0.75));
+          var smallerCtx = smaller.getContext('2d');
+          smallerCtx.clearRect(0, 0, smaller.width, smaller.height);
+          smallerCtx.drawImage(canvas, 0, 0, smaller.width, smaller.height);
+          canvas = smaller;
         }
-        if (dataUrl.length > 900000) throw new Error('optimized logo too large');
+
+        dataUrl = canvas.toDataURL('image/jpeg', 0.2);
+        if (dataUrl.length > 800000) throw new Error('optimized logo too large');
         resolve(dataUrl);
       } catch (err) {
         URL.revokeObjectURL(objectUrl);
