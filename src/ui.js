@@ -160,6 +160,11 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .business-settings-section-sub{font-size:12px;color:var(--text3);line-height:1.5;margin-bottom:12px}
 .business-settings-note{padding:10px 12px;border-radius:12px;background:var(--blue-light);color:var(--blue);font-size:12px;font-weight:700;line-height:1.5;margin-top:10px}
 .business-settings-note.exempt{background:var(--yellow-light);color:var(--yellow)}
+.business-logo-upload{border:1px dashed var(--border2);border-radius:14px;padding:12px;background:#fafbfc;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.business-logo-preview{width:110px;height:70px;border:1px solid var(--border);border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;color:var(--text3);font-size:12px;font-weight:800}
+.business-logo-preview img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.business-logo-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.business-logo-help{font-size:12px;color:var(--text3);line-height:1.5;flex-basis:100%}
 .business-settings-permission{padding:12px 14px;border-radius:12px;background:var(--orange-light);color:var(--orange);font-size:13px;font-weight:700;margin-bottom:14px;line-height:1.5}
 .business-settings-footer{position:sticky;bottom:0;background:rgba(255,255,255,0.96);border-top:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .business-settings-status{font-size:12px;color:var(--text3)}
@@ -3898,11 +3903,11 @@ function renderBusinessSettingsForm() {
     '</div><div class="business-settings-note ' + (isVatExempt ? 'exempt' : '') + '" id="business-settings-vat-note">' +
       (isExemptDealer ? 'עוסק פטור — ללא מע״מ. אחוז המע״מ נעול ל־0 והשרת יאכוף זאת גם אם לקוח שולח ערך אחר.' : (isVatExempt ? 'מצב פטור ממע״מ — מסמכים חדשים יחושבו עם 0% מע״מ.' : 'ברירת המחדל לעסקים חייבי מע״מ בישראל היא 18%.')) +
     '</div></div>' +
-    '<div class="business-settings-section"><div class="business-settings-section-title">ג. פרטי מסמך</div><div class="business-settings-section-sub">פרטי יצירת קשר ו־Logo URL עתידי למסמכים חדשים.</div><div class="business-settings-grid">' +
+    '<div class="business-settings-section"><div class="business-settings-section-title">ג. פרטי מסמך</div><div class="business-settings-section-sub">פרטי יצירת קשר ולוגו שיופיעו במסמכים חדשים.</div><div class="business-settings-grid">' +
       businessSettingsInput('business_address', 'כתובת העסק', s.business_address, disabled) +
       businessSettingsInput('business_phone', 'טלפון עסק', s.business_phone, disabled, 'tel') +
       businessSettingsInput('business_email', 'אימייל עסק', s.business_email, disabled, 'email') +
-      businessSettingsInput('logo_url', 'Logo URL — הכנה עתידית', s.logo_url, disabled, 'url') +
+      businessSettingsLogoControl(s.logo_url, disabled) +
     '</div></div>' +
     '<div class="business-settings-section"><div class="business-settings-section-title">ד. ברירות מחדל למסמכים</div><div class="business-settings-section-sub">יועתקו למסמך חדש ואז ניתן יהיה לערוך במסמך עצמו.</div><div class="business-settings-grid single">' +
       businessSettingsTextarea('default_payment_terms', 'תנאי תשלום', s.default_payment_terms, disabled) +
@@ -3925,6 +3930,24 @@ function businessSettingsInput(field, label, value, disabled, type, step) {
   return '<div class="form-group" style="margin-bottom:0"><label class="form-label">' + escapeHtml(label) + '</label><input class="form-input business-settings-field" data-business-settings-field="' + escapeHtml(field) + '" type="' + escapeHtml(type || 'text') + '" value="' + escapeHtml(value === undefined || value === null ? '' : value) + '"' + attrs + (disabled ? ' disabled' : '') + '></div>';
 }
 
+function businessSettingsLogoControl(value, disabled) {
+  var hasLogo = !!value;
+  var preview = hasLogo ? '<img alt="לוגו העסק" src="' + escapeHtml(value) + '">' : 'אין לוגו';
+  return '<div class="form-group" style="margin-bottom:0;grid-column:1/-1">' +
+    '<label class="form-label">לוגו להצעות מחיר וחשבוניות</label>' +
+    '<input type="hidden" class="business-settings-field" data-business-settings-field="logo_url" id="business-logo-value" value="' + escapeHtml(value || '') + '">' +
+    '<div class="business-logo-upload">' +
+      '<div class="business-logo-preview" id="business-logo-preview">' + preview + '</div>' +
+      '<div class="business-logo-actions">' +
+        '<label class="btn btn-secondary btn-sm" for="business-logo-file"' + (disabled ? ' style="opacity:.6;pointer-events:none"' : '') + '>בחר תמונת לוגו</label>' +
+        '<input id="business-logo-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none"' + (disabled ? ' disabled' : '') + '>' +
+        '<button type="button" class="btn btn-ghost btn-sm" id="business-logo-clear"' + (disabled || !hasLogo ? ' disabled' : '') + '>הסר לוגו</button>' +
+      '</div>' +
+      '<div class="business-logo-help">אפשר להעלות PNG/JPG/WebP/GIF עד 700KB. הלוגו יישמר במערכת וישמש במסמכים חדשים.</div>' +
+    '</div>' +
+  '</div>';
+}
+
 function businessSettingsSelect(field, label, value, options, disabled) {
   return '<div class="form-group" style="margin-bottom:0"><label class="form-label">' + escapeHtml(label) + '</label><select class="form-select business-settings-field" data-business-settings-field="' + escapeHtml(field) + '"' + (disabled ? ' disabled' : '') + '>' +
     options.map(function(option) { return '<option value="' + escapeHtml(option[0]) + '"' + (String(value || '') === option[0] ? ' selected' : '') + '>' + escapeHtml(option[1]) + '</option>'; }).join('') +
@@ -3940,6 +3963,53 @@ function bindBusinessSettingsForm() {
     input.addEventListener('input', function() { updateBusinessSettingsDraft(this); });
     input.addEventListener('change', function() { updateBusinessSettingsDraft(this); });
   });
+  var logoFile = document.getElementById('business-logo-file');
+  if (logoFile) logoFile.addEventListener('change', handleBusinessLogoFile);
+  var logoClear = document.getElementById('business-logo-clear');
+  if (logoClear) logoClear.addEventListener('click', clearBusinessLogo);
+}
+
+function setBusinessLogoValue(value) {
+  if (!currentBusinessSettings || businessSettingsSaving) return;
+  currentBusinessSettings.logo_url = value || '';
+  var hidden = document.getElementById('business-logo-value');
+  if (hidden) hidden.value = currentBusinessSettings.logo_url;
+  var preview = document.getElementById('business-logo-preview');
+  if (preview) {
+    preview.innerHTML = currentBusinessSettings.logo_url ? '<img alt="לוגו העסק" src="' + escapeHtml(currentBusinessSettings.logo_url) + '">' : 'אין לוגו';
+  }
+  var clearBtn = document.getElementById('business-logo-clear');
+  if (clearBtn) clearBtn.disabled = !currentBusinessSettings.logo_url;
+}
+
+function handleBusinessLogoFile(event) {
+  var input = event.target;
+  var file = input && input.files && input.files[0];
+  if (!file) return;
+  if (!/^image\\//.test(file.type || '')) {
+    toast('אפשר להעלות קובץ תמונה בלבד', 'error');
+    input.value = '';
+    return;
+  }
+  if (file.size > 700 * 1024) {
+    toast('הלוגו גדול מדי. עד 700KB', 'error');
+    input.value = '';
+    return;
+  }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    setBusinessLogoValue(e.target.result || '');
+    toast('הלוגו נטען — לא לשכוח לשמור הגדרות', 'success');
+  };
+  reader.onerror = function() { toast('שגיאה בקריאת קובץ הלוגו', 'error'); };
+  reader.readAsDataURL(file);
+}
+
+function clearBusinessLogo() {
+  if (!confirm('להסיר את הלוגו מהגדרות העסק?')) return;
+  setBusinessLogoValue('');
+  var input = document.getElementById('business-logo-file');
+  if (input) input.value = '';
 }
 
 function updateBusinessSettingsDraft(input) {
@@ -4560,7 +4630,7 @@ function renderSalesDocumentEditor() {
       salesDocumentInput('business_phone_snapshot', 'טלפון עסק', doc.business_phone_snapshot, 'tel', locked) +
       salesDocumentInput('business_email_snapshot', 'אימייל עסק', doc.business_email_snapshot, 'email', locked) +
       salesDocumentInput('business_address_snapshot', 'כתובת עסק', doc.business_address_snapshot, 'text', locked) +
-      salesDocumentInput('business_logo_url_snapshot', 'Logo URL', doc.business_logo_url_snapshot, 'url', locked) +
+      salesDocumentInput('business_logo_url_snapshot', 'לוגו העסק', doc.business_logo_url_snapshot, 'text', locked) +
     '</div><div class="business-settings-note ' + (isSalesDocumentVatExempt(doc) ? 'exempt' : '') + '">' + (isSalesDocumentVatExempt(doc) ? 'עוסק פטור — ללא מע״מ. התצוגה והשרת יאכפו 0% מע״מ.' : 'ברירת המחדל למסמך חדש: מע״מ ' + escapeHtml(getSalesDocumentDefaultVatRate(doc)) + '%.') + '</div></div>' +
     '<div class="sales-doc-section"><div class="sales-doc-section-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px">שורות מסמך ' + (locked ? '' : '<button class="btn btn-secondary btn-sm" id="sales-document-add-item">+ שורה</button>') + '</div><div class="sales-doc-line-list" id="sales-document-items-list"></div></div>' +
     '<div class="sales-doc-section"><div class="sales-doc-section-title">הערות, תנאים ומיתוג</div>' +

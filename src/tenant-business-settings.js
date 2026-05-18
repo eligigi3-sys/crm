@@ -17,6 +17,17 @@ function normalizeOptionalText(value) {
   return text ? text : null;
 }
 
+function normalizeLogoValue(value) {
+  const text = normalizeOptionalText(value);
+  if (!text) return null;
+  if (text.length > 950000) throw new Error('קובץ הלוגו גדול מדי');
+  if (text.startsWith('data:')) {
+    if (!/^data:image\/(png|jpeg|jpg|webp|gif);base64,/i.test(text)) throw new Error('קובץ לוגו לא תקין');
+    return text;
+  }
+  return text;
+}
+
 function normalizeBusinessType(value) {
   const businessType = String(value || 'licensed_dealer').trim().toLowerCase();
   if (!BUSINESS_TYPES.has(businessType)) {
@@ -120,7 +131,7 @@ function normalizeSettingsPayload(body, tenant) {
     business_address: normalizeOptionalText(body && body.business_address),
     business_phone: normalizeOptionalText(body && body.business_phone) || (tenant && tenant.contact_phone) || null,
     business_email: normalizeOptionalText(body && body.business_email) || (tenant && tenant.contact_email) || null,
-    logo_url: normalizeOptionalText(body && body.logo_url),
+    logo_url: normalizeLogoValue(body && body.logo_url),
     default_payment_terms: normalizeOptionalText(body && body.default_payment_terms),
     default_cancellation_policy: normalizeOptionalText(body && body.default_cancellation_policy),
     default_document_footer: normalizeOptionalText(body && body.default_document_footer),
