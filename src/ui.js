@@ -2978,6 +2978,9 @@ function loadTeamMembers() {
       if (canManageTeamMember(member) && String(member.status || '').toLowerCase() === 'inactive') {
         actions.push('<button class="btn btn-secondary btn-sm team-reactivate-btn" data-id="' + member.membership_id + '">הפעל מחדש</button>');
       }
+      if (canManageTeamMember(member)) {
+        actions.push('<button class="btn btn-danger btn-sm team-delete-btn" data-id="' + member.membership_id + '">מחק</button>');
+      }
       return '<div class="team-card">' +
         '<div class="team-card-header">' +
           '<div style="flex:1">' +
@@ -3006,6 +3009,11 @@ function loadTeamMembers() {
     grid.querySelectorAll('.team-reactivate-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
         reactivateTeamMember(parseInt(this.getAttribute('data-id')));
+      });
+    });
+    grid.querySelectorAll('.team-delete-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        deleteTeamMember(parseInt(this.getAttribute('data-id')));
       });
     });
   }).catch(function(e) {
@@ -3131,6 +3139,19 @@ function reactivateTeamMember(membershipId) {
   if (!confirm('להפעיל מחדש את המשתמש הזה?')) return;
   apiCall('POST', '/api/tenant-members/' + membershipId + '/reactivate').then(function() {
     toast('המשתמש הופעל מחדש', 'success');
+    loadTeamMembers();
+  }).catch(function(e) { toast(e.message, 'error'); });
+}
+
+function deleteTeamMember(membershipId) {
+  var member = currentTeamMembers.find(function(item) { return Number(item.membership_id) === Number(membershipId); });
+  if (!member) {
+    toast('המשתמש לא נמצא', 'error');
+    return;
+  }
+  if (!confirm('למחוק את המשתמש מהעסק? אם הוא לא משויך לעסק נוסף, המשתמש יימחק לגמרי.')) return;
+  apiCall('DELETE', '/api/tenant-members/' + membershipId).then(function() {
+    toast('המשתמש נמחק', 'success');
     loadTeamMembers();
   }).catch(function(e) { toast(e.message, 'error'); });
 }
@@ -5267,7 +5288,10 @@ function openShoppingList(id) {
 
     html += '<div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:10px">';
     html += '<button class="btn btn-secondary btn-sm" id="back-to-shopping">← חזרה לחנויות</button>';
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+    html += '<button class="btn btn-danger btn-sm" id="delete-shopping-list-btn">מחק חנות</button>';
     html += '<button class="btn btn-primary btn-sm" id="add-shopping-item-btn">+ מוצר לרשימה</button>';
+    html += '</div>';
     html += '</div>';
 
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">';
@@ -6537,11 +6561,14 @@ function openStrategicContactModal(id, defaults) {
   var overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.id = 'strategic-contact-modal-runtime';
-  overlay.innerHTML = '<div class="modal"><div class="modal-header"><h2>' + (isEdit ? 'עריכת קשר אסטרטגי' : 'קשר אסטרטגי חדש') + '</h2><button class="modal-close" id="strategic-contact-close">✕</button></div><div class="modal-body" id="strategic-contact-modal-body"><div class="dash-empty">טוען...</div></div><div class="modal-footer"><button class="btn btn-secondary" id="strategic-contact-cancel">ביטול</button><button class="btn btn-primary" id="strategic-contact-save">שמור</button></div></div>';
+  overlay.innerHTML = '<div class="modal"><div class="modal-header"><h2>' + (isEdit ? 'עריכת קשר אסטרטגי' : 'קשר אסטרטגי חדש') + '</h2><button class="modal-close" id="strategic-contact-close">✕</button></div><div class="modal-body" id="strategic-contact-modal-body"><div class="dash-empty">טוען...</div></div><div class="modal-footer">' + (isEdit ? '<button class="btn btn-danger" id="strategic-contact-delete" style="margin-left:auto">מחק קשר</button>' : '') + '<button class="btn btn-secondary" id="strategic-contact-cancel">ביטול</button><button class="btn btn-primary" id="strategic-contact-save">שמור</button></div></div>';
   document.body.appendChild(overlay);
   function close() { overlay.remove(); }
   document.getElementById('strategic-contact-close').onclick = close;
   document.getElementById('strategic-contact-cancel').onclick = close;
+  if (isEdit && document.getElementById('strategic-contact-delete')) {
+    document.getElementById('strategic-contact-delete').onclick = function() { deleteStrategicContact(id, close); };
+  }
   overlay.addEventListener('click', function(e) { if (e.target === overlay) close(); });
 
   function renderForm(item) {
@@ -6626,6 +6653,16 @@ function openStrategicContactModal(id, defaults) {
   }
 }
 
+
+
+function deleteStrategicContact(id, onDone) {
+  if (!confirm('למחוק את הקשר האסטרטגי? הפעילויות והשיוכים שלו יימחקו.')) return;
+  apiCall('DELETE', '/api/strategic-contacts/' + id).then(function() {
+    if (typeof onDone === 'function') onDone();
+    toast('הקשר האסטרטגי נמחק', 'success');
+    loadStrategicContacts();
+  }).catch(function(e) { toast(e.message || 'שגיאה במחיקה', 'error'); });
+}
 
 function buildStrategicContactDefaultsFromCustomer(customer) {
   customer = customer || {};
@@ -8270,6 +8307,15 @@ function deactivateProduct(id) {
   }).catch(function(e) { toast(e.message, 'error'); });
 }
 
+function deleteProductHard(id, onDone) {
+  if (!confirm('למחוק את המוצר לגמרי? לא ניתן למחוק מוצר שמופיע במסמך מכירה או חשבונית.')) return;
+  apiCall('DELETE', '/api/products/' + id + '/hard-delete').then(function() {
+    if (typeof onDone === 'function') onDone();
+    toast('המוצר נמחק', 'success');
+    loadProducts();
+  }).catch(function(e) { toast(e.message, 'error'); });
+}
+
 function openProductModal(id) {
   currentProductId = id || null;
   currentProductStock = null;
@@ -8320,6 +8366,7 @@ function openProductModal(id) {
         '</div>' : '') +
       '</div>' +
       '<div class="modal-footer">' +
+        (id ? '<button class="btn btn-danger" id="product-modal-delete" style="margin-left:auto">מחק מוצר</button>' : '') +
         '<button class="btn btn-secondary" id="product-modal-cancel">ביטול</button>' +
         '<button class="btn btn-primary" id="product-modal-save">שמור</button>' +
       '</div>' +
@@ -8330,6 +8377,9 @@ function openProductModal(id) {
   function close() { overlay.remove(); currentProductId = null; currentProductPurchaseEditId = null; currentProductPurchaseFormMode = null; currentProductPurchaseSaving = false; currentProductStock = null; currentProductStockMovements = []; currentProductAdjustmentMode = null; currentProductAdjustmentSaving = false; }
   document.getElementById('product-modal-close').onclick = close;
   document.getElementById('product-modal-cancel').onclick = close;
+  if (id && document.getElementById('product-modal-delete')) {
+    document.getElementById('product-modal-delete').onclick = function() { deleteProductHard(id, close); };
+  }
 
   if (id) {
     Promise.all([
@@ -8489,6 +8539,7 @@ function openEmployeeModal(id) {
         (id ? '<div id="employee-assignments-profile"><div class="info-section"><div class="info-section-title">אירועים ושכר</div><div style="font-size:13px;color:var(--text3)">טוען נתונים...</div></div></div>' : '') +
       '</div>' +
       '<div class="modal-footer">' +
+        (id ? '<button class="btn btn-danger" id="employee-modal-delete" style="margin-left:auto">מחק עובד</button>' : '') +
         '<button class="btn btn-secondary" id="employee-modal-cancel">ביטול</button>' +
         '<button class="btn btn-primary" id="employee-modal-save">שמור</button>' +
       '</div>' +
@@ -8499,6 +8550,9 @@ function openEmployeeModal(id) {
   function close() { overlay.remove(); currentEmployeeId = null; }
   document.getElementById('employee-modal-close').onclick = close;
   document.getElementById('employee-modal-cancel').onclick = close;
+  if (id && document.getElementById('employee-modal-delete')) {
+    document.getElementById('employee-modal-delete').onclick = function() { deleteEmployeeHard(id, close); };
+  }
 
   if (id) {
     Promise.all([
@@ -8558,6 +8612,15 @@ function deactivateEmployee(id) {
   if (!confirm('להשבית את העובד? ניתן להציג אותו שוב דרך מסנן כל העובדים.')) return;
   apiCall('DELETE', '/api/employees/' + id).then(function() {
     toast('העובד הושבת', 'success');
+    loadEmployees();
+  }).catch(function(e) { toast(e.message, 'error'); });
+}
+
+function deleteEmployeeHard(id, onDone) {
+  if (!confirm('למחוק את העובד לגמרי? השיוכים שלו לאירועים יימחקו.')) return;
+  apiCall('DELETE', '/api/employees/' + id + '/hard-delete').then(function() {
+    if (typeof onDone === 'function') onDone();
+    toast('העובד נמחק', 'success');
     loadEmployees();
   }).catch(function(e) { toast(e.message, 'error'); });
 }
@@ -10961,7 +11024,10 @@ openShoppingList = function(id) {
 
     html += '<div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:10px">';
     html += '<button class="btn btn-secondary btn-sm" id="back-to-shopping">← חזרה לחנויות</button>';
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+    html += '<button class="btn btn-danger btn-sm" id="delete-shopping-list-btn">מחק חנות</button>';
     html += '<button class="btn btn-primary btn-sm" id="add-shopping-item-btn">+ מוצר לרשימה</button>';
+    html += '</div>';
     html += '</div>';
 
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">';
@@ -11024,6 +11090,17 @@ openShoppingList = function(id) {
     grid.innerHTML = html;
 
     document.getElementById('back-to-shopping').onclick = loadShoppingLists;
+
+    var deleteShoppingListBtn = document.getElementById('delete-shopping-list-btn');
+    if (deleteShoppingListBtn) {
+      deleteShoppingListBtn.onclick = function() {
+        if (!confirm('למחוק את החנות וכל רשימת הקניות והעסקאות שלה?')) return;
+        apiCall('DELETE', '/api/shopping-lists/' + id).then(function() {
+          toast('החנות נמחקה', 'success');
+          loadShoppingLists();
+        }).catch(function(e) { toast(e.message, 'error'); });
+      };
+    }
 
     var addBtn = document.getElementById('add-shopping-item-btn');
     if (addBtn && typeof openShoppingItemModal === 'function') {

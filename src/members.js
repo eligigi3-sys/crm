@@ -338,6 +338,40 @@ export async function handleMembers(request, env, path) {
     };
   }
 
+  const deleteMatch = path.match(/^\/api\/tenant-members\/(\d+)$/);
+  if (deleteMatch && method === 'DELETE') {
+    const membershipId = Number(deleteMatch[1]);
+    const target = await getTenantMembershipById(tenantId, membershipId, env);
+    if (!target) return json({ error: 'משתמש לא נמצא' }, 404);
+    if (Number(target.user_id) === actorUserId) {
+      return json({ error: 'לא ניתן למחוק את המשתמש המחובר' }, 403);
+    }
+    if (!canActorManageMembership(actorRole, normalizeTenantRole(target.role))) {
+      return json({ error: 'Permission denied' }, 403);
+    }
+    if (normalizeTenantRole(target.role) === 'owner') {
+      const activeOwners = await countActiveOwners(tenantId, env);
+      if (target.status === 'active' && activeOwners <= 1) {
+        return json({ error: 'לא ניתן למחוק את הבעלים הפעיל האחרון' }, 409);
+      }
+    }
+
+    await env.DB.prepare(
+      'DELETE FROM tenant_memberships WHERE id = ? AND tenant_id = ?'
+    ).bind(membershipId, tenantId).run();
+
+    const remainingMemberships = await env.DB.prepare(
+      'SELECT COUNT(*) AS count FROM tenant_memberships WHERE user_id = ?'
+    ).bind(target.user_id).first();
+    if (Number(remainingMemberships && remainingMemberships.count || 0) === 0) {
+      await env.DB.prepare(
+        "DELETE FROM users WHERE id = ? AND lower(COALESCE(role,'')) <> 'super_admin'"
+      ).bind(target.user_id).run();
+    }
+
+    return { success: true };
+  }
+
   const reactivateMatch = path.match(/^\/api\/tenant-members\/(\d+)\/reactivate$/);
   if (reactivateMatch && method === 'POST') {
     const membershipId = Number(reactivateMatch[1]);

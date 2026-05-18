@@ -272,6 +272,33 @@ export async function handleEmployees(request, env, path) {
     return { success: true, employee };
   }
 
+  const hardDeleteMatch = path.match(/^\/api\/employees\/(\d+)\/hard-delete$/);
+  if (hardDeleteMatch && method === 'DELETE') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'employees');
+    if (moduleState instanceof Response) return moduleState;
+
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin']);
+    if (roleState instanceof Response) return roleState;
+
+    const tenantId = tenantCtx.tenant.id;
+    const id = Number(hardDeleteMatch[1]);
+
+    const existing = await env.DB.prepare(
+      'SELECT * FROM employees WHERE id = ? AND tenant_id = ?'
+    ).bind(id, tenantId).first();
+    if (!existing) throw new Error('עובד לא נמצא');
+
+    await env.DB.batch([
+      env.DB.prepare('DELETE FROM lead_employees WHERE tenant_id = ? AND employee_id = ?').bind(tenantId, id),
+      env.DB.prepare('DELETE FROM employees WHERE id = ? AND tenant_id = ?').bind(id, tenantId)
+    ]);
+
+    return { success: true };
+  }
+
   // DELETE /api/employees/:id (soft delete)
   if (idMatch && method === 'DELETE') {
     const tenantCtx = await requireTenantContext(request, env);

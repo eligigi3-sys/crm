@@ -884,6 +884,43 @@ export async function handleProducts(request, env, path) {
     return { success: true, product };
   }
 
+  const hardDeleteMatch = path.match(/^\/api\/products\/(\d+)\/hard-delete$/);
+  if (hardDeleteMatch && method === 'DELETE') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'products');
+    if (moduleState instanceof Response) return moduleState;
+
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin']);
+    if (roleState instanceof Response) return roleState;
+
+    const tenantId = tenantCtx.tenant.id;
+    const id = Number(hardDeleteMatch[1]);
+
+    const existing = await env.DB.prepare(
+      'SELECT * FROM products WHERE id = ? AND tenant_id = ?'
+    ).bind(id, tenantId).first();
+    if (!existing) throw new Error('מוצר לא נמצא');
+
+    const linkedDoc = await env.DB.prepare(
+      'SELECT sdi.id FROM sales_document_items sdi JOIN sales_documents sd ON sd.id = sdi.document_id AND sd.tenant_id = sdi.tenant_id WHERE sdi.tenant_id = ? AND sdi.product_id = ? LIMIT 1'
+    ).bind(tenantId, id).first();
+    if (linkedDoc) throw new Error('לא ניתן למחוק מוצר שמופיע במסמך מכירה או חשבונית');
+
+    await env.DB.batch([
+      env.DB.prepare('DELETE FROM shopping_purchase_items WHERE tenant_id = ? AND product_id = ?').bind(tenantId, id),
+      env.DB.prepare('DELETE FROM shopping_items WHERE tenant_id = ? AND product_id = ?').bind(tenantId, id),
+      env.DB.prepare('DELETE FROM product_stock_movements WHERE tenant_id = ? AND product_id = ?').bind(tenantId, id),
+      env.DB.prepare('DELETE FROM product_purchases WHERE tenant_id = ? AND product_id = ?').bind(tenantId, id),
+      env.DB.prepare('DELETE FROM event_inventory_actions WHERE tenant_id = ? AND product_id = ?').bind(tenantId, id),
+      env.DB.prepare('DELETE FROM event_product_allocations WHERE tenant_id = ? AND product_id = ?').bind(tenantId, id),
+      env.DB.prepare('DELETE FROM products WHERE id = ? AND tenant_id = ?').bind(id, tenantId)
+    ]);
+
+    return { success: true };
+  }
+
   if (idMatch && method === 'DELETE') {
     const tenantCtx = await requireTenantContext(request, env);
     if (tenantCtx instanceof Response) return tenantCtx;

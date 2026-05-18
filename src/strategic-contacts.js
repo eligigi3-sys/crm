@@ -764,6 +764,19 @@ async function createStrategicContact(request, env, tenantId) {
   return { success: true, strategic_contact: created };
 }
 
+async function deleteStrategicContact(env, tenantId, id) {
+  const existing = await getStrategicContactForTenant(env, tenantId, id);
+  if (!existing) return json({ error: 'קשר אסטרטגי לא נמצא' }, 404);
+
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM strategic_contact_attributions WHERE strategic_contact_id = ? AND tenant_id = ?').bind(id, tenantId),
+    env.DB.prepare('DELETE FROM strategic_contact_activities WHERE strategic_contact_id = ? AND tenant_id = ?').bind(id, tenantId),
+    env.DB.prepare('DELETE FROM strategic_contacts WHERE id = ? AND tenant_id = ?').bind(id, tenantId)
+  ]);
+
+  return { success: true };
+}
+
 async function updateStrategicContact(request, env, tenantId, id) {
   const existing = await getStrategicContactForTenant(env, tenantId, id);
   if (!existing) return json({ error: 'קשר אסטרטגי לא נמצא' }, 404);
@@ -924,6 +937,12 @@ export async function handleStrategicContacts(request, env, path) {
     const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
     if (roleState instanceof Response) return roleState;
     return updateStrategicContact(request, env, tenantId, Number(idMatch[1]));
+  }
+
+  if (idMatch && method === 'DELETE') {
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin']);
+    if (roleState instanceof Response) return roleState;
+    return deleteStrategicContact(env, tenantId, Number(idMatch[1]));
   }
 
   return json({ error: 'Strategic contacts route not found' }, 404);
