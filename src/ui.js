@@ -1782,10 +1782,13 @@ id="customers-search">
         <div class="filters-row" style="padding:0 16px 12px">
           <select class="filter-select" id="super-admin-cleanup-entity">
             <option value="tenants">Tenants</option>
-            <option value="users">Users / Employees</option>
+            <option value="users">Users</option>
+            <option value="employees">Employees</option>
+            <option value="leads">Events / Leads</option>
             <option value="contacts">Customers</option>
             <option value="products">Products</option>
             <option value="strategic_contacts">Strategic Contacts</option>
+            <option value="shopping">Shopping</option>
             <option value="sales_documents">Draft/Test Sales Docs</option>
             <option value="orphans">Orphans / System leftovers</option>
             <option value="all">All</option>
@@ -3186,7 +3189,7 @@ function cleanupActionButtons(c) {
     var danger = a.action === 'delete';
     var label = escapeHtml(a.label || a.action);
     if (!a.allowed) return '<button class="btn btn-secondary btn-sm" disabled title="' + escapeHtml(a.blocked_reason || 'חסום') + '">' + label + '</button>';
-    return '<button class="btn ' + (danger ? 'btn-danger' : 'btn-secondary') + ' btn-sm" data-cleanup-action="' + escapeHtml([c.type, c.id, a.action].join(':')) + '" data-cleanup-name="' + escapeHtml(a.requires_name || '') + '" data-cleanup-preview="' + escapeHtml(formatCleanupDependencies(c.dependencies)) + '">' + label + '</button>';
+    return '<button class="btn ' + (danger ? 'btn-danger' : 'btn-secondary') + ' btn-sm" data-cleanup-action="' + escapeHtml([c.type, c.id, a.action].join(':')) + '" data-cleanup-preview="' + escapeHtml(formatCleanupDependencies(c.dependencies)) + '">' + label + '</button>';
   }).join(' ');
 }
 
@@ -3217,7 +3220,7 @@ function loadSuperAdminCleanupCandidates() {
     body.querySelectorAll('[data-cleanup-action]').forEach(function(btn) {
       btn.addEventListener('click', function() {
         var parts = String(this.getAttribute('data-cleanup-action') || '').split(':');
-        runCleanupAction(parts[0], Number(parts[1]), parts[2], this.getAttribute('data-cleanup-name') || '', this.getAttribute('data-cleanup-preview') || '');
+        runCleanupAction(parts[0], Number(parts[1]), parts[2], this.getAttribute('data-cleanup-preview') || '');
       });
     });
   }).catch(function(err) {
@@ -3225,7 +3228,7 @@ function loadSuperAdminCleanupCandidates() {
   });
 }
 
-function runCleanupAction(type, id, action, requiredName, dependencyPreview) {
+function runCleanupAction(type, id, action, dependencyPreview) {
   var body = { type: type, id: id, action: action };
   if (action === 'delete') {
     var previewText = dependencyPreview || 'אין';
@@ -3233,11 +3236,6 @@ function runCleanupAction(type, id, action, requiredName, dependencyPreview) {
     if (confirmation === null) return;
     if (confirmation !== 'DELETE') { toast('אישור לא תואם — המחיקה בוטלה', 'error'); return; }
     body.confirmation = confirmation;
-    if (requiredName) {
-      var nameConfirmation = window.prompt('לאישור מחיקת העסק, להקליד את שם העסק בדיוק: ' + requiredName);
-      if (nameConfirmation === null) return;
-      body.name_confirmation = nameConfirmation;
-    }
   }
   apiCall('POST', '/api/admin/cleanup/action', body).then(function() {
     toast(action === 'delete' ? 'הרשומה נמחקה ונרשמה ב-audit' : 'הפעולה בוצעה ונרשמה ב-audit', 'success');

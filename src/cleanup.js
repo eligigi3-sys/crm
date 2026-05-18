@@ -113,7 +113,7 @@ async function buildTenantCandidate(env, row) {
     actions: [
       mkAction('archive', 'Suspend', Number(row.id) !== 1 && row.status !== 'suspended', Number(row.id) === 1 ? 'tenant 1 cannot be suspended' : 'already suspended'),
       mkAction('reactivate', 'Reactivate', row.status === 'suspended', 'tenant is already active'),
-      mkAction('delete', 'Delete Tenant', deleteBlocked.length === 0, summarizeBlockedReasons(deleteBlocked), { requires_delete: true, requires_name: row.name || '' })
+      mkAction('delete', 'Delete Tenant', deleteBlocked.length === 0, summarizeBlockedReasons(deleteBlocked), { requires_delete: true })
     ]
   }, {
     owner_email: row.owner_email || row.contact_email || null,
@@ -153,6 +153,54 @@ async function buildUserCandidate(env, row) {
   });
 }
 
+async function buildLeadCandidate(env, row) {
+  const deps = compactDependencies([
+    await dependency(env, 'lead_notes', 'WHERE tenant_id = ? AND lead_id = ?', [row.tenant_id, row.id]),
+    await dependency(env, 'lead_employees', 'WHERE tenant_id = ? AND lead_id = ?', [row.tenant_id, row.id]),
+    await dependency(env, 'event_product_allocations', 'WHERE tenant_id = ? AND event_id = ?', [row.tenant_id, row.id]),
+    await dependency(env, 'event_inventory_actions', 'WHERE tenant_id = ? AND event_id = ?', [row.tenant_id, row.id]),
+    await dependency(env, 'sales_documents', 'WHERE tenant_id = ? AND lead_id = ?', [row.tenant_id, row.id])
+  ]);
+  const lockedDocs = await countRows(env, 'sales_documents', "WHERE tenant_id = ? AND lead_id = ? AND (status IN ('issued','paid','partially_paid','void') OR locked_at IS NOT NULL OR issued_at IS NOT NULL)", [row.tenant_id, row.id]);
+  const blocked = [];
+  if (lockedDocs > 0) blocked.push('event has issued/locked sales documents');
+  return candidate('lead', {
+    id: row.id,
+    tenant_id: row.tenant_id,
+    label: row.name || ('Event #' + row.id),
+    status: row.status || 'lead',
+    reason: 'event controls',
+    allowed: blocked.length === 0,
+    blocked_reason: summarizeBlockedReasons(blocked),
+    dependencies: deps,
+    actions: [
+      mkAction('archive', 'Cancel', row.status !== 'cancelled' && row.status !== 'בוטל', 'already cancelled'),
+      mkAction('delete', 'Hard Delete', blocked.length === 0, summarizeBlockedReasons(blocked), { requires_delete: true })
+    ]
+  });
+}
+
+async function buildEmployeeCandidate(env, row) {
+  const deps = compactDependencies([
+    await dependency(env, 'lead_employees', 'WHERE tenant_id = ? AND employee_id = ?', [row.tenant_id, row.id])
+  ]);
+  const active = Number(row.is_active) !== 0;
+  return candidate('employee', {
+    id: row.id,
+    tenant_id: row.tenant_id,
+    label: row.full_name || ('Employee #' + row.id),
+    status: active ? 'active' : 'inactive',
+    reason: 'employee controls',
+    allowed: true,
+    dependencies: deps,
+    actions: [
+      mkAction('archive', 'Deactivate', active, 'already inactive'),
+      mkAction('reactivate', 'Reactivate', !active, 'already active'),
+      mkAction('delete', 'Hard Delete', true, '', { requires_delete: true })
+    ]
+  });
+}
+
 async function buildContactCandidate(env, row) {
   const deps = compactDependencies([
     await dependency(env, 'sales_documents', 'WHERE tenant_id = ? AND contact_id = ?', [row.tenant_id, row.id]),
@@ -163,14 +211,9 @@ async function buildContactCandidate(env, row) {
     await dependency(env, 'customer_contact_people', 'WHERE tenant_id = ? AND contact_id = ?', [row.tenant_id, row.id]),
     await dependency(env, 'strategic_contact_attributions', 'WHERE tenant_id = ? AND contact_id = ?', [row.tenant_id, row.id])
   ]);
-  const lockedDocs = await countRows(env, 'sales_documents', "WHERE tenant_id = ? AND contact_id = ? AND (status IN ('issued','paid','partially_paid','void') OR locked_at IS NOT NULL OR issued_at IS NOT NULL)", [row.tenant_id, row.id]);
-  const salesDocs = deps.find(function(dep) { return dep.table === 'sales_documents'; })?.count || 0;
-  const leads = deps.find(function(dep) { return dep.table === 'leads'; })?.count || 0;
+  const lockedDocs = await countRows(env, 'sales_documents', "WHERE tenant_id = ? AND (contact_id = ? OR lead_id IN (SELECT id FROM leads WHERE tenant_id = ? AND contact_id = ?)) AND (status IN ('issued','paid','partially_paid','void') OR locked_at IS NOT NULL OR issued_at IS NOT NULL)", [row.tenant_id, row.id, row.tenant_id, row.id]);
   const blocked = [];
-  if (Number(row.tenant_id) === 1) blocked.push('tenant 1 customer data cannot be hard-deleted in this phase');
-  if (lockedDocs > 0) blocked.push('customer has issued/locked sales documents');
-  if (salesDocs > 0) blocked.push('customer has sales document history');
-  if (leads > 0) blocked.push('customer has event/lead history');
+  if (lockedDocs > 0) blocked.push('customer or customer event has issued/locked sales documents');
   const status = row.status || 'פעיל';
   return candidate('contact', {
     id: row.id,
@@ -197,9 +240,9 @@ async function buildProductCandidate(env, row) {
     await dependency(env, 'event_inventory_actions', 'WHERE tenant_id = ? AND product_id = ?', [row.tenant_id, row.id]),
     await dependency(env, 'sales_document_items', 'WHERE tenant_id = ? AND product_id = ?', [row.tenant_id, row.id])
   ]);
+  const lockedDocItems = await countRows(env, 'sales_document_items', "WHERE tenant_id = ? AND product_id = ? AND document_id IN (SELECT id FROM sales_documents WHERE tenant_id = ? AND (status IN ('issued','paid','partially_paid','void') OR locked_at IS NOT NULL OR issued_at IS NOT NULL))", [row.tenant_id, row.id, row.tenant_id]);
   const blocked = [];
-  if (Number(row.tenant_id) === 1) blocked.push('tenant 1 product data cannot be hard-deleted in this phase');
-  if (deps.length) blocked.push('product has stock/purchase/allocation/sales history');
+  if (lockedDocItems > 0) blocked.push('product is used in issued/locked sales documents');
   const active = Number(row.is_active) !== 0;
   return candidate('product', {
     id: row.id,
@@ -225,7 +268,6 @@ async function buildStrategicContactCandidate(env, row) {
   ]);
   const active = Number(row.active) !== 0;
   const blocked = [];
-  if (Number(row.tenant_id) === 1) blocked.push('tenant 1 strategic contact data cannot be hard-deleted in this phase');
   return candidate('strategic_contact', {
     id: row.id,
     tenant_id: row.tenant_id,
@@ -240,6 +282,53 @@ async function buildStrategicContactCandidate(env, row) {
       mkAction('reactivate', 'Reactivate', !active, 'already active'),
       mkAction('delete', 'Hard Delete', blocked.length === 0, summarizeBlockedReasons(blocked), { requires_delete: true })
     ]
+  });
+}
+
+async function buildShoppingListCandidate(env, row) {
+  const deps = compactDependencies([
+    await dependency(env, 'shopping_items', 'WHERE tenant_id = ? AND list_id = ?', [row.tenant_id, row.id]),
+    await dependency(env, 'shopping_purchases', 'WHERE tenant_id = ? AND list_id = ?', [row.tenant_id, row.id]),
+    await dependency(env, 'shopping_purchase_items', 'WHERE tenant_id = ? AND purchase_id IN (SELECT id FROM shopping_purchases WHERE tenant_id = ? AND list_id = ?)', [row.tenant_id, row.tenant_id, row.id])
+  ]);
+  return candidate('shopping_list', {
+    id: row.id,
+    tenant_id: row.tenant_id,
+    label: row.name || ('Shopping list #' + row.id),
+    status: 'active',
+    reason: 'shopping list controls',
+    allowed: true,
+    dependencies: deps,
+    actions: [mkAction('delete', 'Hard Delete', true, '', { requires_delete: true })]
+  });
+}
+
+async function buildShoppingItemCandidate(row) {
+  return candidate('shopping_item', {
+    id: row.id,
+    tenant_id: row.tenant_id,
+    label: row.item_name || ('Shopping item #' + row.id),
+    status: row.status || 'pending',
+    reason: 'shopping item controls',
+    allowed: true,
+    dependencies: [],
+    actions: [mkAction('delete', 'Hard Delete', true, '', { requires_delete: true })]
+  });
+}
+
+async function buildShoppingPurchaseCandidate(env, row) {
+  const deps = compactDependencies([
+    await dependency(env, 'shopping_purchase_items', 'WHERE tenant_id = ? AND purchase_id = ?', [row.tenant_id, row.id])
+  ]);
+  return candidate('shopping_purchase', {
+    id: row.id,
+    tenant_id: row.tenant_id,
+    label: 'Purchase #' + row.id + (row.purchase_date ? ' / ' + row.purchase_date : ''),
+    status: row.purchase_date || 'purchase',
+    reason: 'shopping purchase controls',
+    allowed: true,
+    dependencies: deps,
+    actions: [mkAction('delete', 'Hard Delete', true, '', { requires_delete: true })]
   });
 }
 
@@ -317,6 +406,17 @@ async function listCleanupCandidates(env, entity, search) {
     for (const row of rows.results || []) if (textLike(row, ['id', 'name', 'display_name', 'email', 'role'], search)) candidates.push(await buildUserCandidate(env, row));
   }
 
+
+  if (want('leads')) {
+    const rows = await env.DB.prepare('SELECT id, tenant_id, name, phone, email, event_type, event_date, status, contact_id FROM leads ORDER BY id DESC LIMIT 100').all();
+    for (const row of rows.results || []) if (textLike(row, ['id', 'name', 'phone', 'email', 'event_type', 'event_date', 'status'], search)) candidates.push(await buildLeadCandidate(env, row));
+  }
+
+  if (want('employees')) {
+    const rows = await env.DB.prepare('SELECT id, tenant_id, full_name, phone, email, role, is_active FROM employees ORDER BY id DESC LIMIT 100').all();
+    for (const row of rows.results || []) if (textLike(row, ['id', 'full_name', 'phone', 'email', 'role'], search)) candidates.push(await buildEmployeeCandidate(env, row));
+  }
+
   if (want('contacts')) {
     const rows = await env.DB.prepare('SELECT id, tenant_id, name, phone, email, status, tags FROM contacts ORDER BY id DESC LIMIT 100').all();
     for (const row of rows.results || []) if (textLike(row, ['id', 'name', 'phone', 'email', 'tags'], search)) candidates.push(await buildContactCandidate(env, row));
@@ -330,6 +430,18 @@ async function listCleanupCandidates(env, entity, search) {
   if (want('strategic_contacts')) {
     const rows = await env.DB.prepare('SELECT id, tenant_id, organization_name, contact_person_name, email, status, active, tags, notes FROM strategic_contacts ORDER BY id DESC LIMIT 100').all();
     for (const row of rows.results || []) if (textLike(row, ['id', 'organization_name', 'contact_person_name', 'email', 'tags'], search)) candidates.push(await buildStrategicContactCandidate(env, row));
+  }
+
+
+  if (want('shopping')) {
+    const lists = await env.DB.prepare('SELECT id, tenant_id, name, phone, address, contact_name, notes FROM shopping_lists ORDER BY id DESC LIMIT 100').all();
+    for (const row of lists.results || []) if (textLike(row, ['id', 'name', 'phone', 'address', 'contact_name', 'notes'], search)) candidates.push(await buildShoppingListCandidate(env, row));
+
+    const items = await env.DB.prepare('SELECT id, tenant_id, list_id, item_name, quantity, status, notes FROM shopping_items ORDER BY id DESC LIMIT 100').all();
+    for (const row of items.results || []) if (textLike(row, ['id', 'item_name', 'quantity', 'status', 'notes'], search)) candidates.push(await buildShoppingItemCandidate(row));
+
+    const purchases = await env.DB.prepare('SELECT id, tenant_id, list_id, purchase_date, total_amount, notes FROM shopping_purchases ORDER BY id DESC LIMIT 100').all();
+    for (const row of purchases.results || []) if (textLike(row, ['id', 'purchase_date', 'total_amount', 'notes'], search)) candidates.push(await buildShoppingPurchaseCandidate(env, row));
   }
 
   if (want('sales_documents')) {
@@ -403,6 +515,14 @@ async function getCandidateByTypeAndId(env, type, id) {
     const row = await env.DB.prepare('SELECT id, name, display_name, email, role, status FROM users WHERE id = ?').bind(id).first();
     return row ? buildUserCandidate(env, row) : null;
   }
+  if (type === 'lead') {
+    const row = await env.DB.prepare('SELECT id, tenant_id, name, phone, email, event_type, event_date, status, contact_id FROM leads WHERE id = ?').bind(id).first();
+    return row ? buildLeadCandidate(env, row) : null;
+  }
+  if (type === 'employee') {
+    const row = await env.DB.prepare('SELECT id, tenant_id, full_name, phone, email, role, is_active FROM employees WHERE id = ?').bind(id).first();
+    return row ? buildEmployeeCandidate(env, row) : null;
+  }
   if (type === 'contact') {
     const row = await env.DB.prepare('SELECT id, tenant_id, name, phone, email, status, tags FROM contacts WHERE id = ?').bind(id).first();
     return row ? buildContactCandidate(env, row) : null;
@@ -414,6 +534,18 @@ async function getCandidateByTypeAndId(env, type, id) {
   if (type === 'strategic_contact') {
     const row = await env.DB.prepare('SELECT id, tenant_id, organization_name, contact_person_name, email, status, active, tags, notes FROM strategic_contacts WHERE id = ?').bind(id).first();
     return row ? buildStrategicContactCandidate(env, row) : null;
+  }
+  if (type === 'shopping_list') {
+    const row = await env.DB.prepare('SELECT id, tenant_id, name, phone, address, contact_name, notes FROM shopping_lists WHERE id = ?').bind(id).first();
+    return row ? buildShoppingListCandidate(env, row) : null;
+  }
+  if (type === 'shopping_item') {
+    const row = await env.DB.prepare('SELECT id, tenant_id, list_id, item_name, quantity, status, notes FROM shopping_items WHERE id = ?').bind(id).first();
+    return row ? buildShoppingItemCandidate(row) : null;
+  }
+  if (type === 'shopping_purchase') {
+    const row = await env.DB.prepare('SELECT id, tenant_id, list_id, purchase_date, total_amount, notes FROM shopping_purchases WHERE id = ?').bind(id).first();
+    return row ? buildShoppingPurchaseCandidate(env, row) : null;
   }
   if (type === 'sales_document' || type === 'blocked_sales_document') {
     const row = await env.DB.prepare(`
@@ -550,19 +682,62 @@ async function runDeleteAction(env, actor, candidate) {
     s.push(env.DB.prepare('DELETE FROM tenants WHERE id = ? AND id <> 1').bind(candidate.id));
   } else if (candidate.type === 'user') {
     s.push(env.DB.prepare("DELETE FROM users WHERE id = ? AND lower(COALESCE(role,'')) <> 'super_admin' AND NOT EXISTS (SELECT 1 FROM tenant_memberships WHERE user_id = users.id)").bind(candidate.id));
+  } else if (candidate.type === 'lead') {
+    s.push(env.DB.prepare("DELETE FROM sales_document_items WHERE tenant_id = ? AND document_id IN (SELECT id FROM sales_documents WHERE tenant_id = ? AND lead_id = ? AND locked_at IS NULL AND issued_at IS NULL AND status NOT IN ('issued','paid','partially_paid','void'))").bind(candidate.tenant_id, candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare("DELETE FROM sales_documents WHERE tenant_id = ? AND lead_id = ? AND locked_at IS NULL AND issued_at IS NULL AND status NOT IN ('issued','paid','partially_paid','void')").bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM strategic_contact_attributions WHERE tenant_id = ? AND (lead_id = ? OR event_id = ?)').bind(candidate.tenant_id, candidate.id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM product_stock_movements WHERE tenant_id = ? AND event_id = ?').bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM event_inventory_actions WHERE tenant_id = ? AND event_id = ?').bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM event_product_allocations WHERE tenant_id = ? AND event_id = ?').bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM lead_employees WHERE tenant_id = ? AND lead_id = ?').bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM lead_notes WHERE tenant_id = ? AND lead_id = ?').bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM leads WHERE id = ? AND tenant_id = ?').bind(candidate.id, candidate.tenant_id));
+  } else if (candidate.type === 'employee') {
+    s.push(env.DB.prepare('DELETE FROM lead_employees WHERE tenant_id = ? AND employee_id = ?').bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM employees WHERE id = ? AND tenant_id = ?').bind(candidate.id, candidate.tenant_id));
   } else if (candidate.type === 'contact') {
+    s.push(env.DB.prepare("DELETE FROM sales_document_items WHERE tenant_id = ? AND document_id IN (SELECT id FROM sales_documents WHERE tenant_id = ? AND (contact_id = ? OR lead_id IN (SELECT id FROM leads WHERE tenant_id = ? AND contact_id = ?)) AND locked_at IS NULL AND issued_at IS NULL AND status NOT IN ('issued','paid','partially_paid','void'))").bind(candidate.tenant_id, candidate.tenant_id, candidate.id, candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare("DELETE FROM sales_documents WHERE tenant_id = ? AND (contact_id = ? OR lead_id IN (SELECT id FROM leads WHERE tenant_id = ? AND contact_id = ?)) AND locked_at IS NULL AND issued_at IS NULL AND status NOT IN ('issued','paid','partially_paid','void')").bind(candidate.tenant_id, candidate.id, candidate.tenant_id, candidate.id));
     s.push(env.DB.prepare('DELETE FROM strategic_contact_attributions WHERE tenant_id = ? AND contact_id = ?').bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM strategic_contact_attributions WHERE tenant_id = ? AND (lead_id IN (SELECT id FROM leads WHERE tenant_id = ? AND contact_id = ?) OR event_id IN (SELECT id FROM leads WHERE tenant_id = ? AND contact_id = ?))').bind(candidate.tenant_id, candidate.tenant_id, candidate.id, candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM product_stock_movements WHERE tenant_id = ? AND event_id IN (SELECT id FROM leads WHERE tenant_id = ? AND contact_id = ?)').bind(candidate.tenant_id, candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM event_inventory_actions WHERE tenant_id = ? AND event_id IN (SELECT id FROM leads WHERE tenant_id = ? AND contact_id = ?)').bind(candidate.tenant_id, candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM event_product_allocations WHERE tenant_id = ? AND event_id IN (SELECT id FROM leads WHERE tenant_id = ? AND contact_id = ?)').bind(candidate.tenant_id, candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM lead_employees WHERE tenant_id = ? AND lead_id IN (SELECT id FROM leads WHERE tenant_id = ? AND contact_id = ?)').bind(candidate.tenant_id, candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM lead_notes WHERE tenant_id = ? AND lead_id IN (SELECT id FROM leads WHERE tenant_id = ? AND contact_id = ?)').bind(candidate.tenant_id, candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM leads WHERE tenant_id = ? AND contact_id = ?').bind(candidate.tenant_id, candidate.id));
     s.push(env.DB.prepare('DELETE FROM customer_contact_people WHERE tenant_id = ? AND contact_id = ?').bind(candidate.tenant_id, candidate.id));
     s.push(env.DB.prepare('DELETE FROM customer_addresses WHERE tenant_id = ? AND contact_id = ?').bind(candidate.tenant_id, candidate.id));
     s.push(env.DB.prepare('DELETE FROM customer_billing_profiles WHERE tenant_id = ? AND contact_id = ?').bind(candidate.tenant_id, candidate.id));
     s.push(env.DB.prepare('DELETE FROM contact_notes WHERE tenant_id = ? AND contact_id = ?').bind(candidate.tenant_id, candidate.id));
-    s.push(env.DB.prepare('DELETE FROM contacts WHERE id = ? AND tenant_id = ? AND tenant_id <> 1 AND NOT EXISTS (SELECT 1 FROM sales_documents WHERE tenant_id = contacts.tenant_id AND contact_id = contacts.id) AND NOT EXISTS (SELECT 1 FROM leads WHERE tenant_id = contacts.tenant_id AND contact_id = contacts.id)').bind(candidate.id, candidate.tenant_id));
+    s.push(env.DB.prepare("DELETE FROM contacts WHERE id = ? AND tenant_id = ? AND NOT EXISTS (SELECT 1 FROM sales_documents WHERE tenant_id = contacts.tenant_id AND contact_id = contacts.id AND (status IN ('issued','paid','partially_paid','void') OR locked_at IS NOT NULL OR issued_at IS NOT NULL))").bind(candidate.id, candidate.tenant_id));
   } else if (candidate.type === 'product') {
-    s.push(env.DB.prepare('DELETE FROM products WHERE id = ? AND tenant_id = ? AND tenant_id <> 1').bind(candidate.id, candidate.tenant_id));
+    s.push(env.DB.prepare("DELETE FROM sales_document_items WHERE tenant_id = ? AND product_id = ? AND document_id NOT IN (SELECT id FROM sales_documents WHERE tenant_id = ? AND (status IN ('issued','paid','partially_paid','void') OR locked_at IS NOT NULL OR issued_at IS NOT NULL))").bind(candidate.tenant_id, candidate.id, candidate.tenant_id));
+    s.push(env.DB.prepare('DELETE FROM shopping_purchase_items WHERE tenant_id = ? AND product_id = ?').bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM shopping_items WHERE tenant_id = ? AND product_id = ?').bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM product_stock_movements WHERE tenant_id = ? AND product_id = ?').bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM product_purchases WHERE tenant_id = ? AND product_id = ?').bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM event_inventory_actions WHERE tenant_id = ? AND product_id = ?').bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM event_product_allocations WHERE tenant_id = ? AND product_id = ?').bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM products WHERE id = ? AND tenant_id = ?').bind(candidate.id, candidate.tenant_id));
   } else if (candidate.type === 'strategic_contact') {
     s.push(env.DB.prepare('DELETE FROM strategic_contact_attributions WHERE strategic_contact_id = ? AND tenant_id = ?').bind(candidate.id, candidate.tenant_id));
     s.push(env.DB.prepare('DELETE FROM strategic_contact_activities WHERE strategic_contact_id = ? AND tenant_id = ?').bind(candidate.id, candidate.tenant_id));
-    s.push(env.DB.prepare('DELETE FROM strategic_contacts WHERE id = ? AND tenant_id = ? AND tenant_id <> 1').bind(candidate.id, candidate.tenant_id));
+    s.push(env.DB.prepare('DELETE FROM strategic_contacts WHERE id = ? AND tenant_id = ?').bind(candidate.id, candidate.tenant_id));
+  } else if (candidate.type === 'shopping_list') {
+    s.push(env.DB.prepare('DELETE FROM product_stock_movements WHERE tenant_id = ? AND product_purchase_id IN (SELECT id FROM product_purchases WHERE tenant_id = ? AND shopping_list_id = ?)').bind(candidate.tenant_id, candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM product_purchases WHERE tenant_id = ? AND shopping_list_id = ?').bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM shopping_purchase_items WHERE tenant_id = ? AND purchase_id IN (SELECT id FROM shopping_purchases WHERE tenant_id = ? AND list_id = ?)').bind(candidate.tenant_id, candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM shopping_purchases WHERE tenant_id = ? AND list_id = ?').bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM shopping_items WHERE tenant_id = ? AND list_id = ?').bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM shopping_lists WHERE id = ? AND tenant_id = ?').bind(candidate.id, candidate.tenant_id));
+  } else if (candidate.type === 'shopping_item') {
+    s.push(env.DB.prepare('DELETE FROM shopping_items WHERE id = ? AND tenant_id = ?').bind(candidate.id, candidate.tenant_id));
+  } else if (candidate.type === 'shopping_purchase') {
+    s.push(env.DB.prepare('DELETE FROM product_stock_movements WHERE tenant_id = ? AND product_purchase_id IN (SELECT id FROM product_purchases WHERE tenant_id = ? AND shopping_purchase_id = ?)').bind(candidate.tenant_id, candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM product_purchases WHERE tenant_id = ? AND shopping_purchase_id = ?').bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM shopping_purchase_items WHERE tenant_id = ? AND purchase_id = ?').bind(candidate.tenant_id, candidate.id));
+    s.push(env.DB.prepare('DELETE FROM shopping_purchases WHERE id = ? AND tenant_id = ?').bind(candidate.id, candidate.tenant_id));
   } else if (candidate.type === 'sales_document') {
     s.push(env.DB.prepare('DELETE FROM sales_document_items WHERE document_id = ? AND tenant_id = ?').bind(candidate.id, candidate.tenant_id));
     s.push(env.DB.prepare("DELETE FROM sales_documents WHERE id = ? AND tenant_id = ? AND locked_at IS NULL AND issued_at IS NULL AND status NOT IN ('issued','paid','partially_paid','void')").bind(candidate.id, candidate.tenant_id));
@@ -617,9 +792,6 @@ export async function handleAdminCleanup(request, env, path, superAdminCtx) {
     if (!action.allowed) throw new Error(action.blocked_reason || item.blocked_reason || 'הפעולה חסומה');
     if (actionName === 'delete') {
       if (!body || body.confirmation !== 'DELETE') throw new Error('נדרש אישור DELETE מדויק');
-      if (action.requires_name && String(body.name_confirmation || '').trim() !== String(action.requires_name).trim()) {
-        throw new Error('נדרש אישור שם עסק מדויק למחיקת tenant');
-      }
     }
 
     if (actionName === 'archive') await runArchiveAction(env, superAdminCtx && superAdminCtx.user, item);
