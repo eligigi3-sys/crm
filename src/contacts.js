@@ -656,6 +656,52 @@ export async function handleContacts(request, env, path) {
     return { success: true, contact };
   }
 
+  // DELETE /api/contacts/:id
+  if (idMatch && method === 'DELETE') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'contacts');
+    if (moduleState instanceof Response) return moduleState;
+
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin']);
+    if (roleState instanceof Response) return roleState;
+
+    const id = Number(idMatch[1]);
+    const tenantId = tenantCtx.tenant.id;
+
+    const existing = await env.DB.prepare(
+      'SELECT id FROM contacts WHERE id = ? AND tenant_id = ?'
+    ).bind(id, tenantId).first();
+    if (!existing) throw new Error('לקוח לא נמצא');
+
+    const lockedDoc = await env.DB.prepare(
+      "SELECT id FROM sales_documents WHERE tenant_id = ? AND (contact_id = ? OR lead_id IN (SELECT id FROM leads WHERE tenant_id = ? AND contact_id = ?)) AND (status IN ('issued','paid','partially_paid','void') OR locked_at IS NOT NULL OR issued_at IS NOT NULL) LIMIT 1"
+    ).bind(tenantId, id, tenantId, id).first();
+    if (lockedDoc) throw new Error('לא ניתן למחוק לקוח עם מסמך מכירה שהופק או ננעל');
+
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM sales_document_items WHERE tenant_id = ? AND document_id IN (SELECT id FROM sales_documents WHERE tenant_id = ? AND (contact_id = ? OR lead_id IN (SELECT id FROM leads WHERE tenant_id = ? AND contact_id = ?)) AND locked_at IS NULL AND issued_at IS NULL AND status NOT IN ('issued','paid','partially_paid','void'))").bind(tenantId, tenantId, id, tenantId, id),
+      env.DB.prepare("DELETE FROM sales_documents WHERE tenant_id = ? AND (contact_id = ? OR lead_id IN (SELECT id FROM leads WHERE tenant_id = ? AND contact_id = ?)) AND locked_at IS NULL AND issued_at IS NULL AND status NOT IN ('issued','paid','partially_paid','void')").bind(tenantId, id, tenantId, id),
+      env.DB.prepare('DELETE FROM strategic_contact_attributions WHERE tenant_id = ? AND contact_id = ?').bind(tenantId, id),
+      env.DB.prepare('DELETE FROM strategic_contact_attributions WHERE tenant_id = ? AND (lead_id IN (SELECT id FROM leads WHERE tenant_id = ? AND contact_id = ?) OR event_id IN (SELECT id FROM leads WHERE tenant_id = ? AND contact_id = ?))').bind(tenantId, tenantId, id, tenantId, id),
+      env.DB.prepare('DELETE FROM product_stock_movements WHERE tenant_id = ? AND event_id IN (SELECT id FROM leads WHERE tenant_id = ? AND contact_id = ?)').bind(tenantId, tenantId, id),
+      env.DB.prepare('DELETE FROM event_inventory_actions WHERE tenant_id = ? AND event_id IN (SELECT id FROM leads WHERE tenant_id = ? AND contact_id = ?)').bind(tenantId, tenantId, id),
+      env.DB.prepare('DELETE FROM event_product_allocations WHERE tenant_id = ? AND event_id IN (SELECT id FROM leads WHERE tenant_id = ? AND contact_id = ?)').bind(tenantId, tenantId, id),
+      env.DB.prepare('DELETE FROM lead_employees WHERE tenant_id = ? AND lead_id IN (SELECT id FROM leads WHERE tenant_id = ? AND contact_id = ?)').bind(tenantId, tenantId, id),
+      env.DB.prepare('DELETE FROM lead_notes WHERE tenant_id = ? AND lead_id IN (SELECT id FROM leads WHERE tenant_id = ? AND contact_id = ?)').bind(tenantId, tenantId, id),
+      env.DB.prepare('DELETE FROM leads WHERE tenant_id = ? AND contact_id = ?').bind(tenantId, id),
+      env.DB.prepare('UPDATE strategic_contacts SET linked_contact_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE tenant_id = ? AND linked_contact_id = ?').bind(tenantId, id),
+      env.DB.prepare('DELETE FROM customer_contact_people WHERE tenant_id = ? AND contact_id = ?').bind(tenantId, id),
+      env.DB.prepare('DELETE FROM customer_addresses WHERE tenant_id = ? AND contact_id = ?').bind(tenantId, id),
+      env.DB.prepare('DELETE FROM customer_billing_profiles WHERE tenant_id = ? AND contact_id = ?').bind(tenantId, id),
+      env.DB.prepare('DELETE FROM contact_notes WHERE tenant_id = ? AND contact_id = ?').bind(tenantId, id),
+      env.DB.prepare('DELETE FROM contacts WHERE id = ? AND tenant_id = ?').bind(id, tenantId)
+    ]);
+
+    return { success: true };
+  }
+
   throw new Error('Contacts route not found');
 }
 

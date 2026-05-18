@@ -1384,22 +1384,27 @@ export async function handleLeads(request, env, path) {
     if (roleState instanceof Response) return roleState;
 
     const tenantId = tenantCtx.tenant.id;
-    const leadId = idMatch[1];
+    const leadId = Number(idMatch[1]);
 
     const existingLead = await getLeadByIdForTenant(leadId, tenantId, env);
     if (!existingLead) throw new Error('Lead not found');
 
-    await env.DB.prepare(
-      'DELETE FROM lead_notes WHERE lead_id = ? AND tenant_id = ?'
-    ).bind(leadId, tenantId).run();
+    const lockedDoc = await env.DB.prepare(
+      "SELECT id FROM sales_documents WHERE tenant_id = ? AND lead_id = ? AND (status IN ('issued','paid','partially_paid','void') OR locked_at IS NOT NULL OR issued_at IS NOT NULL) LIMIT 1"
+    ).bind(tenantId, leadId).first();
+    if (lockedDoc) throw new Error('לא ניתן למחוק אירוע עם מסמך מכירה שהופק או ננעל');
 
-    await env.DB.prepare(
-      'DELETE FROM lead_employees WHERE lead_id = ? AND tenant_id = ?'
-    ).bind(leadId, tenantId).run();
-
-    await env.DB.prepare(
-      'DELETE FROM leads WHERE id = ? AND tenant_id = ?'
-    ).bind(leadId, tenantId).run();
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM sales_document_items WHERE tenant_id = ? AND document_id IN (SELECT id FROM sales_documents WHERE tenant_id = ? AND lead_id = ? AND locked_at IS NULL AND issued_at IS NULL AND status NOT IN ('issued','paid','partially_paid','void'))").bind(tenantId, tenantId, leadId),
+      env.DB.prepare("DELETE FROM sales_documents WHERE tenant_id = ? AND lead_id = ? AND locked_at IS NULL AND issued_at IS NULL AND status NOT IN ('issued','paid','partially_paid','void')").bind(tenantId, leadId),
+      env.DB.prepare('DELETE FROM strategic_contact_attributions WHERE tenant_id = ? AND (lead_id = ? OR event_id = ?)').bind(tenantId, leadId, leadId),
+      env.DB.prepare('DELETE FROM product_stock_movements WHERE tenant_id = ? AND event_id = ?').bind(tenantId, leadId),
+      env.DB.prepare('DELETE FROM event_inventory_actions WHERE tenant_id = ? AND event_id = ?').bind(tenantId, leadId),
+      env.DB.prepare('DELETE FROM event_product_allocations WHERE tenant_id = ? AND event_id = ?').bind(tenantId, leadId),
+      env.DB.prepare('DELETE FROM lead_notes WHERE lead_id = ? AND tenant_id = ?').bind(leadId, tenantId),
+      env.DB.prepare('DELETE FROM lead_employees WHERE lead_id = ? AND tenant_id = ?').bind(leadId, tenantId),
+      env.DB.prepare('DELETE FROM leads WHERE id = ? AND tenant_id = ?').bind(leadId, tenantId)
+    ]);
 
     return { success: true };
   }

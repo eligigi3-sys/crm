@@ -1921,7 +1921,7 @@ id="customers-search">
       <div class="form-group"><label class="form-label">פרטי אירוע</label><textarea class="form-textarea" id="l-details" placeholder="פרטים נוספים..."></textarea></div>
       <div class="form-group"><label class="form-label">הערות פנימיות</label><textarea class="form-textarea" id="l-notes" placeholder="הערות..."></textarea></div>
     </div>
-    <div class="modal-footer"><button class="btn btn-secondary" id="modal-cancel-btn">ביטול</button><button class="btn btn-primary" id="modal-save-btn">שמור</button></div>
+    <div class="modal-footer"><button class="btn btn-danger" id="modal-delete-btn" style="display:none;margin-left:auto">מחק אירוע</button><button class="btn btn-secondary" id="modal-cancel-btn">ביטול</button><button class="btn btn-primary" id="modal-save-btn">שמור</button></div>
   </div>
 </div>
 <div class="modal-overlay" id="modal-customer">
@@ -2333,6 +2333,11 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
 });  document.getElementById('modal-close-btn').addEventListener('click', closeLeadModal);
   document.getElementById('modal-cancel-btn').addEventListener('click', closeLeadModal);
   document.getElementById('modal-save-btn').addEventListener('click', saveLead);
+  var modalDeleteBtn = document.getElementById('modal-delete-btn');
+  if (modalDeleteBtn) modalDeleteBtn.addEventListener('click', function() {
+    var id = document.getElementById('lead-id').value;
+    if (id) deleteLead(parseInt(id));
+  });
   document.getElementById('drawer-close-btn').addEventListener('click', closeDrawer);
   document.getElementById('drawer-sync-btn').addEventListener('click', function() { if (currentLeadId) syncToGoogle(currentLeadId); });
   document.getElementById('drawer-overlay').addEventListener('click', closeDrawer);
@@ -5670,6 +5675,8 @@ function openLeadModal() {
   if (!acSetupDone) { setupAutocomplete(); acSetupDone = true; }
   document.getElementById('lead-id').value = '';
   document.getElementById('modal-lead-title').textContent = 'ליד חדש';
+  var deleteBtn = document.getElementById('modal-delete-btn');
+  if (deleteBtn) deleteBtn.style.display = 'none';
   ['l-name','l-phone','l-email','l-venue','l-details','l-notes','l-price','l-deposit'].forEach(function(id) { document.getElementById(id).value = ''; });
   ['l-event-date','l-event-time','l-deposit-date','l-last-contact','l-next-contact'].forEach(function(id) { document.getElementById(id).value = ''; });
   document.getElementById('l-event-type').value = '';
@@ -5689,7 +5696,9 @@ function editLead(id) {
   apiCall('GET', '/api/leads/' + id).then(function(data) {
     var l = data.lead;
     document.getElementById('lead-id').value = l.id;
-    document.getElementById('modal-lead-title').textContent = 'עריכת ליד';
+    document.getElementById('modal-lead-title').textContent = 'עריכת אירוע';
+    var deleteBtn = document.getElementById('modal-delete-btn');
+    if (deleteBtn) deleteBtn.style.display = '';
     document.getElementById('l-name').value = l.name||'';
     document.getElementById('l-phone').value = l.phone||'';
     document.getElementById('l-email').value = l.email||'';
@@ -5763,8 +5772,22 @@ function saveLead() {
 }
 
 function deleteLead(id) {
-  if (!confirm('למחוק ליד זה?')) return;
-  apiCall('DELETE', '/api/leads/' + id).then(function() { invalidatePages(); refreshAfterLeadMutation('נמחק'); }).catch(function(e) { toast(e.message, 'error'); });
+  if (!confirm('למחוק את האירוע הזה? פעולה זו תמחק גם נתונים קשורים לאירוע שלא ננעלו.')) return;
+  apiCall('DELETE', '/api/leads/' + id).then(function() {
+    closeLeadModal();
+    closeDrawer();
+    invalidatePages();
+    refreshAfterLeadMutation('האירוע נמחק');
+  }).catch(function(e) { toast(e.message, 'error'); });
+}
+
+function deleteCustomer(id, onDone) {
+  if (!confirm('למחוק את הלקוח הזה? פעולה זו תמחק גם אירועים ונתונים קשורים שלא ננעלו.')) return;
+  apiCall('DELETE', '/api/contacts/' + id).then(function() {
+    if (typeof onDone === 'function') onDone();
+    loadCustomers();
+    toast('הלקוח נמחק', 'success');
+  }).catch(function(e) { toast(e.message, 'error'); });
 }
 
 function formatDate(d) { if (!d) return '—'; var p = d.substring(0,10).split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
@@ -8928,6 +8951,7 @@ function openEditCustomerModal(c) {
       '</div>' +
 
       '<div class="modal-footer">' +
+        '<button class="btn btn-danger" id="edit-customer-delete" style="margin-left:auto">מחק לקוח</button>' +
         '<button class="btn btn-secondary" id="edit-customer-cancel">ביטול</button>' +
         '<button class="btn btn-primary" id="edit-customer-save">שמור</button>' +
       '</div>' +
@@ -8941,6 +8965,7 @@ function openEditCustomerModal(c) {
 
   document.getElementById('edit-customer-close').onclick = close;
   document.getElementById('edit-customer-cancel').onclick = close;
+  document.getElementById('edit-customer-delete').onclick = function() { deleteCustomer(c.id, close); };
 
   document.getElementById('edit-customer-save').onclick = function() {
 
