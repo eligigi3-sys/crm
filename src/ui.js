@@ -164,6 +164,7 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .business-logo-preview{width:110px;height:70px;border:1px solid var(--border);border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;color:var(--text3);font-size:12px;font-weight:800}
 .business-logo-preview img{max-width:100%;max-height:100%;object-fit:contain;display:block}
 .business-logo-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.business-logo-file-input{position:absolute;left:-9999px;width:1px;height:1px;opacity:.01}
 .business-logo-help{font-size:12px;color:var(--text3);line-height:1.5;flex-basis:100%}
 .business-settings-permission{padding:12px 14px;border-radius:12px;background:var(--orange-light);color:var(--orange);font-size:13px;font-weight:700;margin-bottom:14px;line-height:1.5}
 .business-settings-footer{position:sticky;bottom:0;background:rgba(255,255,255,0.96);border-top:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
@@ -3939,8 +3940,8 @@ function businessSettingsLogoControl(value, disabled) {
     '<div class="business-logo-upload">' +
       '<div class="business-logo-preview" id="business-logo-preview">' + preview + '</div>' +
       '<div class="business-logo-actions">' +
-        '<label class="btn btn-secondary btn-sm" for="business-logo-file"' + (disabled ? ' style="opacity:.6;pointer-events:none"' : '') + '>בחר תמונת לוגו</label>' +
-        '<input id="business-logo-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none"' + (disabled ? ' disabled' : '') + '>' +
+        '<button type="button" class="btn btn-secondary btn-sm" id="business-logo-pick"' + (disabled ? ' disabled' : '') + '>בחר תמונת לוגו</button>' +
+        '<input id="business-logo-file" class="business-logo-file-input" type="file" accept="image/*"' + (disabled ? ' disabled' : '') + '>' +
         '<button type="button" class="btn btn-ghost btn-sm" id="business-logo-clear"' + (disabled || !hasLogo ? ' disabled' : '') + '>הסר לוגו</button>' +
       '</div>' +
       '<div class="business-logo-help">אפשר להעלות PNG/JPG/WebP/GIF עד 700KB. הלוגו יישמר במערכת וישמש במסמכים חדשים.</div>' +
@@ -3965,6 +3966,8 @@ function bindBusinessSettingsForm() {
   });
   var logoFile = document.getElementById('business-logo-file');
   if (logoFile) logoFile.addEventListener('change', handleBusinessLogoFile);
+  var logoPick = document.getElementById('business-logo-pick');
+  if (logoPick && logoFile) logoPick.addEventListener('click', function() { logoFile.click(); });
   var logoClear = document.getElementById('business-logo-clear');
   if (logoClear) logoClear.addEventListener('click', clearBusinessLogo);
 }
