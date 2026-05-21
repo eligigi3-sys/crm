@@ -110,7 +110,8 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .super-admin-list-status.suspended{background:var(--orange-light);color:var(--orange)}
 .super-admin-modal{width:760px;max-width:96vw}
 .super-admin-modal .modal-body{padding:20px 22px 22px}
-.super-admin-section{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:14px 14px 12px;margin-bottom:14px;box-shadow:0 1px 2px rgba(15,23,42,0.04)}
+#super-admin-tenant-modal .modal-header h2{min-width:0;overflow-wrap:anywhere;line-height:1.35}
+.super-admin-section{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:14px 14px 12px;margin-bottom:14px;box-shadow:0 1px 2px rgba(15,23,42,0.04);max-width:100%;overflow:hidden}
 .super-admin-section:last-child{margin-bottom:0}
 .super-admin-section-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
 .super-admin-section-title{font-size:13px;font-weight:800;color:var(--text)}
@@ -281,7 +282,7 @@ tr:hover td{background:#fafbfc;cursor:pointer}
   @page{size:A4;margin:0}
 }
 
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:11050;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
 .modal-overlay.open{display:flex}
 .modal{background:var(--white);border-radius:16px;width:620px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:var(--shadow-md)}
 .modal-header{padding:18px 24px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--white);z-index:1}
@@ -1439,11 +1440,19 @@ tr:hover td{background:#fafbfc;cursor:pointer}
   .team-card{padding:14px}
   .team-card-actions .btn{flex:1 1 calc(50% - 8px);justify-content:center}
   .super-admin-summary{align-items:flex-start}
-  .super-admin-modal{width:96vw;max-height:94vh}
-  .super-admin-modal .modal-header,.super-admin-modal .modal-body,.super-admin-modal .modal-footer{padding-left:14px;padding-right:14px}
-  .super-admin-owner-grid,.super-admin-meta-grid,.check-grid,.owner-setup-quick-grid{grid-template-columns:1fr}
-  .super-admin-action-row .btn,.super-admin-modal .modal-footer .btn{width:100%;justify-content:center}
-  .super-admin-section{padding:12px}
+  #super-admin-tenant-modal{align-items:stretch;justify-content:center;padding:0}
+  .super-admin-modal{width:100vw!important;max-width:100vw!important;height:100dvh;max-height:100dvh!important;border-radius:0;display:flex;flex-direction:column;overflow:hidden}
+  .super-admin-modal .modal-header{flex:0 0 auto;padding:12px 14px!important}
+  .super-admin-modal .modal-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:12px!important;-webkit-overflow-scrolling:touch}
+  .super-admin-modal .modal-footer{flex:0 0 auto;padding:10px 14px!important}
+  .super-admin-owner-grid,.super-admin-meta-grid,.admin-module-grid,.check-grid,.owner-setup-quick-grid{grid-template-columns:1fr!important}
+  .super-admin-action-row{display:grid;grid-template-columns:1fr;gap:8px;justify-content:stretch}
+  .super-admin-action-row .btn,.super-admin-modal .modal-footer .btn{width:100%;justify-content:center;min-width:0}
+  .super-admin-module-row .super-admin-action-row{grid-template-columns:1fr 1fr}
+  .super-admin-section{padding:12px;overflow:visible}
+  .module-toggle{align-items:flex-start;gap:8px;padding:11px 12px;min-width:0}
+  .module-toggle-title,.module-toggle-status{overflow-wrap:anywhere}
+  .module-toggle-pill{flex:0 0 auto}
 }
 
 
@@ -1475,12 +1484,13 @@ tr:hover td{background:#fafbfc;cursor:pointer}
   body.crm-shell #sidebar .nav-badge{display:none!important}
   body.crm-shell #sidebar .nav-item.mobile-bottom-visible .nav-label{font-size:0}
   body.crm-shell #sidebar .nav-item.mobile-bottom-visible .nav-label::after{content:attr(data-mobile);font-size:11px;line-height:1.1;display:block;white-space:normal;text-align:center}
-  body.crm-shell #page-business-settings .page-header{gap:8px!important;margin-bottom:10px!important}
-  body.crm-shell #page-business-settings .page-title{font-size:18px!important;line-height:1.25}
-  body.crm-shell #page-business-settings .page-title small{font-size:11px!important;line-height:1.4}
+  body.crm-shell #page-business-settings{min-width:0;max-width:100%;overflow-x:hidden}
+  body.crm-shell #page-business-settings .page-header{gap:8px!important;margin-bottom:10px!important;min-width:0}
+  body.crm-shell #page-business-settings .page-title{font-size:18px!important;line-height:1.25;min-width:0;overflow-wrap:anywhere}
+  body.crm-shell #page-business-settings .page-title small{display:block;margin-right:0;font-size:11px!important;line-height:1.4;overflow-wrap:anywhere}
   body.crm-shell #page-business-settings .page-header .btn{width:100%;justify-content:center;min-height:40px}
-  body.crm-shell #page-business-settings .business-settings-layout{display:block;width:100%;max-width:100%;overflow:visible}
-  body.crm-shell #page-business-settings .business-settings-card{border-radius:14px;overflow:visible;max-width:100%}
+  body.crm-shell #page-business-settings .business-settings-layout{display:block;width:100%;max-width:100%;min-width:0;overflow:visible}
+  body.crm-shell #page-business-settings .business-settings-card{border-radius:14px;overflow:visible;max-width:100%;min-width:0}
   body.crm-shell #page-business-settings .business-settings-head{padding:12px;flex-direction:column;align-items:stretch!important;gap:8px}
   body.crm-shell #page-business-settings .business-settings-title{font-size:14px;line-height:1.35}
   body.crm-shell #page-business-settings .business-settings-sub{font-size:11px;line-height:1.45}
@@ -1488,10 +1498,12 @@ tr:hover td{background:#fafbfc;cursor:pointer}
   body.crm-shell #page-business-settings .business-settings-section{padding:12px;border-radius:12px;margin-bottom:10px;max-width:100%;overflow:hidden}
   body.crm-shell #page-business-settings .business-settings-section-title{font-size:13px;line-height:1.35}
   body.crm-shell #page-business-settings .business-settings-section-sub{font-size:11px;line-height:1.45}
-  body.crm-shell #page-business-settings .business-settings-grid{grid-template-columns:1fr!important;gap:10px}
-  body.crm-shell #page-business-settings .business-logo-upload{display:grid;grid-template-columns:1fr;gap:10px;padding:10px}
+  body.crm-shell #page-business-settings .business-settings-grid{grid-template-columns:1fr!important;gap:10px;min-width:0}
+  body.crm-shell #page-business-settings .form-group{min-width:0}
+  body.crm-shell #page-business-settings .form-input,body.crm-shell #page-business-settings .form-select,body.crm-shell #page-business-settings .form-textarea{min-width:0;max-width:100%}
+  body.crm-shell #page-business-settings .business-logo-upload{display:grid;grid-template-columns:1fr;gap:10px;padding:10px;min-width:0}
   body.crm-shell #page-business-settings .business-logo-preview{width:100%;height:92px}
-  body.crm-shell #page-business-settings .business-logo-actions{display:grid;grid-template-columns:1fr;gap:8px;width:100%}
+  body.crm-shell #page-business-settings .business-logo-actions{display:grid;grid-template-columns:1fr;gap:8px;width:100%;min-width:0}
   body.crm-shell #page-business-settings .business-logo-actions .btn{width:100%;justify-content:center}
   body.crm-shell #page-business-settings .mobile-settings-grid{grid-template-columns:1fr!important;gap:8px}
   body.crm-shell #page-business-settings .mobile-settings-toggle{width:100%;min-width:0;padding:12px;gap:8px;align-items:center}
