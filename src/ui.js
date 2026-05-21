@@ -873,6 +873,22 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 
 /* ===== Final Mobile Responsive Fix ===== */
 @media (max-width: 768px) {
+  html,
+  body {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
+  #app,
+  #main,
+  .page {
+    width: 100% !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+  }
+
   #main {
     margin-right: 0 !important;
     padding: 14px 10px 86px !important;
@@ -886,9 +902,12 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     left: 0 !important;
     width: 100% !important;
     height: 68px !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
     flex-direction: row !important;
     z-index: 9999 !important;
     border-top: 1px solid var(--border) !important;
+    overflow: hidden !important;
   }
 
   .sidebar-logo,
@@ -899,14 +918,32 @@ tr:hover td{background:#fafbfc;cursor:pointer}
   }
 
   #sidebar .nav-item {
-    flex: 1 !important;
+    flex: 1 1 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 20vw !important;
     margin: 0 !important;
-    padding: 7px 4px !important;
+    padding: 7px 2px !important;
     border-radius: 0 !important;
     flex-direction: column !important;
     justify-content: center !important;
     font-size: 11px !important;
     gap: 2px !important;
+    overflow: hidden !important;
+  }
+
+  #sidebar .nav-icon {
+    width: auto !important;
+    max-width: 100% !important;
+    line-height: 1 !important;
+    font-size: 17px !important;
+  }
+
+  #sidebar .nav-label {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: clip !important;
   }
 
   .page-header {
@@ -1505,12 +1542,12 @@ tr:hover td{background:#fafbfc;cursor:pointer}
   body.crm-shell .mobile-menu-btn{width:40px;height:40px;border:1px solid var(--border);border-radius:12px;background:#fff;color:var(--text);font-size:22px;line-height:1;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
   body.crm-shell .mobile-crm-title{font-size:14px;font-weight:900;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100vw - 120px)}
   body.crm-shell #main{padding-top:66px!important;padding-bottom:92px!important}
-  body.crm-shell #sidebar{overflow-x:auto;overflow-y:hidden;justify-content:stretch;box-shadow:0 -2px 14px rgba(15,23,42,.08)}
+  body.crm-shell #sidebar{overflow:hidden!important;justify-content:stretch;box-shadow:0 -2px 14px rgba(15,23,42,.08)}
   body.crm-shell #sidebar .nav-item.mobile-bottom-hidden{display:none!important}
-  body.crm-shell #sidebar .nav-item.mobile-bottom-visible{flex:1 1 0!important;min-width:0;max-width:none}
+  body.crm-shell #sidebar .nav-item.mobile-bottom-visible{display:flex!important;flex:1 1 0!important;width:auto!important;min-width:0!important;max-width:20vw!important}
   body.crm-shell #sidebar .nav-badge{display:none!important}
   body.crm-shell #sidebar .nav-item.mobile-bottom-visible .nav-label{font-size:0}
-  body.crm-shell #sidebar .nav-item.mobile-bottom-visible .nav-label::after{content:attr(data-mobile);font-size:11px;line-height:1.1;display:block;white-space:normal;text-align:center}
+  body.crm-shell #sidebar .nav-item.mobile-bottom-visible .nav-label::after{content:attr(data-mobile);font-size:10px;line-height:1.05;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;text-align:center;overflow:hidden}
   body.crm-shell #page-business-settings{min-width:0;max-width:100%;overflow-x:hidden}
   body.crm-shell #page-business-settings .page-header{gap:8px!important;margin-bottom:10px!important;min-width:0}
   body.crm-shell #page-business-settings .page-title{font-size:18px!important;line-height:1.25;min-width:0;overflow-wrap:anywhere}
@@ -2268,15 +2305,15 @@ function getMobileBottomNavSelection() {
     selected = null;
   }
   if (!Array.isArray(selected) || !selected.length) selected = DEFAULT_MOBILE_BOTTOM_NAV.slice();
-  selected = selected.filter(function(id, idx) { return validIds.indexOf(id) !== -1 && selected.indexOf(id) === idx; });
-  if (!selected.length) selected = DEFAULT_MOBILE_BOTTOM_NAV.filter(function(id) { return validIds.indexOf(id) !== -1; });
+  selected = selected.filter(function(id, idx) { return validIds.indexOf(id) !== -1 && selected.indexOf(id) === idx; }).slice(0, 5);
+  if (!selected.length) selected = DEFAULT_MOBILE_BOTTOM_NAV.filter(function(id) { return validIds.indexOf(id) !== -1; }).slice(0, 5);
   return selected.length ? selected : validIds.slice(0, 5);
 }
 
 function saveMobileBottomNavSelection(selected) {
   var validIds = getAvailableCrmMobileNavItems().map(function(item) { return item.navId; });
-  selected = (selected || []).filter(function(id, idx) { return validIds.indexOf(id) !== -1 && selected.indexOf(id) === idx; });
-  if (!selected.length) selected = DEFAULT_MOBILE_BOTTOM_NAV.filter(function(id) { return validIds.indexOf(id) !== -1; });
+  selected = (selected || []).filter(function(id, idx) { return validIds.indexOf(id) !== -1 && selected.indexOf(id) === idx; }).slice(0, 5);
+  if (!selected.length) selected = DEFAULT_MOBILE_BOTTOM_NAV.filter(function(id) { return validIds.indexOf(id) !== -1; }).slice(0, 5);
   localStorage.setItem(getMobileBottomNavStorageKey(), JSON.stringify(selected));
   applyMobileNavigationPreferences();
 }
@@ -4172,6 +4209,11 @@ function bindMobileNavSettings() {
       if (!selected.length) {
         input.checked = true;
         toast('צריך להשאיר לפחות מודול אחד בתפריט התחתון', 'error');
+        return;
+      }
+      if (selected.length > 5) {
+        input.checked = false;
+        toast('אפשר להציג עד 5 מודולים בתפריט התחתון. השאר זמינים מהתפריט העליון.', 'error');
         return;
       }
       saveMobileBottomNavSelection(selected);
