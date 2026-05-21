@@ -1420,6 +1420,74 @@ export async function handleDashboard(request, env, path) {
   if (moduleState instanceof Response) return moduleState;
 
   const tenantId = tenantCtx.tenant.id;
+
+  if (path === '/api/dashboard/monthly-client-events') {
+    const url = new URL(request.url);
+    const now = new Date();
+    const requestedMonth = String(url.searchParams.get('month') || '').trim();
+    const month = /^\d{4}-\d{2}$/.test(requestedMonth) ? requestedMonth : now.toISOString().slice(0, 7);
+    const start = `${month}-01`;
+    const monthStart = new Date(`${month}-01T00:00:00Z`);
+    const endDate = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 0));
+    const end = endDate.toISOString().slice(0, 10);
+    const today = now.toISOString().slice(0, 10);
+
+    const { results: clients } = await env.DB.prepare(`
+      SELECT
+        COALESCE(NULLIF(TRIM(leads.name), ''), contacts.name, 'ללא שם') AS client_name,
+        COALESCE(NULLIF(TRIM(leads.phone), ''), contacts.phone, '') AS client_phone,
+        MIN(leads.event_date) AS first_event_date,
+        MAX(leads.event_date) AS last_event_date,
+        COUNT(*) AS event_count,
+        SUM(CASE WHEN leads.status = 'closed' THEN 1 ELSE 0 END) AS closed_count,
+        SUM(CASE WHEN leads.event_date >= ? THEN 1 ELSE 0 END) AS future_count,
+        SUM(COALESCE(leads.price, 0)) AS total_amount,
+        SUM(COALESCE(leads.deposit, 0)) AS total_deposit,
+        SUM(COALESCE(leads.price, 0) - COALESCE(leads.deposit, 0)) AS total_balance
+      FROM leads
+      LEFT JOIN contacts ON contacts.id = leads.contact_id AND contacts.tenant_id = leads.tenant_id
+      WHERE leads.tenant_id = ?
+        AND leads.event_date >= ?
+        AND leads.event_date <= ?
+      GROUP BY client_name, client_phone
+      ORDER BY total_amount DESC, event_count DESC, client_name COLLATE NOCASE ASC
+    `).bind(today, tenantId, start, end).all();
+
+    const { results: events } = await env.DB.prepare(`
+      SELECT
+        leads.id,
+        COALESCE(NULLIF(TRIM(leads.name), ''), contacts.name, 'ללא שם') AS client_name,
+        COALESCE(NULLIF(TRIM(leads.phone), ''), contacts.phone, '') AS client_phone,
+        leads.event_date,
+        leads.event_time,
+        leads.event_type,
+        leads.venue,
+        leads.status,
+        COALESCE(leads.price, 0) AS price,
+        COALESCE(leads.deposit, 0) AS deposit,
+        COALESCE(leads.price, 0) - COALESCE(leads.deposit, 0) AS balance
+      FROM leads
+      LEFT JOIN contacts ON contacts.id = leads.contact_id AND contacts.tenant_id = leads.tenant_id
+      WHERE leads.tenant_id = ?
+        AND leads.event_date >= ?
+        AND leads.event_date <= ?
+      ORDER BY leads.event_date ASC, COALESCE(leads.event_time, '') ASC, leads.id ASC
+    `).bind(tenantId, start, end).all();
+
+    const totals = clients.reduce(function(acc, row) {
+      acc.client_count += 1;
+      acc.event_count += Number(row.event_count || 0);
+      acc.closed_count += Number(row.closed_count || 0);
+      acc.future_count += Number(row.future_count || 0);
+      acc.total_amount += Number(row.total_amount || 0);
+      acc.total_deposit += Number(row.total_deposit || 0);
+      acc.total_balance += Number(row.total_balance || 0);
+      return acc;
+    }, { client_count: 0, event_count: 0, closed_count: 0, future_count: 0, total_amount: 0, total_deposit: 0, total_balance: 0 });
+
+    return { month, start, end, today, clients, events, totals };
+  }
+
   const now = new Date();
 
   const y = now.getFullYear();

@@ -548,6 +548,19 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .customer-type-empty{font-size:13px;color:var(--text3);padding:10px 12px;border:1px dashed var(--border);border-radius:var(--radius-sm);background:var(--white)}
 .leads-section-row td{background:#fafbfc;font-size:13px;font-weight:800;color:var(--text);padding:12px 10px;border-top:1px solid var(--border)}
 .dash-subsection-title{padding:10px 12px;font-size:12px;font-weight:800;color:var(--text);background:#fafbfc;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.monthly-client-report-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid var(--border);background:#fafbfc}
+.monthly-client-report-title{font-size:14px;font-weight:900;color:var(--text)}
+.monthly-client-report-sub{font-size:12px;color:var(--text3);line-height:1.5;margin-top:3px}
+.monthly-client-report-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.monthly-client-report-actions .form-input{width:150px;background:#fff}
+.monthly-client-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;padding:12px 16px;border-bottom:1px solid var(--border)}
+.monthly-client-summary-card{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center}
+.monthly-client-summary-value{font-size:17px;font-weight:900;color:var(--accent)}
+.monthly-client-summary-label{font-size:11px;color:var(--text3);margin-top:3px}
+.monthly-client-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.monthly-client-table{min-width:760px}
+.monthly-client-table td,.monthly-client-table th{font-size:12px}
+@media (max-width:768px){.monthly-client-report-head{padding:12px}.monthly-client-report-actions{display:grid;grid-template-columns:1fr;width:100%}.monthly-client-report-actions .form-input,.monthly-client-report-actions .btn{width:100%;justify-content:center}.monthly-client-summary{grid-template-columns:1fr 1fr;padding:10px}.monthly-client-table{min-width:680px}}
 .archive-month-section{margin-bottom:18px}
 .archive-month-title{font-size:16px;font-weight:800;color:var(--text);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)}
 .archive-event-item{border:1px solid var(--border);border-radius:var(--radius-sm);background:#fafbfc;padding:12px;margin-bottom:10px;cursor:pointer}
@@ -1679,6 +1692,18 @@ tr:hover td{background:#fafbfc;cursor:pointer}
           </div>
         </div>
       </div>
+      <div class="dash-section" id="monthly-client-report" style="margin-bottom:18px">
+        <div class="monthly-client-report-head">
+          <div><div class="monthly-client-report-title">📊 סיכום אירועים חודשי לפי לקוח</div><div class="monthly-client-report-sub">מרכז את כל אירועי החודש לפי לקוח, כולל עתידיים, ומאפשר יצוא מהיר לאקסל.</div></div>
+          <div class="monthly-client-report-actions">
+            <input class="form-input" type="month" id="monthly-client-month">
+            <button class="btn btn-secondary" id="monthly-client-refresh">רענן</button>
+            <button class="btn btn-primary" id="monthly-client-export">יצוא לאקסל</button>
+          </div>
+        </div>
+        <div id="monthly-client-summary"><div class="dash-empty">טוען סיכום חודשי...</div></div>
+        <div class="monthly-client-table-wrap"><table class="monthly-client-table"><thead><tr><th>לקוח</th><th>טלפון</th><th>אירועים</th><th>עתידיים</th><th>ראשון</th><th>אחרון</th><th>סה״כ</th><th>יתרה</th></tr></thead><tbody id="monthly-client-body"><tr class="empty-row"><td colspan="8">טוען...</td></tr></tbody></table></div>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:18px">
         <div class="dash-section"><div class="dash-section-title">🔔 מעקב — להתקשר היום</div><div id="dash-followups"><div class="dash-empty">טוען...</div></div></div>
         <div class="dash-section"><div class="dash-section-title">📅 אירועים בתאריכים קרובים</div><div id="dash-upcoming"><div class="dash-empty">טוען...</div></div></div>
@@ -2123,6 +2148,7 @@ var businessSettingsLoading = false;
 var businessSettingsSaving = false;
 var currentCustomerBillingState = null;
 var allLeadsCache = [];
+var monthlyClientReportData = null;
 var calYear, calMonth;
 var currentTenantContext = null;
 
@@ -2580,6 +2606,12 @@ function init() {
   calMonth = now.getMonth();
   var el = document.getElementById('dash-date');
   if (el) el.textContent = now.toLocaleDateString('he-IL', {weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  var monthlyClientMonth = document.getElementById('monthly-client-month');
+  if (monthlyClientMonth) monthlyClientMonth.value = now.getFullYear() + '-' + pad2(now.getMonth() + 1);
+  var monthlyClientRefresh = document.getElementById('monthly-client-refresh');
+  if (monthlyClientRefresh) monthlyClientRefresh.addEventListener('click', loadMonthlyClientReport);
+  var monthlyClientExport = document.getElementById('monthly-client-export');
+  if (monthlyClientExport) monthlyClientExport.addEventListener('click', exportMonthlyClientReportToExcel);
 
   document.getElementById('login-btn').addEventListener('click', doLogin);
   document.getElementById('force-password-btn').addEventListener('click', submitForcedPasswordChange);
@@ -3932,7 +3964,90 @@ function loadDashboard() {
     });
     allLeadsCache = d.allLeads || allLeadsCache;
     renderMiniCal(d.allLeads || []);
+    loadMonthlyClientReport();
   }).catch(function(e) { toast(e.message, 'error'); });
+}
+
+function getMonthlyClientReportMonth() {
+  var input = document.getElementById('monthly-client-month');
+  var now = new Date();
+  var fallback = now.getFullYear() + '-' + pad2(now.getMonth() + 1);
+  return input && input.value ? input.value : fallback;
+}
+
+function loadMonthlyClientReport() {
+  var body = document.getElementById('monthly-client-body');
+  var summary = document.getElementById('monthly-client-summary');
+  if (!body || !summary) return;
+  var month = getMonthlyClientReportMonth();
+  body.innerHTML = '<tr class="empty-row"><td colspan="8">טוען...</td></tr>';
+  summary.innerHTML = '<div class="dash-empty">טוען סיכום חודשי...</div>';
+  apiCall('GET', '/api/dashboard/monthly-client-events?month=' + encodeURIComponent(month)).then(function(data) {
+    monthlyClientReportData = data;
+    renderMonthlyClientReport(data);
+  }).catch(function(err) {
+    body.innerHTML = '<tr class="empty-row"><td colspan="8">שגיאה בטעינת הסיכום</td></tr>';
+    summary.innerHTML = '<div class="dash-empty">' + escapeHtml(err.message || 'שגיאה בטעינת הסיכום') + '</div>';
+  });
+}
+
+function renderMonthlyClientReport(data) {
+  var body = document.getElementById('monthly-client-body');
+  var summary = document.getElementById('monthly-client-summary');
+  if (!body || !summary) return;
+  var totals = data.totals || {};
+  var clients = data.clients || [];
+  summary.innerHTML = '<div class="monthly-client-summary">' +
+    '<div class="monthly-client-summary-card"><div class="monthly-client-summary-value">' + Number(totals.client_count || 0) + '</div><div class="monthly-client-summary-label">לקוחות</div></div>' +
+    '<div class="monthly-client-summary-card"><div class="monthly-client-summary-value">' + Number(totals.event_count || 0) + '</div><div class="monthly-client-summary-label">אירועים</div></div>' +
+    '<div class="monthly-client-summary-card"><div class="monthly-client-summary-value">' + Number(totals.future_count || 0) + '</div><div class="monthly-client-summary-label">עתידיים</div></div>' +
+    '<div class="monthly-client-summary-card"><div class="monthly-client-summary-value">₪' + fmtMoney(totals.total_amount || 0) + '</div><div class="monthly-client-summary-label">סה״כ לחיוב</div></div>' +
+  '</div>';
+  if (!clients.length) {
+    body.innerHTML = '<tr class="empty-row"><td colspan="8">אין אירועים בחודש הנבחר</td></tr>';
+    return;
+  }
+  body.innerHTML = clients.map(function(row) {
+    return '<tr>' +
+      '<td class="bold">' + escapeHtml(row.client_name || 'ללא שם') + '</td>' +
+      '<td>' + escapeHtml(row.client_phone || '—') + '</td>' +
+      '<td>' + Number(row.event_count || 0) + '</td>' +
+      '<td>' + Number(row.future_count || 0) + '</td>' +
+      '<td>' + escapeHtml(formatDate(row.first_event_date) || '—') + '</td>' +
+      '<td>' + escapeHtml(formatDate(row.last_event_date) || '—') + '</td>' +
+      '<td class="bold">₪' + fmtMoney(row.total_amount || 0) + '</td>' +
+      '<td>₪' + fmtMoney(row.total_balance || 0) + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function excelCell(value) {
+  value = value === undefined || value === null ? '' : String(value);
+  return '<td style="border:1px solid #ddd;padding:6px">' + escapeHtml(value) + '</td>';
+}
+
+function exportMonthlyClientReportToExcel() {
+  var data = monthlyClientReportData;
+  if (!data) { loadMonthlyClientReport(); toast('טוען נתונים ליצוא, נסה שוב בעוד רגע', 'error'); return; }
+  var totals = data.totals || {};
+  var clients = data.clients || [];
+  var events = data.events || [];
+  var title = 'סיכום אירועים חודשי לפי לקוח - ' + (data.month || getMonthlyClientReportMonth());
+  var html = '<html><head><meta charset="UTF-8"></head><body dir="rtl">' +
+    '<h2>' + escapeHtml(title) + '</h2>' +
+    '<p>לקוחות: ' + Number(totals.client_count || 0) + ' | אירועים: ' + Number(totals.event_count || 0) + ' | עתידיים: ' + Number(totals.future_count || 0) + ' | סה״כ: ₪' + fmtMoney(totals.total_amount || 0) + '</p>' +
+    '<h3>סיכום לפי לקוח</h3><table><tr><th>לקוח</th><th>טלפון</th><th>אירועים</th><th>סגורים</th><th>עתידיים</th><th>אירוע ראשון</th><th>אירוע אחרון</th><th>סה״כ</th><th>מקדמות</th><th>יתרה</th></tr>' +
+    clients.map(function(row) { return '<tr>' + [row.client_name, row.client_phone, row.event_count, row.closed_count, row.future_count, row.first_event_date, row.last_event_date, row.total_amount, row.total_deposit, row.total_balance].map(excelCell).join('') + '</tr>'; }).join('') +
+    '</table><h3>פירוט אירועים</h3><table><tr><th>תאריך</th><th>שעה</th><th>לקוח</th><th>טלפון</th><th>סוג אירוע</th><th>מקום</th><th>סטטוס</th><th>סכום</th><th>מקדמה</th><th>יתרה</th></tr>' +
+    events.map(function(row) { return '<tr>' + [row.event_date, row.event_time, row.client_name, row.client_phone, row.event_type, row.venue, row.status, row.price, row.deposit, row.balance].map(excelCell).join('') + '</tr>'; }).join('') +
+    '</table></body></html>';
+  var blob = new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'monthly-client-events-' + (data.month || getMonthlyClientReportMonth()) + '.xls';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function() { URL.revokeObjectURL(a.href); a.remove(); }, 0);
 }
 
 function renderMiniCal(leads) {
