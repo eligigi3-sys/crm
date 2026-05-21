@@ -165,16 +165,43 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .business-logo-preview{width:110px;height:70px;border:1px solid var(--border);border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;color:var(--text3);font-size:12px;font-weight:800}
 .business-logo-preview img{max-width:100%;max-height:100%;object-fit:contain;display:block}
 .business-logo-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.business-logo-file-input{position:absolute;left:-9999px;width:1px;height:1px;opacity:.01}
+.business-logo-file-input{position:absolute;width:1px;height:1px;opacity:.01;clip:rect(0 0 0 0);clip-path:inset(50%);overflow:hidden;white-space:nowrap}
 .business-logo-help{font-size:12px;color:var(--text3);line-height:1.5;flex-basis:100%}
 .business-settings-permission{padding:12px 14px;border-radius:12px;background:var(--orange-light);color:var(--orange);font-size:13px;font-weight:700;margin-bottom:14px;line-height:1.5}
 .business-settings-footer{position:sticky;bottom:0;background:rgba(255,255,255,0.96);border-top:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .business-settings-status{font-size:12px;color:var(--text3)}
 @media (max-width:760px){
+  #page-business-settings{min-width:0;max-width:100%;overflow-x:hidden}
+  #page-business-settings .page-header{gap:8px!important;margin-bottom:10px!important;min-width:0}
+  #page-business-settings .page-title{font-size:18px!important;line-height:1.25;min-width:0;overflow-wrap:anywhere}
+  #page-business-settings .page-title small{display:block;margin-right:0;font-size:11px!important;line-height:1.4;overflow-wrap:anywhere}
+  #page-business-settings .page-header .btn{width:100%;justify-content:center;min-height:40px}
+  #page-business-settings .business-settings-layout{display:block;width:100%;max-width:100%;min-width:0;overflow:visible}
+  #page-business-settings .business-settings-card{border-radius:14px;overflow:visible;max-width:100%;min-width:0}
+  #page-business-settings .business-settings-head{padding:12px;flex-direction:column;align-items:stretch!important;gap:8px}
+  #page-business-settings .business-settings-title{font-size:14px;line-height:1.35}
+  #page-business-settings .business-settings-sub{font-size:11px;line-height:1.45}
+  #page-business-settings .business-settings-body{padding:10px}
+  #page-business-settings .business-settings-section{padding:12px;border-radius:12px;margin-bottom:10px;max-width:100%;overflow:hidden}
+  #page-business-settings .business-settings-section-title{font-size:13px;line-height:1.35}
+  #page-business-settings .business-settings-section-sub{font-size:11px;line-height:1.45}
   .business-settings-grid{grid-template-columns:1fr}
+  #page-business-settings .business-settings-grid{grid-template-columns:1fr!important;gap:10px;min-width:0}
+  #page-business-settings .form-group{min-width:0}
+  #page-business-settings .form-input,#page-business-settings .form-select,#page-business-settings .form-textarea{min-width:0;max-width:100%}
+  #page-business-settings .business-logo-upload{display:grid;grid-template-columns:1fr;gap:10px;padding:10px;min-width:0}
+  #page-business-settings .business-logo-preview{width:100%;height:92px}
+  #page-business-settings .business-logo-actions{display:grid;grid-template-columns:1fr;gap:8px;width:100%;min-width:0}
+  #page-business-settings .business-logo-actions .btn{width:100%;justify-content:center}
+  #page-business-settings .mobile-settings-grid{grid-template-columns:1fr!important;gap:8px}
+  #page-business-settings .mobile-settings-toggle{width:100%;min-width:0;padding:12px;gap:8px;align-items:center}
+  #page-business-settings .mobile-settings-toggle span{min-width:0;overflow-wrap:anywhere;line-height:1.25}
   .business-settings-head{align-items:stretch}
   .business-settings-footer{margin:0;align-items:stretch;flex-direction:column}
   .business-settings-footer .btn{width:100%;justify-content:center}
+  #page-business-settings .business-settings-footer{position:sticky;bottom:68px;z-index:10005;padding:10px 12px;align-items:stretch;flex-direction:column;background:rgba(255,255,255,.98);box-shadow:0 -4px 14px rgba(15,23,42,.08)}
+  #page-business-settings .business-settings-footer .btn{width:100%;justify-content:center;min-height:42px}
+  #page-business-settings .business-settings-status{text-align:center;font-size:11px}
 }
 
 .sales-doc-actions{display:flex;gap:8px;flex-wrap:wrap}
