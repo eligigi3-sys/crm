@@ -6444,7 +6444,7 @@ function checkGoogleStatus() {
     el.style.display = 'block';
     el.style.background = '#fef2f2';
     el.style.border = '1px solid #fecaca';
-    el.innerHTML = '<span style="color:#dc2626">שגיאה בבדיקת Google Calendar</span>';
+    el.innerHTML = '<span style="color:#dc2626">שגיאה בבדיקת Google Calendar</span>' + (e && e.message ? '<div style="font-size:11px;margin-top:4px">' + escapeHtml(e.message) + '</div>' : '');
   });
 }
 

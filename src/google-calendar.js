@@ -2,7 +2,7 @@
 // google-calendar.js - חיבור ל-Google Calendar
 // ============================================================
 
-import { requireTenantContext, assertTenantModuleEnabled, assertTenantRole } from './auth.js';
+import { requireAuthUser, requireTenantContext, assertTenantModuleEnabled, assertTenantRole } from './auth.js';
 
 const REDIRECT_URI = 'https://crm.comics-events.co.il/auth/google/callback';
 const SCOPES = 'https://www.googleapis.com/auth/calendar.events';
@@ -224,6 +224,26 @@ export async function deleteEventFromCalendar(googleEventId, env) {
 
 // Handler לכל ה-routes של Google
 export async function handleGoogle(request, env, path) {
+  // GET /api/google/status - בדיקת סטטוס חיבור בלבד.
+  // חשוב: לא דורש tenant context כדי שלא יישבר בכניסה ל-CRM העסקי או במעבר בין shell-ים.
+  if (path === '/api/google/status') {
+    const user = await requireAuthUser(request, env);
+    if (user instanceof Response) return user;
+
+    const stored = await env.DB.prepare(
+      "SELECT value FROM app_settings WHERE key = 'google_tokens'"
+    ).first();
+
+    if (!stored) return { connected: false, needs_reconnect: false };
+
+    try {
+      await getAccessToken(env);
+      return { connected: true, needs_reconnect: false };
+    } catch (e) {
+      return { connected: false, needs_reconnect: true, error: e.message };
+    }
+  }
+
   const tenantCtx = await requireTenantContext(request, env);
   if (tenantCtx instanceof Response) return tenantCtx;
 
@@ -238,22 +258,6 @@ export async function handleGoogle(request, env, path) {
     if (roleState instanceof Response) return roleState;
     const url = getAuthUrl(env);
     return { url };
-  }
-
-  // GET /api/google/status - בדוק אם מחובר וה-token תקין
-  if (path === '/api/google/status') {
-    const stored = await env.DB.prepare(
-      "SELECT value FROM app_settings WHERE key = 'google_tokens'"
-    ).first();
-
-    if (!stored) return { connected: false, needs_reconnect: false };
-
-    try {
-      await getAccessToken(env);
-      return { connected: true, needs_reconnect: false };
-    } catch (e) {
-      return { connected: false, needs_reconnect: true, error: e.message };
-    }
   }
 
   // POST /api/google/sync/:id - סנכרן ליד ספציפי
