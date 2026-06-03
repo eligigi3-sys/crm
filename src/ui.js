@@ -5322,7 +5322,6 @@ function renderSalesDocumentPreview() {
     '<div class="sales-doc-preview-top"><div>' +
       '<div class="sales-doc-preview-header-business"><div class="sales-doc-preview-business-name">' + escapeHtml(businessName) + '</div>' + businessDetails + '</div>' +
       '<div class="sales-doc-preview-title">' + escapeHtml(getSalesDocumentTypeLabel(doc.document_type)) + '</div>' +
-      '<div class="sales-doc-preview-number">' + escapeHtml(doc.document_number || 'טיוטה חדשה') + '</div>' +
       '<div class="sales-doc-preview-meta">' + metaHtml + '</div>' +
     '</div><div class="sales-doc-preview-business">' +
       (doc.business_logo_url_snapshot ? '<img class="sales-doc-preview-logo" alt="לוגו" src="' + escapeHtml(doc.business_logo_url_snapshot) + '">' : '') +
