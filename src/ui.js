@@ -6425,16 +6425,27 @@ function checkGoogleStatus() {
         if (!confirm('זה יסנכרן מחדש את כל האירועים מהיום והלאה ליומן Google. להמשיך?')) return;
         toast('מסנכרן מחדש אירועים מהיום והלאה ל-Google Calendar...', 'success');
         apiCall('POST', '/api/google/resync-future').then(function(result) {
-          toast('הסתיים: סונכרנו ' + (result.synced || 0) + ' מתוך ' + (result.total || 0) + ', נכשלו ' + (result.failed || 0), result.failed ? 'error' : 'success');
+          var firstError = result.errors && result.errors.length ? ' — ' + result.errors[0].name + ': ' + result.errors[0].error : '';
+          toast('הסתיים: סונכרנו ' + (result.synced || 0) + ' מתוך ' + (result.total || 0) + ', נכשלו ' + (result.failed || 0) + firstError, result.failed ? 'error' : 'success');
         }).catch(function(e) { toast('שגיאה: ' + e.message, 'error'); });
       };
     } else {
       el.style.display = 'block';
-      el.style.background = '#eff6ff';
-      el.style.border = '1px solid #bfdbfe';
-      el.innerHTML = '<span style="color:#2563eb">📅 Google Calendar לא מחובר</span><br><button onclick="connectGoogle()" style="margin-top:6px;font-size:11px;background:var(--blue);color:white;border:none;border-radius:4px;padding:4px 8px;cursor:pointer">חבר יומן</button>';
+      el.style.background = data.needs_reconnect ? '#fef3c7' : '#eff6ff';
+      el.style.border = data.needs_reconnect ? '1px solid #f59e0b' : '1px solid #bfdbfe';
+      var message = data.needs_reconnect ? '⚠️ יש להתחבר מחדש ל-Google Calendar' : '📅 Google Calendar לא מחובר';
+      var detail = data.error ? '<div style="font-size:11px;color:#92400e;margin-top:4px">' + escapeHtml(data.error) + '</div>' : '';
+      el.innerHTML = '<span style="color:' + (data.needs_reconnect ? '#92400e' : '#2563eb') + '">' + message + '</span>' + detail + '<br><button onclick="connectGoogle()" style="margin-top:6px;font-size:11px;background:var(--blue);color:white;border:none;border-radius:4px;padding:4px 8px;cursor:pointer">חבר יומן</button>';
+      document.getElementById('drawer-sync-btn').style.display = 'none';
     }
-  }).catch(function() {});
+  }).catch(function(e) {
+    var el = document.getElementById('gcal-status');
+    if (!el) return;
+    el.style.display = 'block';
+    el.style.background = '#fef2f2';
+    el.style.border = '1px solid #fecaca';
+    el.innerHTML = '<span style="color:#dc2626">שגיאה בבדיקת Google Calendar</span>';
+  });
 }
 
 function connectGoogle() {
@@ -6454,7 +6465,8 @@ function disconnectGoogle() {
 function syncToGoogle(id) {
   toast('מסנכרן ל-Google Calendar...', 'success');
   apiCall('POST', '/api/google/sync/' + id).then(function(data) {
-    if (data.skipped) { toast('ניתן לסנכרן רק אירועים סגורים עם תאריך', 'error'); }
+    if (data.skipped) { toast('ניתן לסנכרן רק אירועים עם תאריך', 'error'); }
+    else if (data.deleted) { toast('האירוע הוסר מ-Google Calendar ✓', 'success'); }
     else { toast('האירוע סונכרן ל-Google Calendar! ✓', 'success'); }
   }).catch(function(e) { toast('שגיאה: ' + e.message, 'error'); });
 }

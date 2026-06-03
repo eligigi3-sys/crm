@@ -2,6 +2,8 @@
 // google-calendar.js - חיבור ל-Google Calendar
 // ============================================================
 
+import { requireTenantContext, assertTenantModuleEnabled, assertTenantRole } from './auth.js';
+
 const REDIRECT_URI = 'https://crm.comics-events.co.il/auth/google/callback';
 const SCOPES = 'https://www.googleapis.com/auth/calendar.events';
 
@@ -49,7 +51,14 @@ export async function refreshToken(refreshTok, env) {
     }),
   });
   const data = await res.json();
-  if (data.error) throw new Error(data.error_description || data.error);
+  if (data.error) {
+    const message = data.error === 'invalid_grant'
+      ? 'החיבור ל-Google פג או בוטל — יש להתחבר מחדש ליומן'
+      : (data.error_description || data.error);
+    const err = new Error(message);
+    err.googleError = data.error;
+    throw err;
+  }
   return data.access_token;
 }
 
@@ -74,6 +83,27 @@ async function getAccessToken(env) {
   }
   
   return tokens.access_token;
+}
+
+function shouldCreateReplacementEvent(status) {
+  return status === 404 || status === 410;
+}
+
+async function persistGoogleEventId(lead, eventId, env) {
+  if (lead && lead.tenant_id) {
+    await env.DB.prepare(
+      'UPDATE leads SET google_event_id = ? WHERE id = ? AND tenant_id = ?'
+    ).bind(eventId, lead.id, lead.tenant_id).run();
+    return;
+  }
+
+  await env.DB.prepare(
+    'UPDATE leads SET google_event_id = ? WHERE id = ?'
+  ).bind(eventId, lead.id).run();
+}
+
+async function clearGoogleEventId(lead, env) {
+  await persistGoogleEventId(lead, null, env);
 }
 
 // יצירת/עדכון אירוע ביומן Google
@@ -128,7 +158,22 @@ export async function syncEventToCalendar(lead, env) {
   // בדוק אם כבר יש Google Event ID ל-lead הזה
   const existingId = lead.google_event_id;
   
+  const createEvent = function() {
+    return fetch(
+      'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(eventBody),
+      }
+    );
+  };
+
   let res;
+  let replacedMissingEvent = false;
   if (existingId) {
     // עדכן אירוע קיים
     res = await fetch(
@@ -142,80 +187,110 @@ export async function syncEventToCalendar(lead, env) {
         body: JSON.stringify(eventBody),
       }
     );
+
+    if (shouldCreateReplacementEvent(res.status)) {
+      replacedMissingEvent = true;
+      res = await createEvent();
+    }
   } else {
     // צור אירוע חדש
-    res = await fetch(
-      'https://www.googleapis.com/calendar/v3/calendars/primary/events',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(eventBody),
-      }
-    );
+    res = await createEvent();
   }
 
   const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
+  if (data.error) throw new Error(data.error.message || 'Google Calendar sync failed');
   
   // שמור את Google Event ID ב-lead
-  await env.DB.prepare(
-    'UPDATE leads SET google_event_id = ? WHERE id = ?'
-  ).bind(data.id, lead.id).run();
+  await persistGoogleEventId(lead, data.id, env);
 
-  return { success: true, eventId: data.id, eventUrl: data.htmlLink };
+  return { success: true, eventId: data.id, eventUrl: data.htmlLink, replacedMissingEvent };
 }
 
 // מחיקת אירוע מהיומן
 export async function deleteEventFromCalendar(googleEventId, env) {
   if (!googleEventId) return { skipped: true };
   const accessToken = await getAccessToken(env);
-  await fetch(
+  const res = await fetch(
     `https://www.googleapis.com/calendar/v3/calendars/primary/events/${googleEventId}`,
     { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } }
   );
+  if (!res.ok && !shouldCreateReplacementEvent(res.status)) {
+    let data = {};
+    try { data = await res.json(); } catch (e) {}
+    throw new Error(data && data.error && data.error.message ? data.error.message : 'Google Calendar delete failed');
+  }
   return { success: true };
 }
 
 // Handler לכל ה-routes של Google
 export async function handleGoogle(request, env, path) {
+  const tenantCtx = await requireTenantContext(request, env);
+  if (tenantCtx instanceof Response) return tenantCtx;
+
+  const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'leads');
+  if (moduleState instanceof Response) return moduleState;
+
+  const tenantId = tenantCtx.tenant.id;
+
   // GET /api/google/auth-url - קבל קישור לחיבור
   if (path === '/api/google/auth-url') {
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
     const url = getAuthUrl(env);
     return { url };
   }
 
-  // GET /api/google/status - בדוק אם מחובר
+  // GET /api/google/status - בדוק אם מחובר וה-token תקין
   if (path === '/api/google/status') {
     const stored = await env.DB.prepare(
       "SELECT value FROM app_settings WHERE key = 'google_tokens'"
     ).first();
-    return { connected: !!stored };
+
+    if (!stored) return { connected: false, needs_reconnect: false };
+
+    try {
+      await getAccessToken(env);
+      return { connected: true, needs_reconnect: false };
+    } catch (e) {
+      return { connected: false, needs_reconnect: true, error: e.message };
+    }
   }
 
   // POST /api/google/sync/:id - סנכרן ליד ספציפי
   const syncMatch = path.match(/^\/api\/google\/sync\/(\d+)$/);
   if (syncMatch && request.method === 'POST') {
-    const lead = await env.DB.prepare('SELECT * FROM leads WHERE id = ?').bind(syncMatch[1]).first();
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
+
+    const lead = await env.DB.prepare('SELECT * FROM leads WHERE id = ? AND tenant_id = ?').bind(syncMatch[1], tenantId).first();
     if (!lead) throw new Error('ליד לא נמצא');
+    if (lead.status === 'cancelled') {
+      if (lead.google_event_id) {
+        await deleteEventFromCalendar(lead.google_event_id, env);
+        await clearGoogleEventId(lead, env);
+      }
+      return { success: true, deleted: true };
+    }
     const result = await syncEventToCalendar(lead, env);
     return result;
   }
 
-  // POST /api/google/sync-backlog - סנכרון אירועים קיימים
+  // POST /api/google/sync-backlog - סנכרון אירועים קיימים שעדיין לא סונכרנו
   if (path === '/api/google/sync-backlog' && request.method === 'POST') {
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
+
     const leads = await env.DB.prepare(
       `SELECT *
        FROM leads
-       WHERE status = 'closed'
+       WHERE tenant_id = ?
+         AND status != 'cancelled'
          AND event_date IS NOT NULL
          AND TRIM(event_date) != ''
          AND (google_event_id IS NULL OR TRIM(google_event_id) = '')
        ORDER BY event_date ASC, id ASC
        LIMIT 50`
-    ).all();
+    ).bind(tenantId).all();
 
     const items = leads.results || [];
     let synced = 0;
@@ -235,11 +310,14 @@ export async function handleGoogle(request, env, path) {
       }
     }
 
-    return { success: true, synced, skipped, failed, errors };
+    return { success: true, total: items.length, synced, skipped, failed, errors };
   }
 
-  // POST /api/google/resync-future - סנכרון מחדש של אירועים מהיום והלאה
+  // POST /api/google/resync-future - סנכרון/עדכון אירועים מהיום והלאה בלי לאפס IDs קיימים
   if (path === '/api/google/resync-future' && request.method === 'POST') {
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
+
     const parts = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Jerusalem',
       year: 'numeric',
@@ -251,30 +329,30 @@ export async function handleGoogle(request, env, path) {
     const leads = await env.DB.prepare(
       `SELECT *
        FROM leads
-       WHERE event_date IS NOT NULL
+       WHERE tenant_id = ?
+         AND status != 'cancelled'
+         AND event_date IS NOT NULL
          AND TRIM(event_date) != ''
          AND event_date >= ?
        ORDER BY event_date ASC, id ASC
        LIMIT 100`
-    ).bind(today).all();
+    ).bind(tenantId, today).all();
 
     const items = leads.results || [];
-    const ids = items.map(lead => lead.id);
     let synced = 0;
+    let skipped = 0;
     let failed = 0;
+    let replaced = 0;
     const errors = [];
-
-    if (ids.length) {
-      const placeholders = ids.map(function() { return '?'; }).join(', ');
-      await env.DB.prepare(
-        `UPDATE leads SET google_event_id = NULL WHERE id IN (${placeholders})`
-      ).bind(...ids).run();
-    }
 
     for (const lead of items) {
       try {
-        await syncEventToCalendar({ ...lead, google_event_id: null }, env);
-        synced++;
+        const result = await syncEventToCalendar(lead, env);
+        if (result && result.skipped) skipped++;
+        else {
+          synced++;
+          if (result && result.replacedMissingEvent) replaced++;
+        }
       } catch (e) {
         failed++;
         errors.push({ id: lead.id, name: lead.name || '', error: e.message });
@@ -282,11 +360,13 @@ export async function handleGoogle(request, env, path) {
       }
     }
 
-    return { success: true, total: items.length, synced, failed, errors };
+    return { success: true, total: items.length, synced, skipped, failed, replaced, errors };
   }
 
   // POST /api/google/disconnect - התנתק
   if (path === '/api/google/disconnect' && request.method === 'POST') {
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin']);
+    if (roleState instanceof Response) return roleState;
     await env.DB.prepare("DELETE FROM app_settings WHERE key = 'google_tokens'").run();
     return { success: true };
   }

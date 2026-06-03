@@ -1627,19 +1627,21 @@ export async function handleDashboard(request, env, path) {
 }
 
 export async function autoSyncToCalendar(leadId, newStatus, env) {
-  if (newStatus !== 'closed') return;
+  const { syncEventToCalendar, deleteEventFromCalendar } = await import('./google-calendar.js');
 
-  try {
-    const { syncEventToCalendar } = await import('./google-calendar.js');
+  const lead = await env.DB.prepare(
+    'SELECT * FROM leads WHERE id = ?'
+  ).bind(leadId).first();
 
-    const lead = await env.DB.prepare(
-      'SELECT * FROM leads WHERE id = ?'
-    ).bind(leadId).first();
+  if (!lead) return;
 
-    if (lead && lead.event_date) {
-      await syncEventToCalendar(lead, env);
+  if (newStatus === 'cancelled' || !lead.event_date) {
+    if (lead.google_event_id) {
+      await deleteEventFromCalendar(lead.google_event_id, env);
+      await env.DB.prepare('UPDATE leads SET google_event_id = NULL WHERE id = ?').bind(leadId).run();
     }
-  } catch (e) {
-    console.log('Google sync skipped:', e.message);
+    return;
   }
+
+  await syncEventToCalendar(lead, env);
 }
