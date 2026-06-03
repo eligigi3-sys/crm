@@ -317,30 +317,36 @@ export async function handleGoogle(request, env, path) {
     return { success: true, total: items.length, synced, skipped, failed, errors };
   }
 
-  // POST /api/google/resync-future - סנכרון/עדכון אירועים מהיום והלאה בלי לאפס IDs קיימים
-  if (path === '/api/google/resync-future' && request.method === 'POST') {
+  async function resyncLeadsToCalendar(label, includePast) {
     const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
     if (roleState instanceof Response) return roleState;
 
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Jerusalem',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).formatToParts(new Date());
-    const today = parts.filter(p => p.type !== 'literal').map(p => p.value).join('-');
-
-    const leads = await env.DB.prepare(
-      `SELECT *
+    let query = `SELECT *
        FROM leads
        WHERE tenant_id = ?
          AND status != 'cancelled'
          AND event_date IS NOT NULL
-         AND TRIM(event_date) != ''
-         AND event_date >= ?
+         AND TRIM(event_date) != ''`;
+    const params = [tenantId];
+
+    if (!includePast) {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Jerusalem',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).formatToParts(new Date());
+      const today = parts.filter(p => p.type !== 'literal').map(p => p.value).join('-');
+      query += `
+         AND event_date >= ?`;
+      params.push(today);
+    }
+
+    query += `
        ORDER BY event_date ASC, id ASC
-       LIMIT 100`
-    ).bind(tenantId, today).all();
+       LIMIT 200`;
+
+    const leads = await env.DB.prepare(query).bind(...params).all();
 
     const items = leads.results || [];
     let synced = 0;
@@ -360,11 +366,21 @@ export async function handleGoogle(request, env, path) {
       } catch (e) {
         failed++;
         errors.push({ id: lead.id, name: lead.name || '', error: e.message });
-        console.log('Google future resync failed for lead', lead.id, e.message);
+        console.log('Google ' + label + ' resync failed for lead', lead.id, e.message);
       }
     }
 
-    return { success: true, total: items.length, synced, skipped, failed, replaced, errors };
+    return { success: true, mode: label, total: items.length, synced, skipped, failed, replaced, errors };
+  }
+
+  // POST /api/google/resync-future - סנכרון/עדכון אירועים מהיום והלאה בלי לאפס IDs קיימים
+  if (path === '/api/google/resync-future' && request.method === 'POST') {
+    return resyncLeadsToCalendar('future', false);
+  }
+
+  // POST /api/google/resync-all - סנכרון/עדכון כל האירועים הקיימים בלי לאפס IDs קיימים
+  if (path === '/api/google/resync-all' && request.method === 'POST') {
+    return resyncLeadsToCalendar('all', true);
   }
 
   // POST /api/google/disconnect - התנתק

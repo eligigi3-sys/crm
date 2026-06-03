@@ -6419,12 +6419,12 @@ function checkGoogleStatus() {
       el.style.display = 'block';
       el.style.background = '#f0fdf4';
       el.style.border = '1px solid #bbf7d0';
-      el.innerHTML = '<span style="color:#16a34a;font-weight:600">✓ Google Calendar מחובר</span><br><div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap"><button onclick="disconnectGoogle()" style="font-size:11px;background:none;border:none;color:#dc2626;cursor:pointer">נתק חיבור</button><button id="sync-google-backlog-btn" style="font-size:11px;background:var(--blue);color:white;border:none;border-radius:4px;padding:4px 8px;cursor:pointer">סנכרן את כל האירועים עכשיו</button></div>';
+      el.innerHTML = '<span style="color:#16a34a;font-weight:600">✓ Google Calendar מחובר</span><br><div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap"><button onclick="disconnectGoogle()" style="font-size:11px;background:none;border:none;color:#dc2626;cursor:pointer">נתק חיבור</button><button id="sync-google-backlog-btn" style="font-size:11px;background:var(--blue);color:white;border:none;border-radius:4px;padding:4px 8px;cursor:pointer">סנכרן את כל האירועים לגוגל</button></div>';
       document.getElementById('drawer-sync-btn').style.display = '';
       document.getElementById('sync-google-backlog-btn').onclick = function() {
-        if (!confirm('זה יסנכרן מחדש את כל האירועים מהיום והלאה ליומן Google. להמשיך?')) return;
-        toast('מסנכרן מחדש אירועים מהיום והלאה ל-Google Calendar...', 'success');
-        apiCall('POST', '/api/google/resync-future').then(function(result) {
+        if (!confirm('זה יסנכרן/יעדכן את כל האירועים הקיימים ב-CRM ליומן Google, כולל אירועי עבר ועתיד. להמשיך?')) return;
+        toast('מסנכרן את כל האירועים ל-Google Calendar...', 'success');
+        apiCall('POST', '/api/google/resync-all').then(function(result) {
           var firstError = result.errors && result.errors.length ? ' — ' + result.errors[0].name + ': ' + result.errors[0].error : '';
           toast('הסתיים: סונכרנו ' + (result.synced || 0) + ' מתוך ' + (result.total || 0) + ', נכשלו ' + (result.failed || 0) + firstError, result.failed ? 'error' : 'success');
         }).catch(function(e) { toast('שגיאה: ' + e.message, 'error'); });
