@@ -254,8 +254,9 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .sales-doc-preview-a4{aspect-ratio:210/297;width:100%;max-width:794px}
 .sales-doc-preview-top{display:grid;grid-template-columns:1.1fr 0.9fr;gap:18px;border-bottom:3px solid var(--doc-primary);padding-bottom:16px;margin-bottom:18px;align-items:start;direction:rtl}
 .sales-doc-preview-top>div{direction:rtl}
-.sales-doc-preview-logo{width:110px;height:86px;border:1px solid #e5e7eb;border-radius:14px;object-fit:contain;background:#fff;padding:6px;margin:0 0 10px auto;display:block}
-.sales-doc-preview-logo-placeholder{width:110px;height:86px;border:1px dashed #cbd5e1;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px;margin:0 0 10px auto;background:#f8fafc}
+.sales-doc-preview-logo{max-width:128px;max-height:92px;width:auto;height:auto;object-fit:contain;background:transparent;padding:0;margin:0 auto 10px 0;display:block;border:0;border-radius:0}
+.sales-doc-preview-logo-placeholder{display:none}
+.sales-doc-preview-header-business{font-size:13px;color:#334155;line-height:1.7;margin-bottom:10px}
 .sales-doc-preview-title{font-size:26px;font-weight:900;color:var(--doc-primary);letter-spacing:-0.4px}
 .sales-doc-preview-number{font-size:13px;color:#64748b;font-weight:700;margin-top:4px}
 .sales-doc-preview-meta{font-size:12px;color:#475569;line-height:1.7;margin-top:8px}
@@ -5074,7 +5075,7 @@ function renderSalesDocumentEditor() {
   body.innerHTML = (locked ? '<div class="sales-doc-locked-note">מסמך זה אינו טיוטה פתוחה ולכן אינו ניתן לעריכה.</div>' : '') +
     '<div class="sales-doc-section"><div class="sales-doc-section-title">פרטי מסמך</div><div class="sales-doc-grid-2">' +
       salesDocumentInput('issue_date', 'תאריך מסמך', doc.issue_date, 'date', locked) +
-      salesDocumentInput(doc.document_type === 'invoice' ? 'due_date' : 'valid_until', doc.document_type === 'invoice' ? 'תאריך לתשלום' : 'בתוקף עד', doc.document_type === 'invoice' ? doc.due_date : doc.valid_until, 'date', locked) +
+      (doc.document_type === 'invoice' ? salesDocumentInput('due_date', 'תאריך לתשלום', doc.due_date, 'date', locked) : '') +
     '</div></div>' +
     '<div class="sales-doc-section"><div class="sales-doc-section-title">לקוח וחיוב</div>' +
       renderSalesDocumentBillingGroup('לקוח', 'קישור ללקוח קיים טוען ברירות מחדל בלבד. ניתן עדיין לבצע התאמות ידניות למסמך.', '<div class="form-group" style="margin-bottom:0"><label class="form-label">בחר לקוח קיים</label><select id="sales-document-contact-select" class="form-input"' + (locked ? ' disabled' : '') + '><option value="">' + (salesDocumentContactsLoading ? 'טוען לקוחות...' : 'ללא קישור — מילוי ידני') + '</option></select></div>') +
@@ -5300,8 +5301,7 @@ function renderSalesDocumentPreview() {
     doc.customer_email_snapshot || '',
     doc.customer_address_snapshot || ''
   ].filter(Boolean).map(escapeHtml).join('<br>');
-  var dateLabel = doc.document_type === 'invoice' ? 'לתשלום עד' : 'בתוקף עד';
-  var secondDate = doc.document_type === 'invoice' ? doc.due_date : doc.valid_until;
+  var invoiceDueDate = doc.document_type === 'invoice' ? doc.due_date : '';
   var itemRows = items.map(function(item) {
     var qty = Number(item.quantity || 0);
     var unit = Number(item.unit_price || 0);
@@ -5325,14 +5325,15 @@ function renderSalesDocumentPreview() {
       (vatExempt ? '' : '<div class="sales-doc-preview-mobile-row"><span>מע״מ</span><b>' + escapeHtml(rate + '%') + '</b></div>') +
       '<div class="sales-doc-preview-mobile-row"><span>סה״כ</span><b>' + escapeHtml(formatSalesMoney(lineTotal)) + '</b></div></div>';
   }).join('');
+  var metaHtml = 'תאריך: ' + escapeHtml(doc.issue_date || '—') + (invoiceDueDate ? '<br>לתשלום עד: ' + escapeHtml(invoiceDueDate) : '');
   preview.innerHTML = '<div class="sales-doc-print-root"><div class="sales-doc-preview-card sales-doc-preview-a4" style="--doc-primary:' + escapeHtml(template.primary_color) + '">' +
     '<div class="sales-doc-preview-top"><div>' +
+      '<div class="sales-doc-preview-header-business"><div class="sales-doc-preview-business-name">' + escapeHtml(businessName) + '</div>' + businessDetails + '</div>' +
       '<div class="sales-doc-preview-title">' + escapeHtml(getSalesDocumentTypeLabel(doc.document_type)) + '</div>' +
       '<div class="sales-doc-preview-number">' + escapeHtml(doc.document_number || 'טיוטה חדשה') + '</div>' +
-      '<div class="sales-doc-preview-meta">תאריך: ' + escapeHtml(doc.issue_date || '—') + '<br>' + escapeHtml(dateLabel) + ': ' + escapeHtml(secondDate || '—') + '</div>' +
+      '<div class="sales-doc-preview-meta">' + metaHtml + '</div>' +
     '</div><div class="sales-doc-preview-business">' +
-      (doc.business_logo_url_snapshot ? '<img class="sales-doc-preview-logo" alt="לוגו" src="' + escapeHtml(doc.business_logo_url_snapshot) + '">' : '<div class="sales-doc-preview-logo-placeholder">Logo</div>') +
-      '<div class="sales-doc-preview-business-name">' + escapeHtml(businessName) + '</div>' + businessDetails +
+      (doc.business_logo_url_snapshot ? '<img class="sales-doc-preview-logo" alt="לוגו" src="' + escapeHtml(doc.business_logo_url_snapshot) + '">' : '') +
     '</div></div>' +
     '<div class="sales-doc-preview-grid">' +
       '<div class="sales-doc-preview-box"><div class="sales-doc-preview-box-title">לקוח</div>' + customerDetails + '</div>' +
@@ -5393,7 +5394,7 @@ function printSalesDocumentPreviewPanel() {
     return;
   }
   var appStyles = Array.prototype.map.call(document.querySelectorAll('style'), function(style) { return style.textContent || ''; }).join('\\n');
-  var printCss = '@page{size:A4;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important}.sales-doc-print-root{width:210mm;margin:0 auto;direction:rtl}.sales-doc-preview-card{box-shadow:none!important;border:none!important;border-radius:0!important;width:210mm!important;max-width:210mm!important;min-height:auto!important;margin:0!important;padding:12mm!important;break-after:auto!important;page-break-after:auto!important}.sales-doc-preview-a4{aspect-ratio:auto!important}.sales-doc-preview-body{padding:0!important;background:#fff!important;overflow:visible!important}.sales-doc-preview-top{direction:rtl!important}.sales-doc-preview-top>div{direction:rtl!important}.sales-doc-preview-business{text-align:left!important}.sales-doc-preview-logo,.sales-doc-preview-logo-placeholder{margin-right:auto!important;margin-left:0!important}.sales-doc-preview-table,.sales-doc-preview-box,.sales-doc-totals-box,.sales-doc-preview-footer{break-inside:avoid;page-break-inside:avoid}';
+  var printCss = '@page{size:A4;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important}.sales-doc-print-root{width:210mm;margin:0 auto;direction:rtl}.sales-doc-preview-card{box-shadow:none!important;border:none!important;border-radius:0!important;width:210mm!important;max-width:210mm!important;min-height:auto!important;margin:0!important;padding:12mm!important;break-after:auto!important;page-break-after:auto!important}.sales-doc-preview-a4{aspect-ratio:auto!important}.sales-doc-preview-body{padding:0!important;background:#fff!important;overflow:visible!important}.sales-doc-preview-top{direction:rtl!important}.sales-doc-preview-top>div{direction:rtl!important}.sales-doc-preview-business{text-align:left!important}.sales-doc-preview-logo,.sales-doc-preview-logo-placeholder{margin-right:auto!important;margin-left:0!important;border:0!important;background:transparent!important;padding:0!important;border-radius:0!important}.sales-doc-preview-table,.sales-doc-preview-box,.sales-doc-totals-box,.sales-doc-preview-footer{break-inside:avoid;page-break-inside:avoid}';
   printDocument.open();
   printDocument.write('<!doctype html><html lang="he" dir="rtl"><head><meta charset="UTF-8"><title>הדפסת מסמך</title><style>' + appStyles + '\\n' + printCss + '</style></head><body>' + preview.innerHTML + '</body></html>');
   printDocument.close();
