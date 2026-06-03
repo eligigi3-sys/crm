@@ -252,9 +252,10 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .sales-doc-preview-body{padding:18px;background:#f8fafc;overflow:auto}
 .sales-doc-preview-card{--doc-primary:#7c3aed;background:#fff;border:1px solid var(--border);border-radius:14px;padding:30px;min-height:680px;box-shadow:0 10px 26px rgba(15,23,42,0.08);max-width:794px;margin:0 auto;color:#111827}
 .sales-doc-preview-a4{aspect-ratio:210/297;width:100%;max-width:794px}
-.sales-doc-preview-top{display:grid;grid-template-columns:1.1fr 0.9fr;gap:18px;border-bottom:3px solid var(--doc-primary);padding-bottom:16px;margin-bottom:18px;align-items:start}
-.sales-doc-preview-logo{width:110px;height:86px;border:1px solid #e5e7eb;border-radius:14px;object-fit:contain;background:#fff;padding:6px;margin-bottom:10px}
-.sales-doc-preview-logo-placeholder{width:110px;height:86px;border:1px dashed #cbd5e1;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px;margin-bottom:10px;background:#f8fafc}
+.sales-doc-preview-top{display:grid;grid-template-columns:1.1fr 0.9fr;gap:18px;border-bottom:3px solid var(--doc-primary);padding-bottom:16px;margin-bottom:18px;align-items:start;direction:ltr}
+.sales-doc-preview-top>div{direction:rtl}
+.sales-doc-preview-logo{width:110px;height:86px;border:1px solid #e5e7eb;border-radius:14px;object-fit:contain;background:#fff;padding:6px;margin:0 0 10px auto;display:block}
+.sales-doc-preview-logo-placeholder{width:110px;height:86px;border:1px dashed #cbd5e1;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px;margin:0 0 10px auto;background:#f8fafc}
 .sales-doc-preview-title{font-size:26px;font-weight:900;color:var(--doc-primary);letter-spacing:-0.4px}
 .sales-doc-preview-number{font-size:13px;color:#64748b;font-weight:700;margin-top:4px}
 .sales-doc-preview-meta{font-size:12px;color:#475569;line-height:1.7;margin-top:8px}
@@ -5287,7 +5288,7 @@ function renderSalesDocumentPreview() {
   var businessName = doc.business_display_name_snapshot || doc.business_name_snapshot || doc.business_legal_name_snapshot || 'שם העסק';
   var businessDetails = [
     doc.business_legal_name_snapshot && doc.business_legal_name_snapshot !== businessName ? doc.business_legal_name_snapshot : '',
-    doc.business_tax_id ? 'ח.פ/עוסק: ' + doc.business_tax_id : '',
+    doc.business_tax_id ? 'מספר עוסק: ' + doc.business_tax_id : '',
     doc.business_address_snapshot || '',
     doc.business_phone_snapshot || '',
     doc.business_email_snapshot || ''
@@ -5329,7 +5330,6 @@ function renderSalesDocumentPreview() {
       '<div class="sales-doc-preview-title">' + escapeHtml(getSalesDocumentTypeLabel(doc.document_type)) + '</div>' +
       '<div class="sales-doc-preview-number">' + escapeHtml(doc.document_number || 'טיוטה חדשה') + '</div>' +
       '<div class="sales-doc-preview-meta">תאריך: ' + escapeHtml(doc.issue_date || '—') + '<br>' + escapeHtml(dateLabel) + ': ' + escapeHtml(secondDate || '—') + '</div>' +
-      (vatExempt ? '<div class="sales-doc-vat-exempt-note">עוסק פטור — ללא מע״מ</div>' : '') +
     '</div><div class="sales-doc-preview-business">' +
       (doc.business_logo_url_snapshot ? '<img class="sales-doc-preview-logo" alt="לוגו" src="' + escapeHtml(doc.business_logo_url_snapshot) + '">' : '<div class="sales-doc-preview-logo-placeholder">Logo</div>') +
       '<div class="sales-doc-preview-business-name">' + escapeHtml(businessName) + '</div>' + businessDetails +
@@ -5353,10 +5353,15 @@ function renderSalesDocumentPreview() {
 }
 
 function renderSalesDocumentTotalsHtml(totals, vatExempt, defaultVatRate) {
+  if (vatExempt) {
+    return '<div class="sales-doc-totals-box">' +
+      '<div class="sales-doc-total-row"><span>סה״כ מחיר</span><strong>' + escapeHtml(formatSalesMoney(totals.total)) + '</strong></div>' +
+    '</div>';
+  }
   return '<div class="sales-doc-totals-box">' +
     '<div class="sales-doc-total-row"><span>ביניים</span><strong>' + escapeHtml(formatSalesMoney(totals.subtotal)) + '</strong></div>' +
     '<div class="sales-doc-total-row"><span>הנחות</span><strong>' + escapeHtml(formatSalesMoney(totals.discount)) + '</strong></div>' +
-    (vatExempt ? '<div class="sales-doc-total-row"><span>מע״מ</span><strong>פטור — 0%</strong></div>' : '<div class="sales-doc-total-row"><span>מע״מ ' + escapeHtml(defaultVatRate) + '%</span><strong>' + escapeHtml(formatSalesMoney(totals.vat)) + '</strong></div>') +
+    '<div class="sales-doc-total-row"><span>מע״מ ' + escapeHtml(defaultVatRate) + '%</span><strong>' + escapeHtml(formatSalesMoney(totals.vat)) + '</strong></div>' +
     '<div class="sales-doc-total-row"><span>סה״כ</span><strong>' + escapeHtml(formatSalesMoney(totals.total)) + '</strong></div>' +
   '</div>';
 }
@@ -5364,11 +5369,63 @@ function renderSalesDocumentTotalsHtml(totals, vatExempt, defaultVatRate) {
 function printSalesDocumentPreviewPanel() {
   if (!currentSalesDocumentDraft) { toast('אין מסמך פתוח להדפסה', 'error'); return; }
   renderSalesDocumentPreview();
-  document.body.classList.add('sales-doc-printing');
-  var cleanup = function() { document.body.classList.remove('sales-doc-printing'); window.removeEventListener('afterprint', cleanup); };
-  window.addEventListener('afterprint', cleanup);
-  window.print();
-  setTimeout(cleanup, 1200);
+  var preview = document.getElementById('sales-document-preview');
+  if (!preview) { toast('לא נמצאה תצוגה להדפסה', 'error'); return; }
+  var frame = document.createElement('iframe');
+  frame.setAttribute('title', 'sales-document-print-frame');
+  frame.style.position = 'fixed';
+  frame.style.left = '0';
+  frame.style.bottom = '0';
+  frame.style.width = '0';
+  frame.style.height = '0';
+  frame.style.border = '0';
+  frame.style.opacity = '0';
+  document.body.appendChild(frame);
+  var printWindow = frame.contentWindow;
+  var printDocument = frame.contentDocument || (printWindow && printWindow.document);
+  if (!printWindow || !printDocument) {
+    frame.remove();
+    document.body.classList.add('sales-doc-printing');
+    var cleanupFallback = function() { document.body.classList.remove('sales-doc-printing'); window.removeEventListener('afterprint', cleanupFallback); };
+    window.addEventListener('afterprint', cleanupFallback);
+    window.print();
+    setTimeout(cleanupFallback, 1200);
+    return;
+  }
+  var appStyles = Array.prototype.map.call(document.querySelectorAll('style'), function(style) { return style.textContent || ''; }).join('\\n');
+  var printCss = '@page{size:A4;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important}.sales-doc-print-root{width:210mm;margin:0 auto;direction:rtl}.sales-doc-preview-card{box-shadow:none!important;border:none!important;border-radius:0!important;width:210mm!important;max-width:210mm!important;min-height:auto!important;margin:0!important;padding:12mm!important;break-after:auto!important;page-break-after:auto!important}.sales-doc-preview-a4{aspect-ratio:auto!important}.sales-doc-preview-body{padding:0!important;background:#fff!important;overflow:visible!important}.sales-doc-preview-top{direction:ltr!important}.sales-doc-preview-top>div{direction:rtl!important}.sales-doc-preview-business{text-align:left!important}.sales-doc-preview-logo,.sales-doc-preview-logo-placeholder{margin-right:auto!important;margin-left:0!important}.sales-doc-preview-table,.sales-doc-preview-box,.sales-doc-totals-box,.sales-doc-preview-footer{break-inside:avoid;page-break-inside:avoid}';
+  printDocument.open();
+  printDocument.write('<!doctype html><html lang="he" dir="rtl"><head><meta charset="UTF-8"><title>הדפסת מסמך</title><style>' + appStyles + '\\n' + printCss + '</style></head><body>' + preview.innerHTML + '</body></html>');
+  printDocument.close();
+  var cleanup = function() { setTimeout(function() { if (frame && frame.parentNode) frame.parentNode.removeChild(frame); }, 500); };
+  var printNow = function() {
+    try {
+      printWindow.focus();
+      printWindow.print();
+      cleanup();
+    } catch (e) {
+      cleanup();
+      toast('לא ניתן לפתוח הדפסה, נסה שוב', 'error');
+    }
+  };
+  var images = Array.prototype.slice.call(printDocument.images || []);
+  var pendingImages = images.filter(function(img) { return !img.complete; });
+  if (!pendingImages.length) { setTimeout(printNow, 100); return; }
+  var remaining = pendingImages.length;
+  var done = false;
+  var finish = function() {
+    if (done) return;
+    remaining -= 1;
+    if (remaining <= 0) {
+      done = true;
+      setTimeout(printNow, 100);
+    }
+  };
+  pendingImages.forEach(function(img) {
+    img.addEventListener('load', finish, { once: true });
+    img.addEventListener('error', finish, { once: true });
+  });
+  setTimeout(function() { if (!done) { done = true; printNow(); } }, 1200);
 }
 
 function saveSalesDocumentAsPdfHint() {
