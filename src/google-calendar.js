@@ -240,7 +240,7 @@ export async function handleGoogle(request, env, path) {
       await getAccessToken(env);
       return { connected: true, needs_reconnect: false };
     } catch (e) {
-      return { connected: false, needs_reconnect: true, error: e.message };
+      return { connected: false, needs_reconnect: true, message: e.message };
     }
   }
 

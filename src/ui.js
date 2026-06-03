@@ -6434,7 +6434,7 @@ function checkGoogleStatus() {
       el.style.background = data.needs_reconnect ? '#fef3c7' : '#eff6ff';
       el.style.border = data.needs_reconnect ? '1px solid #f59e0b' : '1px solid #bfdbfe';
       var message = data.needs_reconnect ? '⚠️ יש להתחבר מחדש ל-Google Calendar' : '📅 Google Calendar לא מחובר';
-      var detail = data.error ? '<div style="font-size:11px;color:#92400e;margin-top:4px">' + escapeHtml(data.error) + '</div>' : '';
+      var detail = data.message ? '<div style="font-size:11px;color:#92400e;margin-top:4px">' + escapeHtml(data.message) + '</div>' : '';
       el.innerHTML = '<span style="color:' + (data.needs_reconnect ? '#92400e' : '#2563eb') + '">' + message + '</span>' + detail + '<br><button onclick="connectGoogle()" style="margin-top:6px;font-size:11px;background:var(--blue);color:white;border:none;border-radius:4px;padding:4px 8px;cursor:pointer">חבר יומן</button>';
       document.getElementById('drawer-sync-btn').style.display = 'none';
     }
