@@ -5482,17 +5482,25 @@ function renderSalesDocumentPreview() {
   ].filter(Boolean).map(escapeHtml).join('<br>');
   var invoiceDueDate = doc.document_type === 'invoice' ? doc.due_date : '';
   var quoteEventDate = doc.document_type === 'quote' ? doc.valid_until : '';
+  var hasLineDiscount = items.some(function(item) { return Number(item.discount_amount || 0) > 0; });
   var itemRows = items.map(function(item) {
     var qty = Number(item.quantity || 0);
     var unit = Number(item.unit_price || 0);
-    return '<tr><td>' + escapeHtml(item.description || 'שורת פריט') + '</td><td>' + escapeHtml(qty) + '</td><td>' + escapeHtml(formatSalesMoney(unit)) + '</td></tr>';
+    var discount = Number(item.discount_amount || 0);
+    var gross = roundSalesMoney(qty * unit);
+    var net = Math.max(0, roundSalesMoney(gross - discount));
+    return '<tr><td>' + escapeHtml(item.description || 'שורת פריט') + '</td><td>' + escapeHtml(qty) + '</td><td>' + escapeHtml(formatSalesMoney(unit)) + '</td>' + (hasLineDiscount ? '<td>' + (discount > 0 ? '-' + escapeHtml(formatSalesMoney(discount)) : '—') + '</td>' : '') + '<td>' + escapeHtml(formatSalesMoney(net)) + '</td></tr>';
   }).join('');
   var mobileItems = items.map(function(item) {
     var qty = Number(item.quantity || 0);
     var unit = Number(item.unit_price || 0);
+    var discount = Number(item.discount_amount || 0);
+    var net = Math.max(0, roundSalesMoney(qty * unit - discount));
     return '<div class="sales-doc-preview-mobile-item"><strong>' + escapeHtml(item.description || 'שורת פריט') + '</strong>' +
       '<div class="sales-doc-preview-mobile-row"><span>כמות</span><b>' + escapeHtml(qty) + '</b></div>' +
-      '<div class="sales-doc-preview-mobile-row"><span>מחיר</span><b>' + escapeHtml(formatSalesMoney(unit)) + '</b></div></div>';
+      '<div class="sales-doc-preview-mobile-row"><span>מחיר</span><b>' + escapeHtml(formatSalesMoney(unit)) + '</b></div>' +
+      (hasLineDiscount ? '<div class="sales-doc-preview-mobile-row"><span>הנחה</span><b>' + (discount > 0 ? '-' + escapeHtml(formatSalesMoney(discount)) : '—') + '</b></div>' : '') +
+      '<div class="sales-doc-preview-mobile-row"><span>אחרי הנחה</span><b>' + escapeHtml(formatSalesMoney(net)) + '</b></div></div>';
   }).join('');
   var metaHtml = 'מספר: ' + escapeHtml(getSalesDocumentNumberText(doc)) + '<br>תאריך: ' + escapeHtml(doc.issue_date || '—') + (invoiceDueDate ? '<br>לתשלום עד: ' + escapeHtml(invoiceDueDate) : '') + (quoteEventDate ? '<br>אירוע בתאריך: ' + escapeHtml(quoteEventDate) : '');
   preview.innerHTML = '<div class="sales-doc-print-root"><div class="sales-doc-preview-card sales-doc-preview-a4" style="--doc-primary:' + escapeHtml(template.primary_color) + '">' +
@@ -5506,7 +5514,7 @@ function renderSalesDocumentPreview() {
     '<div class="sales-doc-preview-grid">' +
       '<div class="sales-doc-preview-box"><div class="sales-doc-preview-box-title">לקוח</div>' + customerDetails + '</div>' +
     '</div>' +
-    '<table class="sales-doc-preview-table"><thead><tr><th>תיאור</th><th>כמות</th><th>מחיר</th></tr></thead><tbody>' + itemRows + '</tbody></table>' +
+    '<table class="sales-doc-preview-table"><thead><tr><th>תיאור</th><th>כמות</th><th>מחיר</th>' + (hasLineDiscount ? '<th>הנחה</th>' : '') + '<th>סה״כ שורה</th></tr></thead><tbody>' + itemRows + '</tbody></table>' +
     '<div class="sales-doc-preview-mobile-items">' + mobileItems + '</div>' +
     renderSalesDocumentTotalsHtml(totals, vatExempt, getSalesDocumentDefaultVatRate(doc)) +
     renderSalesDocumentTextBlock('כתובת שירות/אירוע', doc.customer_service_address_snapshot) +
@@ -5521,16 +5529,19 @@ function renderSalesDocumentPreview() {
 }
 
 function renderSalesDocumentTotalsHtml(totals, vatExempt, defaultVatRate) {
+  var discountRow = totals.discount > 0 ? '<div class="sales-doc-total-row"><span>הנחה</span><strong>-' + escapeHtml(formatSalesMoney(totals.discount)) + '</strong></div>' : '';
   if (vatExempt) {
     return '<div class="sales-doc-totals-box">' +
-      '<div class="sales-doc-total-row"><span>סה״כ מחיר</span><strong>' + escapeHtml(formatSalesMoney(totals.total)) + '</strong></div>' +
+      '<div class="sales-doc-total-row"><span>ביניים לפני הנחה</span><strong>' + escapeHtml(formatSalesMoney(totals.subtotal)) + '</strong></div>' +
+      discountRow +
+      '<div class="sales-doc-total-row"><span>סה״כ אחרי הנחה</span><strong>' + escapeHtml(formatSalesMoney(totals.total)) + '</strong></div>' +
     '</div>';
   }
   return '<div class="sales-doc-totals-box">' +
-    '<div class="sales-doc-total-row"><span>ביניים</span><strong>' + escapeHtml(formatSalesMoney(totals.subtotal)) + '</strong></div>' +
-    '<div class="sales-doc-total-row"><span>הנחות</span><strong>' + escapeHtml(formatSalesMoney(totals.discount)) + '</strong></div>' +
+    '<div class="sales-doc-total-row"><span>ביניים לפני הנחה</span><strong>' + escapeHtml(formatSalesMoney(totals.subtotal)) + '</strong></div>' +
+    discountRow +
     '<div class="sales-doc-total-row"><span>מע״מ ' + escapeHtml(defaultVatRate) + '%</span><strong>' + escapeHtml(formatSalesMoney(totals.vat)) + '</strong></div>' +
-    '<div class="sales-doc-total-row"><span>סה״כ</span><strong>' + escapeHtml(formatSalesMoney(totals.total)) + '</strong></div>' +
+    '<div class="sales-doc-total-row"><span>סה״כ אחרי הנחה</span><strong>' + escapeHtml(formatSalesMoney(totals.total)) + '</strong></div>' +
   '</div>';
 }
 
