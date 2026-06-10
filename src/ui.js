@@ -5446,6 +5446,17 @@ function renderSalesDocumentTextBlock(title, value) {
   return '<div class="sales-doc-preview-box"><div class="sales-doc-preview-box-title">' + escapeHtml(title) + '</div>' + escapeHtml(value).replace(/\\n/g, '<br>') + '</div>';
 }
 
+function getSalesDocumentNumberText(doc) {
+  if (!doc) return '—';
+  var number = String(doc.document_number || '').trim();
+  if (number && number !== 'טיוטה חדשה') return number;
+  return doc.document_type === 'invoice' ? 'ייקבע בשמירה' : 'טיוטה חדשה';
+}
+
+function salesDocumentNeedsNumberBeforePrint(doc) {
+  return !!(doc && doc.document_type === 'invoice' && (!doc.id || !doc.document_number || doc.document_number === 'טיוטה חדשה'));
+}
+
 function renderSalesDocumentPreview() {
   var preview = document.getElementById('sales-document-preview');
   if (!preview || !currentSalesDocumentDraft) return;
@@ -5483,7 +5494,7 @@ function renderSalesDocumentPreview() {
       '<div class="sales-doc-preview-mobile-row"><span>כמות</span><b>' + escapeHtml(qty) + '</b></div>' +
       '<div class="sales-doc-preview-mobile-row"><span>מחיר</span><b>' + escapeHtml(formatSalesMoney(unit)) + '</b></div></div>';
   }).join('');
-  var metaHtml = 'תאריך: ' + escapeHtml(doc.issue_date || '—') + (invoiceDueDate ? '<br>לתשלום עד: ' + escapeHtml(invoiceDueDate) : '') + (quoteEventDate ? '<br>אירוע בתאריך: ' + escapeHtml(quoteEventDate) : '');
+  var metaHtml = 'מספר: ' + escapeHtml(getSalesDocumentNumberText(doc)) + '<br>תאריך: ' + escapeHtml(doc.issue_date || '—') + (invoiceDueDate ? '<br>לתשלום עד: ' + escapeHtml(invoiceDueDate) : '') + (quoteEventDate ? '<br>אירוע בתאריך: ' + escapeHtml(quoteEventDate) : '');
   preview.innerHTML = '<div class="sales-doc-print-root"><div class="sales-doc-preview-card sales-doc-preview-a4" style="--doc-primary:' + escapeHtml(template.primary_color) + '">' +
     '<div class="sales-doc-preview-top"><div>' +
       '<div class="sales-doc-preview-header-business"><div class="sales-doc-preview-business-name">' + escapeHtml(businessName) + '</div>' + businessDetails + '</div>' +
@@ -5525,6 +5536,11 @@ function renderSalesDocumentTotalsHtml(totals, vatExempt, defaultVatRate) {
 
 function printSalesDocumentPreviewPanel() {
   if (!currentSalesDocumentDraft) { toast('אין מסמך פתוח להדפסה', 'error'); return; }
+  if (salesDocumentNeedsNumberBeforePrint(currentSalesDocumentDraft)) {
+    toast('שומר חשבונית כדי להקצות מספר לפני הדפסה...', 'success');
+    persistSalesDocumentDraft({ silent: true }).then(function() { printSalesDocumentPreviewPanel(); }).catch(function(err) { toast(err.message || 'שגיאה בשמירת חשבונית לפני הדפסה', 'error'); });
+    return;
+  }
   renderSalesDocumentPreview();
   var preview = document.getElementById('sales-document-preview');
   if (!preview) { toast('לא נמצאה תצוגה להדפסה', 'error'); return; }
@@ -5766,26 +5782,32 @@ function validateSalesDocumentDraft() {
   return null;
 }
 
-function saveSalesDocumentDraft() {
-  if (salesDocumentSaving || !currentSalesDocumentDraft || isSalesDocumentLocked(currentSalesDocumentDraft)) return;
+function persistSalesDocumentDraft(options) {
+  options = options || {};
+  if (salesDocumentSaving || !currentSalesDocumentDraft || isSalesDocumentLocked(currentSalesDocumentDraft)) return Promise.reject(new Error('לא ניתן לשמור את המסמך כרגע'));
   var validationError = validateSalesDocumentDraft();
-  if (validationError) { toast(validationError, 'error'); return; }
+  if (validationError) return Promise.reject(new Error(validationError));
   salesDocumentSaving = true;
   var saveBtn = document.getElementById('sales-document-save-draft');
   if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'שומר...'; }
   var method = currentSalesDocumentId ? 'PUT' : 'POST';
   var path = currentSalesDocumentId ? '/api/sales-documents/' + encodeURIComponent(currentSalesDocumentId) : '/api/sales-documents';
-  apiCall(method, path, buildSalesDocumentPayload()).then(function(data) {
-    toast('הטיוטה נשמרה', 'success');
+  return apiCall(method, path, buildSalesDocumentPayload()).then(function(data) {
+    if (!options.silent) toast('הטיוטה נשמרה', 'success');
     currentSalesDocumentDraft = data.document || currentSalesDocumentDraft;
     currentSalesDocumentId = currentSalesDocumentDraft.id || currentSalesDocumentId;
     renderSalesDocumentEditor();
     loadSalesDocuments();
-  }).catch(function(err) {
-    toast(err.message || 'שגיאה בשמירת המסמך', 'error');
+    return currentSalesDocumentDraft;
   }).finally(function() {
     salesDocumentSaving = false;
     renderSalesDocumentStickyActions();
+  });
+}
+
+function saveSalesDocumentDraft() {
+  persistSalesDocumentDraft().catch(function(err) {
+    toast(err.message || 'שגיאה בשמירת המסמך', 'error');
   });
 }
 
