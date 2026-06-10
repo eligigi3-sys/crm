@@ -1651,6 +1651,7 @@ tr:hover td{background:#fafbfc;cursor:pointer}
     <div class="nav-item" id="nav-shopping"><span class="nav-icon">🛒</span> <span class="nav-label" data-mobile="רשימת קניות">רשימות קניות</span></div>
     <div class="nav-item" id="nav-strategic-contacts"><span class="nav-icon">🤝</span> <span class="nav-label" data-mobile="קשרים">קשרים אסטרטגיים</span></div>
     <div class="nav-item" id="nav-sales-documents"><span class="nav-icon">🧾</span> <span class="nav-label" data-mobile="מסמכים">מסמכי מכירה</span></div>
+    <div class="nav-item" id="nav-print-requests"><span class="nav-icon">🖨️</span> <span class="nav-label" data-mobile="הדפסות">בקשות הדפסה</span> <span class="nav-badge" id="nav-print-requests-count" style="display:none">0</span></div>
     <div class="nav-item" id="nav-business-settings"><span class="nav-icon">⚙️</span> <span class="nav-label" data-mobile="הגדרות">הגדרות עסק</span></div>
     <div class="nav-item" id="nav-calendar"><span class="nav-icon">📅</span> <span class="nav-label" data-mobile="יומן אירועים">יומן אירועים</span></div>
     <div class="nav-item" id="nav-archive"><span class="nav-icon">🗂️</span> <span class="nav-label" data-mobile="ארכיון">ארכיון אירועים</span></div>
@@ -1921,6 +1922,19 @@ id="customers-search">
         </div>
       </div>
     </div>
+    <div id="page-print-requests" class="page">
+      <div class="page-header">
+        <div class="page-title">בקשות הדפסה <small>אישור ידני לפני שליחה להדפסה</small></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <select class="filter-select" id="print-requests-status-filter"><option value="pending">ממתינות לאישור</option><option value="approved">מאושרות</option><option value="printed">הודפסו</option><option value="rejected">נדחו</option></select>
+          <button class="btn btn-secondary" id="btn-refresh-print-requests">רענן</button>
+        </div>
+      </div>
+      <div class="table-card">
+        <div id="print-requests-grid" style="padding:16px"><div class="dash-empty">טוען...</div></div>
+      </div>
+    </div>
+
     <div id="page-archive" class="page">
       <div class="page-header">
         <div class="page-title">ארכיון אירועים <small>אירועים שחלף התאריך שלהם</small></div>
@@ -2145,6 +2159,7 @@ var currentSalesDocumentDraft = null;
 var currentSalesDocumentId = null;
 var salesDocumentSaving = false;
 var currentBusinessSettings = null;
+var currentPrintRequests = [];
 var salesDocumentContactOptions = [];
 var salesDocumentContactsLoading = false;
 var salesDocumentBillingState = { contactId: null, loading: false, profile: null, addresses: [], people: [], error: null };
@@ -2165,11 +2180,12 @@ var CRM_MOBILE_NAV_ITEMS = [
   { navId: 'nav-products', page: 'products', label: 'מוצרים', icon: '📦', moduleKey: 'products' },
   { navId: 'nav-shopping', page: 'shopping', label: 'רשימות קניות', icon: '🛒', moduleKey: 'shopping' },
   { navId: 'nav-sales-documents', page: 'sales-documents', label: 'מסמכים', icon: '🧾', moduleKey: 'sales_documents' },
+  { navId: 'nav-print-requests', page: 'print-requests', label: 'בקשות הדפסה', icon: '🖨️', managerOnly: true },
   { navId: 'nav-strategic-contacts', page: 'strategic-contacts', label: 'קשרים אסטרטגיים', icon: '🤝', moduleKey: 'strategic_contacts' },
   { navId: 'nav-archive', page: 'archive', label: 'ארכיון אירועים', icon: '🗂️', moduleKey: 'leads' },
   { navId: 'nav-business-settings', page: 'business-settings', label: 'הגדרות', icon: '⚙️' }
 ];
-var DEFAULT_MOBILE_BOTTOM_NAV = ['nav-calendar', 'nav-leads', 'nav-shopping', 'nav-sales-documents', 'nav-business-settings'];
+var DEFAULT_MOBILE_BOTTOM_NAV = ['nav-calendar', 'nav-leads', 'nav-shopping', 'nav-print-requests', 'nav-business-settings'];
 var currentTeamMembers = [];
 var currentSuperAdminTenantDetail = null;
 var tenantOwnerSetupStep = 0;
@@ -2261,6 +2277,11 @@ function isTeamManagerAllowed() {
   return role === 'owner' || role === 'admin';
 }
 
+function isPrintRequestsAllowed() {
+  var role = getTenantRole();
+  return role === 'owner' || role === 'admin' || role === 'manager';
+}
+
 function getTenantRoleLabel(role) {
   var map = {
     owner: 'Owner',
@@ -2315,6 +2336,7 @@ function getModuleSortOrder(moduleKey, fallback) {
 function getAvailableCrmMobileNavItems() {
   return CRM_MOBILE_NAV_ITEMS.filter(function(item) {
     if (item.teamOnly && !isTeamManagerAllowed()) return false;
+    if (item.managerOnly && !isPrintRequestsAllowed()) return false;
     if (item.moduleKey && !isModuleEnabled(item.moduleKey)) return false;
     return true;
   });
@@ -2418,6 +2440,8 @@ function applySidebarModuleOrder() {
   ];
   var dashboard = document.getElementById('nav-dashboard');
   if (dashboard) dashboard.style.order = 10;
+  var printRequests = document.getElementById('nav-print-requests');
+  if (printRequests) printRequests.style.order = 85;
   var businessSettings = document.getElementById('nav-business-settings');
   if (businessSettings) businessSettings.style.order = 95;
   orderedNav.forEach(function(item) {
@@ -2469,6 +2493,8 @@ function applyModuleVisibility() {
   if (navStrategicContacts) navStrategicContacts.style.display = isModuleEnabled('strategic_contacts') ? 'flex' : 'none';
   var navSalesDocuments = document.getElementById('nav-sales-documents');
   if (navSalesDocuments) navSalesDocuments.style.display = isModuleEnabled('sales_documents') ? 'flex' : 'none';
+  var navPrintRequests = document.getElementById('nav-print-requests');
+  if (navPrintRequests) navPrintRequests.style.display = isPrintRequestsAllowed() ? 'flex' : 'none';
   var navCalendar = document.getElementById('nav-calendar');
   if (navCalendar) navCalendar.style.display = isModuleEnabled('leads') ? 'flex' : 'none';
   var navArchive = document.getElementById('nav-archive');
@@ -2534,7 +2560,7 @@ function applyShellVisibility() {
   document.body.classList.toggle('crm-shell', isCrmShell);
   document.body.classList.toggle('admin-shell', isAdminShell);
   var isAdminUser = isSuperAdmin();
-  var crmNavIds = ['nav-dashboard', 'nav-leads', 'nav-employees', 'nav-team', 'nav-products', 'nav-shopping', 'nav-strategic-contacts', 'nav-sales-documents', 'nav-business-settings', 'nav-calendar', 'nav-archive'];
+  var crmNavIds = ['nav-dashboard', 'nav-leads', 'nav-employees', 'nav-team', 'nav-products', 'nav-shopping', 'nav-strategic-contacts', 'nav-sales-documents', 'nav-print-requests', 'nav-business-settings', 'nav-calendar', 'nav-archive'];
   var logoTitle = document.getElementById('shell-logo-title');
   var logoSub = document.getElementById('shell-logo-sub');
 
@@ -2660,6 +2686,8 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   if (navStrategicContacts) navStrategicContacts.addEventListener('click', function() { goTo('strategic-contacts', this); });
   var navSalesDocuments = document.getElementById('nav-sales-documents');
   if (navSalesDocuments) navSalesDocuments.addEventListener('click', function() { goTo('sales-documents', this); });
+  var navPrintRequests = document.getElementById('nav-print-requests');
+  if (navPrintRequests) navPrintRequests.addEventListener('click', function() { goTo('print-requests', this); });
   var navBusinessSettings = document.getElementById('nav-business-settings');
   if (navBusinessSettings) navBusinessSettings.addEventListener('click', function() { goTo('business-settings', this); });
   document.getElementById('nav-calendar').addEventListener('click', function() { goTo('calendar', this); });
@@ -2690,6 +2718,10 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   if (printSalesDocumentPreview) printSalesDocumentPreview.addEventListener('click', printSalesDocumentPreviewPanel);
   var refreshBusinessSettings = document.getElementById('btn-refresh-business-settings');
   if (refreshBusinessSettings) refreshBusinessSettings.addEventListener('click', loadBusinessSettings);
+  var refreshPrintRequests = document.getElementById('btn-refresh-print-requests');
+  if (refreshPrintRequests) refreshPrintRequests.addEventListener('click', loadPrintRequests);
+  var printRequestsStatusFilter = document.getElementById('print-requests-status-filter');
+  if (printRequestsStatusFilter) printRequestsStatusFilter.addEventListener('change', loadPrintRequests);
 
   var enterCrmBtn = document.getElementById('btn-enter-crm');
   if (enterCrmBtn) enterCrmBtn.addEventListener('click', goToCrmShell);
@@ -2796,6 +2828,10 @@ function goTo(page, el) {
     toast('Permission denied', 'error');
     return;
   }
+  if (page === 'print-requests' && !isPrintRequestsAllowed()) {
+    toast('Permission denied', 'error');
+    return;
+  }
   var requiredModule = pageModuleMap[page];
   if (requiredModule && !isModuleEnabled(requiredModule)) {
     document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
@@ -2820,6 +2856,7 @@ function goTo(page, el) {
   if (page === 'strategic-contacts') loadStrategicContacts();
   if (page === 'sales-documents') loadSalesDocuments();
   if (page === 'business-settings') loadBusinessSettings();
+  if (page === 'print-requests') loadPrintRequests();
   if (page === 'calendar') loadCalendar();
   if (page === 'customers') loadCustomers();
   if (page === 'employees') loadEmployees();
@@ -2893,6 +2930,7 @@ function loadTenantContext() {
   return apiCall('GET', '/api/auth/tenant-context').then(function(data) {
     currentTenantContext = data || null;
     applySuperAdminVisibility();
+    loadPendingPrintRequestsCount();
     maybeShowTenantOwnerSetup();
     return data;
   }).catch(function(err) {
@@ -4722,6 +4760,134 @@ function loadSalesDocuments() {
   }).catch(function(err) {
     body.innerHTML = '<tr class="empty-row"><td colspan="7">שגיאה בטעינת מסמכים: ' + escapeHtml(err.message || 'שגיאה') + '</td></tr>';
   });
+}
+
+
+function getPrintRequestStatusLabel(status) {
+  var map = { pending: 'ממתינה', approved: 'מאושרת', rejected: 'נדחתה', printed: 'הודפסה', cancelled: 'בוטלה' };
+  return map[status] || status || '—';
+}
+
+function getPrintRequestStatusBadgeClass(status) {
+  var map = { pending: 'badge-orange', approved: 'badge-blue', rejected: 'badge-red', printed: 'badge-green', cancelled: 'badge-gray' };
+  return map[status] || 'badge-gray';
+}
+
+function formatDateTime(value) {
+  if (!value) return '—';
+  var d = new Date(String(value).replace(' ', 'T') + 'Z');
+  if (isNaN(d.getTime())) return String(value);
+  return d.toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function updatePrintRequestsBadge(count) {
+  var badge = document.getElementById('nav-print-requests-count');
+  if (!badge) return;
+  count = Number(count || 0);
+  badge.textContent = String(count);
+  badge.style.display = count > 0 ? 'inline-flex' : 'none';
+}
+
+function loadPendingPrintRequestsCount() {
+  if (!isPrintRequestsAllowed()) { updatePrintRequestsBadge(0); return Promise.resolve(); }
+  return apiCall('GET', '/api/print-requests?status=pending&limit=200').then(function(data) {
+    updatePrintRequestsBadge((data.requests || []).length);
+  }).catch(function() {
+    updatePrintRequestsBadge(0);
+  });
+}
+
+function loadPrintRequests() {
+  var grid = document.getElementById('print-requests-grid');
+  var filter = document.getElementById('print-requests-status-filter');
+  var status = filter ? filter.value || 'pending' : 'pending';
+  if (grid) grid.innerHTML = '<div class="dash-empty">טוען בקשות הדפסה...</div>';
+  return apiCall('GET', '/api/print-requests?status=' + encodeURIComponent(status)).then(function(data) {
+    currentPrintRequests = data.requests || [];
+    if (status === 'pending') updatePrintRequestsBadge(currentPrintRequests.length);
+    renderPrintRequests();
+  }).catch(function(err) {
+    if (grid) grid.innerHTML = '<div class="dash-empty">' + escapeHtml(err.message || 'שגיאה בטעינת בקשות הדפסה') + '</div>';
+    toast(err.message || 'שגיאה בטעינת בקשות הדפסה', 'error');
+  });
+}
+
+function renderPrintRequestPreview(req) {
+  if (req.image_data || req.image_url) {
+    var src = req.image_data || req.image_url;
+    return '<img src="' + escapeHtml(src) + '" alt="תוכן להדפסה" style="width:120px;max-height:120px;object-fit:contain;border:1px solid var(--border);border-radius:12px;background:#fff">';
+  }
+  return '<div style="min-width:120px;max-width:220px;white-space:pre-wrap;line-height:1.5;color:var(--text)">' + escapeHtml(req.text_content || '—') + '</div>';
+}
+
+function renderPrintRequests() {
+  var grid = document.getElementById('print-requests-grid');
+  if (!grid) return;
+  var requests = currentPrintRequests || [];
+  if (!requests.length) {
+    grid.innerHTML = '<div class="dash-empty">אין בקשות בסטטוס הזה</div>';
+    return;
+  }
+  grid.innerHTML = requests.map(function(req) {
+    var eventLine = req.event_customer_name ? escapeHtml(req.event_customer_name) + (req.event_date ? ' · ' + escapeHtml(formatDate(req.event_date)) : '') : 'ללא שיוך אירוע';
+    var guestLine = [req.guest_name, req.guest_phone].filter(Boolean).map(escapeHtml).join(' · ') || 'אורח לא מזוהה';
+    var actions = '';
+    if (req.status === 'pending') {
+      actions = '<button class="btn btn-primary btn-sm" onclick="approvePrintRequest(' + req.id + ')">אשר להדפסה</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="rejectPrintRequest(' + req.id + ')">דחה</button>';
+    } else if (req.status === 'approved') {
+      actions = '<button class="btn btn-primary btn-sm" onclick="printApprovedRequest(' + req.id + ')">הדפס עכשיו</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="markPrintRequestPrinted(' + req.id + ')">סמן כהודפס</button>';
+    }
+    return '<div class="table-card" style="margin-bottom:12px;overflow:hidden">' +
+      '<div style="display:flex;gap:14px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;padding:14px 16px">' +
+        '<div style="display:flex;gap:14px;align-items:flex-start;min-width:260px;flex:1">' + renderPrintRequestPreview(req) +
+          '<div style="min-width:0"><div style="font-weight:800;color:var(--text);margin-bottom:4px">בקשה #' + req.id + ' · ' + guestLine + '</div>' +
+          '<div style="font-size:12px;color:var(--text3);line-height:1.6">' + eventLine + '<br>נשלחה: ' + escapeHtml(formatDateTime(req.created_at)) + (req.notes ? '<br>הערה: ' + escapeHtml(req.notes) : '') + (req.admin_note ? '<br>הערת מנהל: ' + escapeHtml(req.admin_note) : '') + '</div></div>' +
+        '</div>' +
+        '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px"><span class="badge ' + getPrintRequestStatusBadgeClass(req.status) + '">' + getPrintRequestStatusLabel(req.status) + '</span><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">' + actions + '</div></div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function postPrintRequestAction(id, action, note) {
+  return apiCall('POST', '/api/print-requests/' + encodeURIComponent(id) + '/' + action, { admin_note: note || null }).then(function() {
+    return loadPrintRequests();
+  });
+}
+
+function approvePrintRequest(id) {
+  postPrintRequestAction(id, 'approve').then(function() { toast('בקשת ההדפסה אושרה', 'success'); }).catch(function(err) { toast(err.message, 'error'); });
+}
+
+function rejectPrintRequest(id) {
+  var note = prompt('סיבת דחייה (אופציונלי):') || '';
+  postPrintRequestAction(id, 'reject', note).then(function() { toast('בקשת ההדפסה נדחתה', 'success'); }).catch(function(err) { toast(err.message, 'error'); });
+}
+
+function markPrintRequestPrinted(id) {
+  postPrintRequestAction(id, 'mark-printed').then(function() { toast('סומן כהודפס', 'success'); }).catch(function(err) { toast(err.message, 'error'); });
+}
+
+function printApprovedRequest(id) {
+  var req = (currentPrintRequests || []).find(function(item) { return Number(item.id) === Number(id); });
+  if (!req || req.status !== 'approved') { toast('אפשר להדפיס רק בקשה מאושרת', 'error'); return; }
+  var frame = document.createElement('iframe');
+  frame.style.position = 'fixed';
+  frame.style.left = '-9999px';
+  frame.style.top = '-9999px';
+  document.body.appendChild(frame);
+  var win = frame.contentWindow;
+  var doc = frame.contentDocument || (win && win.document);
+  if (!win || !doc) { document.body.removeChild(frame); toast('לא ניתן לפתוח חלון הדפסה', 'error'); return; }
+  var content = req.image_data || req.image_url ? '<img src="' + escapeHtml(req.image_data || req.image_url) + '" style="max-width:100%;max-height:95vh;object-fit:contain;display:block;margin:0 auto">' : '<pre style="white-space:pre-wrap;font-family:Arial,sans-serif;font-size:18px;direction:rtl">' + escapeHtml(req.text_content || '') + '</pre>';
+  doc.open();
+  doc.write('<!doctype html><html lang="he" dir="rtl"><head><meta charset="UTF-8"><title>הדפסה מאושרת</title><style>html,body{margin:0;padding:12mm;background:#fff}img{break-inside:avoid}</style></head><body>' + content + '</body></html>');
+  doc.close();
+  setTimeout(function() {
+    try { win.focus(); win.print(); } finally { setTimeout(function() { if (frame.parentNode) frame.parentNode.removeChild(frame); }, 1500); }
+  }, 300);
 }
 
 function renderSalesDocumentsList(documents) {

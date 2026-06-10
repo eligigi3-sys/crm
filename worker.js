@@ -11,6 +11,7 @@ import { handleSalesDocuments } from './src/sales-documents.js';
 import { handleTenantBusinessSettings } from './src/tenant-business-settings.js';
 import { handleCustomerBilling, isCustomerBillingRoute } from './src/customer-billing.js';
 import { handleStrategicContacts } from './src/strategic-contacts.js';
+import { handlePrintRequests } from './src/print-requests.js';
 import { serveHTML } from './src/ui.js';
 
 export default {
@@ -55,6 +56,8 @@ export default {
           response = await handleSalesDocuments(request, env, path);
         } else if (path.startsWith('/api/strategic-contacts')) {
           response = await handleStrategicContacts(request, env, path);
+        } else if (path.startsWith('/api/print-requests') || path.startsWith('/api/public/print-requests')) {
+          response = await handlePrintRequests(request, env, path);
         } else if (path.startsWith('/api/dashboard')) {
           response = await handleDashboard(request, env, path);
         } else if (path.startsWith('/api/leads') || path.startsWith('/api/lead-employees')) {
