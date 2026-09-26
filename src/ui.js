@@ -1595,6 +1595,62 @@ tr:hover td{background:#fafbfc;cursor:pointer}
   body.crm-shell #sidebar::-webkit-scrollbar{display:none}
 }
 
+
+/* ===== Visual refresh (2026-09) ===== */
+:root{
+  --bg:#f3f4f9;--border:#e4e6f0;--border2:#d3d7e4;
+  --shadow:0 1px 2px rgba(16,24,40,.04),0 3px 10px rgba(16,24,40,.05);
+  --shadow-md:0 10px 30px rgba(16,24,40,.13);
+  --radius:14px;--radius-sm:9px;
+}
+body{background:radial-gradient(1100px 560px at 88% -6%,#eceefc 0%,var(--bg) 58%) fixed}
+#main{padding:30px 36px}
+.page-title{font-size:22px;letter-spacing:-0.01em}
+/* Deep premium sidebar */
+#sidebar{background:linear-gradient(178deg,#221a4d 0%,#2b1a63 55%,#3b1178 100%);border-left:none;box-shadow:4px 0 26px rgba(30,16,70,.16)}
+.sidebar-logo{border-bottom:1px solid rgba(255,255,255,.09)}
+.sidebar-logo .logo-title{color:#fff}
+.sidebar-logo .logo-sub{color:rgba(255,255,255,.55)}
+.logo-icon{box-shadow:0 6px 16px rgba(0,0,0,.28)}
+.nav-section{color:rgba(255,255,255,.38)}
+.nav-item{color:rgba(255,255,255,.74);margin:2px 10px}
+.nav-item:hover{background:rgba(255,255,255,.09);color:#fff}
+.nav-item.active{background:rgba(255,255,255,.14);color:#fff;font-weight:700;box-shadow:inset -3px 0 0 0 #a78bfa}
+.nav-badge{background:#a78bfa;color:#241259}
+.sidebar-bottom{border-top:1px solid rgba(255,255,255,.09)}
+#sidebar .user-name{color:#fff}
+#sidebar .user-role{color:rgba(255,255,255,.5)}
+#sidebar .user-avatar{background:linear-gradient(135deg,#a78bfa,#7c3aed);box-shadow:0 3px 10px rgba(0,0,0,.3)}
+#sidebar .logout-btn{border-color:rgba(255,255,255,.24);color:rgba(255,255,255,.72)}
+#sidebar .logout-btn:hover{color:#fda4af;border-color:#fda4af;background:rgba(255,255,255,.06)}
+/* Buttons */
+.btn{transition:all .16s ease}
+.btn-primary{background:linear-gradient(135deg,#8b5cf6,#6d28d9);box-shadow:0 4px 14px rgba(124,58,237,.3)}
+.btn-primary:hover{background:linear-gradient(135deg,#8b5cf6,#5b21b6);transform:translateY(-1px);box-shadow:0 7px 20px rgba(124,58,237,.38)}
+.btn-primary:active{transform:translateY(0)}
+.btn-secondary:hover{transform:translateY(-1px);box-shadow:var(--shadow)}
+/* Cards */
+.stat-card{transition:transform .16s ease,box-shadow .16s ease}
+.stat-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
+.table-card{border-color:var(--border)}
+th{background:#f7f8fc;color:#8a8fa3}
+tr:hover td{background:#f7f8fd}
+.empty-row td{padding:52px 40px;font-size:14.5px;color:var(--text3)}
+/* Forms */
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent);background:var(--white);box-shadow:0 0 0 3px rgba(124,58,237,.1)}
+.filter-select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,58,237,.1)}
+/* Login */
+#login-page{background:radial-gradient(760px 520px at 88% 8%,rgba(167,139,250,.4),transparent 62%),radial-gradient(640px 520px at 8% 92%,rgba(96,165,250,.32),transparent 62%),linear-gradient(135deg,#ede9fe 0%,#e0e7ff 52%,#dbeafe 100%)}
+.login-card{border:none;border-radius:24px;padding:46px 42px;box-shadow:0 26px 70px rgba(76,29,149,.2),0 4px 16px rgba(76,29,149,.08)}
+.login-icon{box-shadow:0 12px 26px rgba(124,58,237,.38)}
+.login-title{font-size:22px}
+/* Modals */
+.modal{box-shadow:0 24px 70px rgba(16,24,40,.22)}
+.modal-overlay{background:rgba(24,16,52,.44);backdrop-filter:blur(5px)}
+/* Mobile top bar matches sidebar */
+body.crm-shell .mobile-crm-topbar{background:linear-gradient(135deg,#221a4d,#3b1178);border-bottom:none}
+body.crm-shell .mobile-crm-topbar .mobile-crm-title{color:#fff}
+body.crm-shell .mobile-crm-topbar .mobile-menu-btn{color:#fff}
 </style>
 </head>
 <body>
