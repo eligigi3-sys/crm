@@ -1735,6 +1735,23 @@ tbody tr:hover td{background:#f6f4fc}
 .login-title{background:linear-gradient(135deg,#241150,#5b21b6);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-weight:800}
 .login-sub{color:#7a7794}
 
+/* Smart features: strip, filter chip, FAB */
+.smart-strip{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.smart-chip{display:flex;align-items:center;gap:9px;background:#fff;border:1px solid #eceaf4;border-radius:14px;padding:10px 16px;cursor:pointer;box-shadow:0 1px 2px rgba(24,16,52,.05);transition:transform .15s ease,box-shadow .15s ease}
+.smart-chip:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.smart-chip-num{font-size:18px;font-weight:800;color:var(--accent)}
+.smart-chip-label{font-size:12.5px;font-weight:600;color:var(--text2)}
+.smart-chip.hot{background:linear-gradient(135deg,#f5f0ff,#ede4ff);border-color:#d9cbff}
+.smart-chip.alert{background:linear-gradient(135deg,#fef2f2,#fee2e2);border-color:#fca5a5}
+.smart-chip.alert .smart-chip-num{color:#dc2626}
+.filter-chip{border:1.5px solid #e4e2ef;background:#fff;color:var(--text2);border-radius:999px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);transition:all .15s ease}
+.filter-chip:hover{border-color:#c4b5fd;color:var(--accent)}
+.filter-chip.on{background:linear-gradient(135deg,#8b5cf6,#6d28d9);border-color:transparent;color:#fff;box-shadow:0 4px 12px rgba(109,40,217,.3)}
+.fab-add{position:fixed;left:22px;bottom:22px;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#8b5cf6 0%,#6d28d9 60%,#5b21b6 100%);color:#fff;font-size:30px;line-height:1;border:none;box-shadow:0 10px 26px rgba(109,40,217,.45),inset 0 1px 0 rgba(255,255,255,.25);cursor:pointer;z-index:140;display:none;align-items:center;justify-content:center;transition:transform .15s ease,box-shadow .15s ease}
+body.crm-shell .fab-add{display:flex}
+.fab-add:hover{transform:scale(1.08);box-shadow:0 14px 32px rgba(109,40,217,.55),inset 0 1px 0 rgba(255,255,255,.25)}
+@media (max-width:768px){.fab-add{left:14px;bottom:84px;width:52px;height:52px;font-size:27px}}
+
 /* Scrollbars */
 ::-webkit-scrollbar{width:9px;height:9px}
 ::-webkit-scrollbar-thumb{background:#d3d1e0;border-radius:6px;border:2px solid var(--bg)}
@@ -1826,6 +1843,7 @@ tbody tr:hover td{background:#f6f4fc}
         <div class="page-title">שלום! 👋 <small id="dash-date"></small></div>
         <button class="btn btn-primary" id="btn-new-lead">+ ליד חדש</button>
       </div>
+      <div class="smart-strip" id="smart-strip" style="display:none"></div>
       <div class="stats-grid">
         <div class="stat-card purple"><div class="stat-icon-wrap">👥</div><div><div class="stat-label">סה"כ לידים</div><div class="stat-value" id="stat-total">—</div></div></div>
         <div class="stat-card green"><div class="stat-icon-wrap">✅</div><div><div class="stat-label">עסקאות סגורות</div><div class="stat-value" id="stat-closed">—</div></div></div>
@@ -1866,6 +1884,7 @@ tbody tr:hover td{background:#f6f4fc}
           <span id="leads-count" style="font-size:12px;color:var(--text3);margin-inline-start:auto"></span>
           <select class="filter-select" id="leads-status-filter"><option value="">כל הסטטוסים</option><option value="lead">ליד</option><option value="quote">הצעת מחיר</option><option value="closed">סגור</option><option value="cancelled">בוטל</option></select>
           <select class="filter-select" id="leads-event-filter"><option value="">כל סוגי האירועים</option><option>חתונה</option><option>בר מצווה</option><option>בת מצווה</option><option>יום הולדת</option><option>אירוע חברה</option><option>ברית</option><option>הפרשת חלה</option><option>אחר</option></select>
+          <button class="filter-chip" id="leads-overdue-filter" type="button" onclick="toggleOverdueFilter()">🔥 מעקב באיחור</button>
         </div>
         <table><thead><tr><th></th><th>שם לקוח</th><th>טלפון</th><th>סוג אירוע</th><th>תאריך</th><th>אולם</th><th>מחיר</th><th>סטטוס</th><th>מעקב הבא</th><th></th></tr></thead><tbody id="leads-body"><tr class="empty-row"><td colspan="10">טוען...</td></tr></tbody></table>
       </div>
@@ -2275,6 +2294,7 @@ id="customers-search">
   <div class="drawer-footer"><div class="note-input-row"><input class="note-input" id="new-note-input" placeholder="הוסף הערה..."><button class="btn btn-primary btn-sm" id="add-note-btn">הוסף</button></div></div>
 </div>
 <div class="toast-container" id="toasts"></div>
+  <button class="fab-add" id="fab-add" type="button" title="ליד חדש (N)">+</button>
 <script>
 (function consumeImpersonationHash() {
   var hash = location.hash || '';
@@ -2936,6 +2956,20 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   var shoppingSearch = document.getElementById('shopping-search');
   if (shoppingSearch) shoppingSearch.addEventListener('input', renderShoppingGrid);
   document.getElementById('leads-status-filter').addEventListener('change', loadLeads);
+  var fabAdd = document.getElementById('fab-add');
+  if (fabAdd) fabAdd.addEventListener('click', function() { openLeadModal(); });
+  document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    var t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+    if (!currentUser) return;
+    if (e.key === 'n' || e.key === 'N') { e.preventDefault(); openLeadModal(); }
+    if (e.key === '/') {
+      e.preventDefault();
+      goTo('leads', document.getElementById('nav-leads'));
+      setTimeout(function() { var s = document.getElementById('leads-search'); if (s) s.focus(); }, 80);
+    }
+  });
   document.getElementById('leads-event-filter').addEventListener('change', loadLeads);
   document.getElementById('new-note-input').addEventListener('keydown', function(e) { if (e.key === 'Enter') addNote(); });
   document.getElementById('l-name').addEventListener('input', function() { checkDup('name', this.value); });
@@ -4212,6 +4246,44 @@ function openDupLead() {
   });
 }
 
+var leadsOverdueOnly = false;
+function toggleOverdueFilter() {
+  leadsOverdueOnly = !leadsOverdueOnly;
+  var chip = document.getElementById('leads-overdue-filter');
+  if (chip) chip.classList.toggle('on', leadsOverdueOnly);
+  loadLeads();
+}
+function enableOverdueFilter() {
+  leadsOverdueOnly = true;
+  var chip = document.getElementById('leads-overdue-filter');
+  if (chip) chip.classList.add('on');
+  goTo('leads', document.getElementById('nav-leads'));
+}
+function renderSmartStrip(leads) {
+  var el = document.getElementById('smart-strip');
+  if (!el) return;
+  var today = getTodayYMD();
+  var weekEnd = shiftYMD(today, 7);
+  var evToday = 0, evWeek = 0, overdue = 0;
+  (leads || []).forEach(function(l) {
+    if ((l.status || '') === 'cancelled') return;
+    var ed = (l.event_date || '').substring(0, 10);
+    if (ed === today) evToday++;
+    if (ed > today && ed <= weekEnd) evWeek++;
+    if (isOverdue(l.next_contact)) overdue++;
+  });
+  var html = '<div class="smart-chip' + (evToday ? ' hot' : '') + '" id="smart-chip-today"><span class="smart-chip-num">' + evToday + '</span><span class="smart-chip-label">אירועים היום</span></div>';
+  html += '<div class="smart-chip' + (overdue ? ' alert' : '') + '" id="smart-chip-overdue"><span class="smart-chip-num">' + overdue + '</span><span class="smart-chip-label">מעקבים באיחור</span></div>';
+  html += '<div class="smart-chip" id="smart-chip-week"><span class="smart-chip-num">' + evWeek + '</span><span class="smart-chip-label">אירועים ב-7 הימים הקרובים</span></div>';
+  el.innerHTML = html;
+  el.style.display = 'flex';
+  document.getElementById('smart-chip-today').onclick = function() { goTo('calendar', document.getElementById('nav-calendar')); };
+  document.getElementById('smart-chip-week').onclick = function() { goTo('calendar', document.getElementById('nav-calendar')); };
+  document.getElementById('smart-chip-overdue').onclick = function() { enableOverdueFilter(); };
+  var nb = document.getElementById('nav-leads-count');
+  if (nb) { nb.textContent = overdue; nb.style.display = overdue ? '' : 'none'; nb.title = overdue ? overdue + ' מעקבים באיחור' : ''; }
+}
+
 function loadDashboard() {
   apiCall('GET', '/api/dashboard').then(function(d) {
     document.getElementById('stat-total').textContent = d.stats.total;
@@ -4225,8 +4297,6 @@ function loadDashboard() {
     ['stat-revenue','rev-prev','rev-curr','rev-next'].forEach(function(id) {
       document.getElementById(id).textContent = document.getElementById(id).textContent.replace('R','₪');
     });
-    var nb = document.getElementById('nav-leads-count');
-    if (nb) { nb.textContent = ''; nb.style.display = 'none'; }
     var fuEl = document.getElementById('dash-followups');
     fuEl.innerHTML = d.followUps.length ? d.followUps.map(function(l) {
       return '<div class="dash-item" data-id="' + l.id + '"><div><div class="dash-item-name">' + l.name + '</div><div class="dash-item-sub">' + (l.event_type||'') + (l.event_date ? ' - ' + formatDate(l.event_date) : '') + '</div></div>' + statusBadge(l.status) + '</div>';
@@ -4256,6 +4326,7 @@ function loadDashboard() {
     });
     allLeadsCache = d.allLeads || allLeadsCache;
     renderMiniCal(d.allLeads || []);
+    renderSmartStrip(d.allLeads || []);
     loadMonthlyClientReport();
   }).catch(function(e) { toast(e.message, 'error'); });
 }
@@ -4395,6 +4466,7 @@ function loadLeads() {
     allLeadsCache = data.leads || [];
     var leads = data.leads;
     if (eventType) leads = leads.filter(function(l) { return l.event_type === eventType; });
+    if (leadsOverdueOnly) leads = leads.filter(function(l) { return isOverdue(l.next_contact) && (l.status || '') !== 'cancelled'; });
     var leadsCountEl = document.getElementById('leads-count');
     if (leadsCountEl) leadsCountEl.textContent = leads.length + ' אירועים';
     var tbody = document.getElementById('leads-body');
