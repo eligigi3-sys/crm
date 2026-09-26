@@ -7483,7 +7483,34 @@ function renderCalculatorInputs(cfg) {
   if (kashrutBox) {
     kashrutBox.innerHTML = cfg.kashrut.map(function(k, i) {
       return '<div class="calc-kashrut-row"><span class="calc-kashrut-name">' + k.name + (k.price ? ' (+₪' + fmtMoney(k.price) + ' למנה)' : '') + '</span><input class="form-input calc-kashrut-qty" data-idx="' + i + '" type="number" min="0" value="0"></div>';
-    }).join('');
+    }).join('') +
+    // מנות מצומצם - לא אפשרות סטנדרטית מההגדרות: בחירה ב"+ הוסף" פותחת חלונית של כמות מנות + תוספת מחיר פר מנה
+    '<div class="calc-kashrut-row"><span class="calc-kashrut-name">מנות מצומצם (תוספת משתנה למנה)</span><button class="btn btn-secondary btn-sm" id="calc-limited-add" type="button" style="flex:0 0 auto">+ הוסף</button></div>' +
+    '<div id="calc-limited-panel" style="display:none;margin:0 0 6px;padding:8px;border:1px dashed var(--border);border-radius:10px">' +
+      '<div class="calc-kashrut-row"><span class="calc-kashrut-name">כמות מנות</span><input class="form-input calc-kashrut-qty" id="calc-limited-qty" data-idx="limited" type="number" min="0" value="0"></div>' +
+      '<div class="calc-kashrut-row"><span class="calc-kashrut-name">תוספת ₪ למנה</span><input class="form-input" id="calc-limited-price" type="number" min="0" value="0" style="flex:0 0 90px;max-width:90px;margin:0"></div>' +
+      '<button class="btn btn-ghost btn-sm" id="calc-limited-remove" type="button">✕ הסר מנות מצומצם</button>' +
+    '</div>';
+    var limitedAdd = document.getElementById('calc-limited-add');
+    if (limitedAdd) limitedAdd.addEventListener('click', function() {
+      var panel = document.getElementById('calc-limited-panel');
+      if (panel) { panel.style.display = ''; }
+      var qty = document.getElementById('calc-limited-qty');
+      if (qty) qty.focus();
+    });
+    var limitedRemove = document.getElementById('calc-limited-remove');
+    if (limitedRemove) limitedRemove.addEventListener('click', function() {
+      var qty = document.getElementById('calc-limited-qty');
+      var price = document.getElementById('calc-limited-price');
+      if (qty) qty.value = 0;
+      if (price) price.value = 0;
+      var panel = document.getElementById('calc-limited-panel');
+      if (panel) panel.style.display = 'none';
+      kashrutDefaultBalance();
+      renderCalculation();
+    });
+    var limitedPrice = document.getElementById('calc-limited-price');
+    if (limitedPrice) limitedPrice.addEventListener('input', renderCalculation);
     kashrutBox.querySelectorAll('.calc-kashrut-qty').forEach(function(inp) {
       inp.addEventListener('input', function() {
         if (Number(inp.getAttribute('data-idx')) !== 0) kashrutDefaultBalance();
@@ -7553,6 +7580,11 @@ function renderCalculation() {
     kashrutSum += qty;
     if (opt && qty > 0 && opt.price) rows.push({ label: 'כשרות ' + opt.name + ': ₪' + fmtMoney(opt.price) + ' × ' + qty + ' מנות', amount: opt.price * qty });
   });
+  var limitedQtyEl = document.getElementById('calc-limited-qty');
+  var limitedPriceEl = document.getElementById('calc-limited-price');
+  var limitedQty = limitedQtyEl ? (Number(limitedQtyEl.value) || 0) : 0;
+  var limitedPlatePrice = limitedPriceEl ? (Number(limitedPriceEl.value) || 0) : 0;
+  if (limitedQty > 0 && limitedPlatePrice > 0) rows.push({ label: 'מנות מצומצם: ₪' + fmtMoney(limitedPlatePrice) + ' × ' + limitedQty + ' מנות', amount: limitedPlatePrice * limitedQty });
   calcKashrutOk = guests > 0 && kashrutSum === guests;
   var kashrutNote = document.getElementById('calc-kashrut-note');
   if (kashrutNote) {
