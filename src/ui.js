@@ -450,6 +450,9 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .pricing-list-row .form-input{margin:0}
 .pricing-list-row .pricing-name{flex:1 1 auto;min-width:0}
 .pricing-list-row .pricing-price{flex:0 0 110px}
+.calc-kashrut-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.calc-kashrut-row .calc-kashrut-name{flex:1 1 auto;min-width:0;font-size:13px;overflow-wrap:anywhere}
+.calc-kashrut-row .form-input{margin:0;flex:0 0 90px;max-width:90px}
 @media (max-width: 900px){.calc-layout{grid-template-columns:1fr}.pricing-day-grid{grid-template-columns:repeat(4,1fr)}.pricing-tiers-grid{grid-template-columns:repeat(3,1fr)}}
 @media (max-width: 760px){
   #page-calculator{min-width:0;max-width:100%;overflow-x:hidden}
@@ -2161,7 +2164,7 @@ id="customers-search">
             <div class="form-group"><label class="form-label">תאריך החתונה</label><input class="form-input" id="calc-date" type="date"></div>
           </div>
           <div class="form-group"><label class="form-label">תוספות בר (לאדם) — דמי מזיגה מתווספים אוטומטית</label><div id="calc-bar-options"></div></div>
-          <div class="form-group"><label class="form-label">כשרות</label><select class="form-input" id="calc-kashrut"></select></div>
+          <div class="form-group"><label class="form-label">כשרות — חלוקת מנות (תוספת ₪ למנה)</label><div id="calc-kashrut"></div><div id="calc-kashrut-note" style="font-size:12px;margin-top:4px"></div></div>
           <div class="form-group"><label class="form-label">תוספות מיוחדות</label><div id="calc-extras"></div></div>
         </div>
         <div class="calc-card">
@@ -3033,11 +3036,9 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   var calcCoupleSel = document.getElementById('calc-couple');
   if (calcCoupleSel) calcCoupleSel.addEventListener('change', onCalculatorCoupleChange);
   var calcGuestsInput = document.getElementById('calc-guests');
-  if (calcGuestsInput) calcGuestsInput.addEventListener('input', renderCalculation);
+  if (calcGuestsInput) calcGuestsInput.addEventListener('input', function() { kashrutDefaultBalance(); renderCalculation(); });
   var calcDateInput = document.getElementById('calc-date');
   if (calcDateInput) calcDateInput.addEventListener('change', renderCalculation);
-  var calcKashrutSel = document.getElementById('calc-kashrut');
-  if (calcKashrutSel) calcKashrutSel.addEventListener('change', renderCalculation);
   var calcApplyBtn = document.getElementById('calc-apply');
   if (calcApplyBtn) calcApplyBtn.addEventListener('click', calculatorApply);
   var navEmployees = document.getElementById('nav-employees');
@@ -7222,6 +7223,7 @@ function patchLeadField(id, fields, msg) {
 }
 // ---- Artista: תמחור אירועים + מחשבון מחיר (tenant 82) ----
 var pricingConfigCache = null;
+var calcKashrutOk = true;
 var calculatorCouples = [];
 var calculatorPrefillLeadId = null;
 var DAY_NAMES = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
@@ -7322,7 +7324,7 @@ function loadPricingSettings(retries) {
       html += '<div class="form-group"><label class="form-label">' + DAY_NAMES[i] + '</label><input class="form-input" id="ps-day-' + i + '" type="number" min="0" value="' + (cfg.day_pricing[String(i)] || 0) + '"></div>';
     }
     html += '</div></div>';
-    html += '<div class="form-group"><label class="form-label">כשרות (אפשרות + תוספת ₪)</label><div id="ps-kashrut-rows"></div><button class="btn btn-secondary btn-sm" id="ps-kashrut-add" type="button">+ הוסף אפשרות כשרות</button></div>';
+    html += '<div class="form-group"><label class="form-label">כשרות (אפשרות + תוספת ₪ למנה)</label><div id="ps-kashrut-rows"></div><button class="btn btn-secondary btn-sm" id="ps-kashrut-add" type="button">+ הוסף אפשרות כשרות</button></div>';
     html += '<div class="form-group"><label class="form-label">תוספות מיוחדות (שם + מחיר ₪)</label><div id="ps-extras-rows"></div><button class="btn btn-secondary btn-sm" id="ps-extras-add" type="button">+ הוסף תוספת</button></div>';
     html += '<button class="btn btn-primary" id="ps-save" type="button">שמור מחירי בסיס</button>';
     body.innerHTML = html;
@@ -7404,12 +7406,23 @@ function loadCalculator(retries) {
     onCalculatorCoupleChange();
   }).catch(function(e) { toast(e.message, 'error'); });
 }
+function kashrutDefaultBalance() {
+  var guestsEl = document.getElementById('calc-guests');
+  var guests = guestsEl ? (Number(guestsEl.value) || 0) : 0;
+  var inputs = Array.prototype.slice.call(document.querySelectorAll('.calc-kashrut-qty'));
+  if (!inputs.length) return;
+  var others = 0;
+  inputs.slice(1).forEach(function(inp) { others += Number(inp.value) || 0; });
+  inputs[0].value = Math.max(0, guests - others);
+}
 function renderCalculatorInputs(cfg) {
-  var kashrutSel = document.getElementById('calc-kashrut');
-  if (kashrutSel) {
-    kashrutSel.innerHTML = cfg.kashrut.map(function(k, i) {
-      return '<option value="' + i + '">' + k.name + (k.price ? ' (+₪' + fmtMoney(k.price) + ')' : '') + '</option>';
+  var kashrutBox = document.getElementById('calc-kashrut');
+  if (kashrutBox) {
+    kashrutBox.innerHTML = cfg.kashrut.map(function(k, i) {
+      return '<div class="calc-kashrut-row"><span class="calc-kashrut-name">' + k.name + (k.price ? ' (+₪' + fmtMoney(k.price) + ' למנה)' : '') + '</span><input class="form-input calc-kashrut-qty" data-idx="' + i + '" type="number" min="0" value="0"></div>';
     }).join('');
+    kashrutBox.querySelectorAll('.calc-kashrut-qty').forEach(function(inp) { inp.addEventListener('input', renderCalculation); });
+    kashrutDefaultBalance();
   }
   var barBox = document.getElementById('calc-bar-options');
   if (barBox) {
@@ -7441,7 +7454,6 @@ function renderCalculation() {
   var cfg = pricingConfigCache || defaultPricingConfig();
   var guests = Number(document.getElementById('calc-guests').value) || 0;
   var dateVal = document.getElementById('calc-date').value;
-  var kashrutIdx = Number(document.getElementById('calc-kashrut').value) || 0;
   var rows = [];
   var total = 0;
   var tierIdx = -1;
@@ -7466,8 +7478,24 @@ function renderCalculation() {
     var dayExtra = Number(cfg.day_pricing[String(wd)]) || 0;
     if (dayExtra) rows.push({ label: 'תוספת יום ' + DAY_NAMES[wd], amount: dayExtra });
   }
-  var kashrutOpt = cfg.kashrut[kashrutIdx];
-  if (kashrutOpt && kashrutOpt.price) rows.push({ label: 'כשרות: ' + kashrutOpt.name, amount: kashrutOpt.price });
+  var kashrutSum = 0;
+  document.querySelectorAll('#calc-kashrut .calc-kashrut-qty').forEach(function(inp) {
+    var opt = cfg.kashrut[Number(inp.getAttribute('data-idx'))];
+    var qty = Number(inp.value) || 0;
+    kashrutSum += qty;
+    if (opt && qty > 0 && opt.price) rows.push({ label: 'כשרות ' + opt.name + ': ₪' + fmtMoney(opt.price) + ' × ' + qty + ' מנות', amount: opt.price * qty });
+  });
+  calcKashrutOk = guests > 0 && kashrutSum === guests;
+  var kashrutNote = document.getElementById('calc-kashrut-note');
+  if (kashrutNote) {
+    if (guests > 0 && kashrutSum !== guests) {
+      kashrutNote.textContent = 'חולקו ' + kashrutSum + ' מנות מתוך ' + guests + ' אורחים — הסכום חייב להיות שווה';
+      kashrutNote.style.color = '#dc2626';
+    } else {
+      kashrutNote.textContent = guests > 0 ? 'חולקו ' + kashrutSum + ' מנות מתוך ' + guests + ' אורחים' : '';
+      kashrutNote.style.color = 'var(--text3)';
+    }
+  }
   document.querySelectorAll('#calc-extras .calc-extra:checked').forEach(function(cb) {
     var x = cfg.extras[Number(cb.value)];
     if (x && x.price) rows.push({ label: 'תוספת: ' + x.name, amount: x.price });
@@ -7483,6 +7511,7 @@ function calculatorApply() {
   var leadId = sel ? sel.value : '';
   if (!leadId) { toast('בחר זוג כדי לעדכן לו הצעה', 'error'); return; }
   var total = renderCalculation();
+  if (!calcKashrutOk) { toast('חלוקת מנות הכשרות לא תואמת את מספר האורחים', 'error'); return; }
   if (!total) { toast('ההצעה עדיין ₪0 — בדוק אורחים ומחירי בסיס', 'error'); return; }
   apiCall('PATCH', '/api/leads/' + leadId, { price: total }).then(function() {
     toast('ההצעה עודכנה לזוג: ₪' + fmtMoney(total), 'success');
