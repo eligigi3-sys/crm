@@ -1,5 +1,15 @@
 import { requireTenantContext, assertTenantModuleEnabled, assertTenantRole } from './auth.js';
 
+// תאריך היום בשעון ישראל - SQLite date('now') הוא UTC וטעה בחצות-03:00
+function todayIL() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+}
+function shiftDaysIL(ymd, days) {
+  const d = new Date(ymd + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -372,20 +382,25 @@ async function listStrategicContacts(request, env, tenantId) {
   if (followUp) {
     if (!FOLLOW_UP_FILTER_VALUES.has(followUp)) return json({ error: 'מסנן מעקב לא תקין' }, 400);
     if (followUp === 'today') {
-      sql += " AND next_contact_at = date('now')";
+      sql += " AND next_contact_at = ?";
+      params.push(todayIL());
     } else if (followUp === 'week') {
-      sql += " AND next_contact_at IS NOT NULL AND next_contact_at >= date('now') AND next_contact_at <= date('now', '+7 days')";
+      sql += " AND next_contact_at IS NOT NULL AND next_contact_at >= ? AND next_contact_at <= ?";
+      params.push(todayIL(), shiftDaysIL(todayIL(), 7));
     } else if (followUp === 'overdue') {
-      sql += " AND next_contact_at IS NOT NULL AND next_contact_at < date('now')";
+      sql += " AND next_contact_at IS NOT NULL AND next_contact_at < ?";
+      params.push(todayIL());
     } else if (followUp === 'high_priority') {
       sql += " AND priority = 'high'";
     } else if (followUp === 'dormant_90') {
-      sql += " AND (status = 'dormant' OR last_contact_at IS NULL OR last_contact_at <= date('now', '-90 days'))";
+      sql += " AND (status = 'dormant' OR last_contact_at IS NULL OR last_contact_at <= ?)";
+      params.push(shiftDaysIL(todayIL(), -90));
     }
   }
 
   if (due === '1' || due === 'true') {
-    sql += " AND next_contact_at IS NOT NULL AND next_contact_at <= date('now')";
+    sql += " AND next_contact_at IS NOT NULL AND next_contact_at <= ?";
+    params.push(todayIL());
   }
 
   sql += ` ORDER BY

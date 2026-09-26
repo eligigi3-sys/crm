@@ -1,5 +1,10 @@
 import { requireTenantContext, assertTenantModuleEnabled, assertTenantRole } from './auth.js';
 
+// תאריך היום בשעון ישראל - SQLite date('now') הוא UTC וטעה בחצות-03:00
+function todayIL() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+}
+
 // ============================================================
 // contacts.js - ניהול לקוחות קבועים וכרטיסי לקוח
 // לקוח = ישות קבועה עם מספר לקוח
@@ -130,10 +135,10 @@ async function buildContactFinancialSummary(contactId, tenantId, env) {
        COUNT(CASE WHEN sd.document_type = 'invoice' AND sd.status IN ('issued', 'paid', 'partially_paid') THEN 1 END) AS recognized_invoice_count,
        COALESCE(SUM(CASE WHEN sd.document_type = 'invoice' AND sd.status IN ('issued', 'paid', 'partially_paid') THEN sd.total_amount ELSE 0 END), 0) AS total_revenue,
        COALESCE(SUM(CASE WHEN sd.document_type = 'invoice' AND sd.status IN ('sent', 'issued', 'partially_paid') THEN sd.balance_amount ELSE 0 END), 0) AS open_balance,
-       COALESCE(SUM(CASE WHEN sd.document_type = 'invoice' AND sd.status IN ('sent', 'issued', 'partially_paid') AND sd.due_date IS NOT NULL AND sd.due_date < date('now') THEN sd.balance_amount ELSE 0 END), 0) AS overdue_balance
+       COALESCE(SUM(CASE WHEN sd.document_type = 'invoice' AND sd.status IN ('sent', 'issued', 'partially_paid') AND sd.due_date IS NOT NULL AND sd.due_date < ? THEN sd.balance_amount ELSE 0 END), 0) AS overdue_balance
      FROM sales_documents sd
      WHERE ${whereSql}`
-  ).bind(...baseParams).first();
+  ).bind(todayIL(), ...baseParams).first();
 
   const { results: statusRows } = await env.DB.prepare(
     `SELECT sd.status, COUNT(*) AS count
@@ -156,11 +161,11 @@ async function buildContactFinancialSummary(contactId, tenantId, env) {
        COUNT(CASE WHEN status = 'closed' THEN 1 END) AS closed_events,
        COALESCE(SUM(CASE WHEN status = 'closed' THEN price ELSE 0 END), 0) AS closed_event_value,
        MAX(event_date) AS last_event_date,
-       MIN(CASE WHEN event_date >= date('now') THEN event_date ELSE NULL END) AS next_event_date
+       MIN(CASE WHEN event_date >= ? THEN event_date ELSE NULL END) AS next_event_date
      FROM leads
      WHERE tenant_id = ?
        AND contact_id = ?`
-  ).bind(tenantId, contactId).first();
+  ).bind(todayIL(), tenantId, contactId).first();
 
   const { results: recentDocumentsRows } = await env.DB.prepare(
     `SELECT
@@ -269,13 +274,13 @@ export async function handleContacts(request, env, path) {
         SUM(CASE WHEN leads.status = 'closed' THEN 1 ELSE 0 END) AS closed_count,
         SUM(CASE WHEN leads.status = 'closed' THEN leads.price ELSE 0 END) AS revenue,
         MAX(leads.event_date) AS last_event_date,
-        MIN(CASE WHEN leads.event_date >= date('now') THEN leads.event_date ELSE NULL END) AS next_event_date
+        MIN(CASE WHEN leads.event_date >= ? THEN leads.event_date ELSE NULL END) AS next_event_date
       FROM contacts
       LEFT JOIN leads ON leads.contact_id = contacts.id AND leads.tenant_id = contacts.tenant_id
       WHERE contacts.tenant_id = ?
     `;
 
-    const params = [tenantId];
+    const params = [todayIL(), tenantId];
 
     if (search) {
       query += `
@@ -495,11 +500,11 @@ export async function handleContacts(request, env, path) {
         SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END) AS closed,
         SUM(CASE WHEN status = 'closed' THEN price ELSE 0 END) AS revenue,
         MAX(event_date) AS last_event_date,
-        MIN(CASE WHEN event_date >= date('now') THEN event_date ELSE NULL END) AS next_event_date
+        MIN(CASE WHEN event_date >= ? THEN event_date ELSE NULL END) AS next_event_date
        FROM leads
        WHERE contact_id = ?
          AND tenant_id = ?`
-    ).bind(id, tenantId).first();
+    ).bind(todayIL(), id, tenantId).first();
 
     return {
       contact,
