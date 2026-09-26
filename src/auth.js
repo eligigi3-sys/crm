@@ -202,10 +202,8 @@ export async function requireTenantContext(request, env) {
     return json({ error: 'אין למשתמש שיוך פעיל לעסק' }, 403);
   }
 
-  if (activeMemberships.length > 1) {
-    return json({ error: 'נדרשת בחירת עסק פעיל לפני המשך' }, 409);
-  }
-
+  // כמה שיוכים פעילים בכתובת הראשית (apex): בוחרים אוטומטית בשיוך הראשון (העסק הוותיק),
+  // כדי לא לנעול את המשתמש מחוץ למערכת. ב-subdomain ההקשר כבר מצומצם לעסק של הכתובת.
   const membership = activeMemberships[0];
   return {
     user: {
@@ -334,6 +332,20 @@ async function updateUserLoginSuccess(userId, env, options = {}) {
   }
 }
 
+let usernameColumnEnsured = false;
+export async function ensureUsernameColumn(env) {
+  if (usernameColumnEnsured) return;
+  try {
+    const { results } = await env.DB.prepare('PRAGMA table_info(users)').all();
+    const names = {};
+    (results || []).forEach(function(c) { names[c.name] = true; });
+    if (!names.username) await env.DB.prepare('ALTER TABLE users ADD COLUMN username TEXT').run();
+    usernameColumnEnsured = true;
+  } catch (e) {
+    console.log('username column ensure failed:', e.message);
+  }
+}
+
 async function loginWithUser(user, password, env) {
   const verification = await verifyPassword(password, user && user.password_hash);
   if (!verification.ok) return null;
@@ -381,29 +393,33 @@ export async function handleAuth(request, env, path) {
       return json({ error: 'בקשה לא תקינה' }, 400);
     }
 
-    const email = (body.email || '').trim();
+    const identifier = (body.email || body.username || '').trim();
     const password = body.password;
 
-    if (!email || !password) {
-      return json({ error: 'אימייל וסיסמה חובה' }, 400);
+    if (!identifier || !password) {
+      return json({ error: 'שם משתמש וסיסמה חובה' }, 400);
     }
 
-    const user = await env.DB.prepare(
+    let user = await env.DB.prepare(
       'SELECT * FROM users WHERE email = ?'
-    ).bind(email.toLowerCase()).first();
+    ).bind(identifier.toLowerCase()).first();
 
     if (!user) {
-      const user2 = await env.DB.prepare(
+      user = await env.DB.prepare(
         'SELECT * FROM users WHERE email = ?'
-      ).bind(email).first();
-      if (!user2) return json({ error: 'אימייל או סיסמה שגויים' }, 401);
-      const loginResult = await loginWithUser(user2, password, env);
-      if (!loginResult) return json({ error: 'אימייל או סיסמה שגויים' }, 401);
-      return loginResult;
+      ).bind(identifier).first();
     }
 
+    if (!user) {
+      await ensureUsernameColumn(env);
+      user = await env.DB.prepare(
+        'SELECT * FROM users WHERE username IS NOT NULL AND LOWER(username) = LOWER(?)'
+      ).bind(identifier).first();
+    }
+
+    if (!user) return json({ error: 'שם משתמש או סיסמה שגויים' }, 401);
     const loginResult = await loginWithUser(user, password, env);
-    if (!loginResult) return json({ error: 'אימייל או סיסמה שגויים' }, 401);
+    if (!loginResult) return json({ error: 'שם משתמש או סיסמה שגויים' }, 401);
     return loginResult;
   }
 

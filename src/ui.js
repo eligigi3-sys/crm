@@ -1831,7 +1831,7 @@ body.crm-shell .fab-add{display:flex}
       <div class="login-sub">ניהול לקוחות ואירועים</div>
     </div>
     <div class="login-error" id="login-error"></div>
-    <div class="form-group"><label class="form-label">אימייל</label><input class="form-input" type="email" id="login-email" placeholder="your@email.com"></div>
+    <div class="form-group"><label class="form-label">אימייל או שם משתמש</label><input class="form-input" type="text" id="login-email" placeholder="אימייל או שם משתמש" autocomplete="username"></div>
     <div class="form-group"><label class="form-label">סיסמה</label><input class="form-input" type="password" id="login-password" placeholder=""></div>
     <button class="btn btn-primary" style="width:100%;justify-content:center;padding:11px;margin-top:6px" id="login-btn">כניסה</button>
   </div>

@@ -1,4 +1,4 @@
-import { requireSuperAdmin, createImpersonationToken } from './auth.js';
+import { requireSuperAdmin, createImpersonationToken, ensureUsernameColumn } from './auth.js';
 import { hashPassword } from './passwords.js';
 import { RESERVED_SUBDOMAINS, BASE_DOMAIN } from './host.js';
 import { handleAdminCleanup } from './cleanup.js';
@@ -22,7 +22,8 @@ const AUDIT_ACTIONS = new Set([
   'tenant_modules_update',
   'tenant_owner_password_reset',
   'tenant_enter',
-  'cleanup_hard_delete'
+  'cleanup_hard_delete',
+  'user_credentials_set'
 ]);
 
 function normalizeOptionalText(value) {
@@ -334,6 +335,53 @@ export async function handleAdmin(request, env, path) {
 
   if (path.startsWith('/api/admin/cleanup')) {
     return handleAdminCleanup(request, env, path, superAdminCtx);
+  }
+
+  const userCredsMatch = path.match(/^\/api\/admin\/users\/(\d+)\/credentials$/);
+  if (userCredsMatch && method === 'POST') {
+    const userId = Number(userCredsMatch[1]);
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      throw new Error('בקשה לא תקינה');
+    }
+    const username = normalizeOptionalText(body && body.username);
+    const password = normalizeOptionalText(body && body.password);
+    if (!username && !password) throw new Error('יש לציין שם משתמש או סיסמה');
+    if (username && !/^[a-zA-Z0-9._-]{2,32}$/.test(username)) {
+      throw new Error('שם משתמש לא תקין — אותיות לטיניות, ספרות, נקודה, מקף או קו תחתון, 2-32 תווים');
+    }
+    if (password && password.length < 4) throw new Error('הסיסמה חייבת להכיל לפחות 4 תווים');
+
+    const targetUser = await env.DB.prepare('SELECT id, email FROM users WHERE id = ? LIMIT 1').bind(userId).first();
+    if (!targetUser) throw new Error('משתמש לא נמצא');
+
+    await ensureUsernameColumn(env);
+
+    if (username) {
+      const dup = await env.DB.prepare(
+        'SELECT id FROM users WHERE username IS NOT NULL AND LOWER(username) = LOWER(?) AND id != ? LIMIT 1'
+      ).bind(username, userId).first();
+      if (dup) throw new Error('שם המשתמש כבר תפוס');
+    }
+
+    const sets = ['updated_at = CURRENT_TIMESTAMP'];
+    const binds = [];
+    if (username) { sets.push('username = ?'); binds.push(username); }
+    if (password) {
+      sets.push('password_hash = ?');
+      binds.push(await hashPassword(password));
+      sets.push('must_change_password = 1');
+    }
+    await env.DB.prepare('UPDATE users SET ' + sets.join(', ') + ' WHERE id = ?').bind(...binds, userId).run();
+
+    await logAdminAudit(env, superAdminCtx.user, 'user_credentials_set', { type: 'user', id: userId }, {
+      email: targetUser.email,
+      username_set: !!username,
+      password_set: !!password
+    });
+    return { success: true, user_id: userId, username_set: !!username, password_set: !!password };
   }
 
   if (path === '/api/admin/tenants' && method === 'GET') {
