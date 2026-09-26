@@ -7421,7 +7421,12 @@ function renderCalculatorInputs(cfg) {
     kashrutBox.innerHTML = cfg.kashrut.map(function(k, i) {
       return '<div class="calc-kashrut-row"><span class="calc-kashrut-name">' + k.name + (k.price ? ' (+₪' + fmtMoney(k.price) + ' למנה)' : '') + '</span><input class="form-input calc-kashrut-qty" data-idx="' + i + '" type="number" min="0" value="0"></div>';
     }).join('');
-    kashrutBox.querySelectorAll('.calc-kashrut-qty').forEach(function(inp) { inp.addEventListener('input', renderCalculation); });
+    kashrutBox.querySelectorAll('.calc-kashrut-qty').forEach(function(inp) {
+      inp.addEventListener('input', function() {
+        if (Number(inp.getAttribute('data-idx')) !== 0) kashrutDefaultBalance();
+        renderCalculation();
+      });
+    });
     kashrutDefaultBalance();
   }
   var barBox = document.getElementById('calc-bar-options');
