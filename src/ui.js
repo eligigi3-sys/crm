@@ -2924,8 +2924,8 @@ function applyShellVisibility() {
     el.style.display = isAdminShell ? 'none' : 'flex';
   });
 
-  if (logoTitle) logoTitle.textContent = isAdminShell ? 'Platform Admin' : 'Comics Events CRM';
-  if (logoSub) logoSub.textContent = isAdminShell ? 'Super Admin Control Plane' : 'Tenant Business Workspace';
+  if (logoTitle) logoTitle.textContent = isAdminShell ? 'Platform Admin' : (isArtistaMode() ? 'ארטיסטה' : 'Comics Events CRM');
+  if (logoSub) logoSub.textContent = isAdminShell ? 'Super Admin Control Plane' : (isArtistaMode() ? 'אולם אירועים' : 'Tenant Business Workspace');
 
   var navSuperAdmin = document.getElementById('nav-super-admin');
   if (navSuperAdmin) {
@@ -2939,12 +2939,14 @@ function applyShellVisibility() {
   var enterCrmMobile = document.getElementById('btn-enter-crm-mobile');
   var backPlatformMobile = document.getElementById('btn-back-platform-mobile');
   var isMobileViewport = window.matchMedia('(max-width: 768px)').matches;
-  if (switcher) switcher.style.display = isAdminUser ? 'flex' : 'none';
+  // בתוך סביבת העסק (crm shell) לא מציגים שום רכיב של שכבת הפלטפורמה — גם לא למנהל-על.
+  // הכניסה לסביבת העסק נשארת דרך מסך הניהול הראשי (apex) בלבד; חזרה = סגירת הטאב.
+  if (switcher) switcher.style.display = isAdminUser && isAdminShell ? 'flex' : 'none';
   if (enterCrm) enterCrm.style.display = isAdminUser && isAdminShell ? 'flex' : 'none';
-  if (backPlatform) backPlatform.style.display = isAdminUser && isCrmShell ? 'flex' : 'none';
-  if (mobileSwitcher) mobileSwitcher.style.display = isAdminUser && isMobileViewport ? 'block' : 'none';
+  if (backPlatform) backPlatform.style.display = 'none';
+  if (mobileSwitcher) mobileSwitcher.style.display = isAdminUser && isAdminShell && isMobileViewport ? 'block' : 'none';
   if (enterCrmMobile) enterCrmMobile.style.display = isAdminUser && isMobileViewport && isAdminShell ? 'inline-flex' : 'none';
-  if (backPlatformMobile) backPlatformMobile.style.display = isAdminUser && isMobileViewport && isCrmShell ? 'inline-flex' : 'none';
+  if (backPlatformMobile) backPlatformMobile.style.display = 'none';
   applyMobileNavigationPreferences();
 }
 
@@ -2978,7 +2980,8 @@ function loadModuleStates() {
 function applySuperAdminVisibility() {
   var roleEl = document.getElementById('user-role-text');
   if (roleEl) {
-    roleEl.textContent = isSuperAdmin() ? 'Super Admin' : getTenantRoleLabel(getTenantRole());
+    var inAdminShell = getShellMode() === 'admin';
+    roleEl.textContent = (isSuperAdmin() && inAdminShell) ? 'Super Admin' : getTenantRoleLabel(getTenantRole());
   }
   applyModuleVisibility();
   applyShellVisibility();
