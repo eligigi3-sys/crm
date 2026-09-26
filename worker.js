@@ -62,7 +62,11 @@ export default {
     // נתיבים עם סיומת קובץ (למשל /favicon.ico) ממשיכים ל-404.
     if (method === 'GET' && !path.startsWith('/api/') && !/\/[^/]*\.[^/]+$/.test(path)) {
       return new Response(serveHTML(), {
-        headers: { 'Content-Type': 'text/html;charset=UTF-8' },
+        headers: {
+          'Content-Type': 'text/html;charset=UTF-8',
+          // ה-HTML תמיד מתאמת מחדש מול השרת - אחרת דפדפנים ממשיכים להציג גרסה ישנה אחרי פריסה
+          'Cache-Control': 'no-cache',
+        },
       });
     }
 
