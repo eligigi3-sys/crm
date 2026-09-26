@@ -2280,7 +2280,7 @@ id="customers-search">
           <div id="ac-email" class="ac-dropdown"></div>
         </div>
       </div>
-      <div class="form-section">פרטי האירוע</div>
+      <div class="form-section" id="lead-modal-event-section">פרטי האירוע</div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">סוג אירוע</label><select class="form-select" id="l-event-type"><option value="">בחר סוג...</option><option>חתונה</option><option>בר מצווה</option><option>בת מצווה</option><option>יום הולדת</option><option>אירוע חברה</option><option>ברית</option><option>הפרשת חלה</option><option>אחר</option></select></div>
         <div class="form-group"><label class="form-label">סטטוס</label><select class="form-select" id="l-status"><option value="lead">ליד</option><option value="quote">הצעת מחיר</option><option value="closed">סגור</option><option value="cancelled">בוטל</option></select></div>
@@ -6843,7 +6843,7 @@ function editLead(id) {
   apiCall('GET', '/api/leads/' + id).then(function(data) {
     var l = data.lead;
     document.getElementById('lead-id').value = l.id;
-    document.getElementById('modal-lead-title').textContent = 'עריכת אירוע';
+    document.getElementById('modal-lead-title').textContent = isArtistaMode() ? 'עריכת זוג' : 'עריכת אירוע';
     var deleteBtn = document.getElementById('modal-delete-btn');
     if (deleteBtn) deleteBtn.style.display = '';
     document.getElementById('l-name').value = l.name||'';
@@ -6885,6 +6885,7 @@ function invalidatePages() {
 function refreshAfterLeadMutation(successMessage) {
   loadLeads();
   loadDashboard();
+  loadPipeline();
   preloadLeads();
   toast(successMessage, 'success');
 }
@@ -6920,7 +6921,7 @@ function saveLead() {
   req.then(function() {
     closeLeadModal();
     invalidatePages();
-    refreshAfterLeadMutation(id ? 'ליד עודכן בהצלחה' : 'ליד נוסף בהצלחה');
+    refreshAfterLeadMutation(isArtistaMode() ? (id ? 'הזוג עודכן בהצלחה' : 'הזוג נוסף בהצלחה') : (id ? 'ליד עודכן בהצלחה' : 'ליד נוסף בהצלחה'));
   }).catch(function(e) { toast(e.message, 'error'); });
 }
 
@@ -7008,6 +7009,7 @@ function applyLeadModalMode() {
   setTextIf('lead-modal-client-section', 'פרטי הזוג');
   setTextIf('l-name-label', 'שם הזוג *');
   setTextIf('l-event-date-label', 'תאריך החתונה');
+  setTextIf('lead-modal-event-section', 'פרטי החתונה');
   var lname = document.getElementById('l-name');
   if (lname) lname.placeholder = 'דני ומיכל';
   var statusSel = document.getElementById('l-status');
@@ -7067,6 +7069,7 @@ function renderPipelineCard(l) {
     '<div class="pipe-card-name">' + (l.name || '') + '</div>' +
     (meta.length ? '<div class="pipe-card-meta">' + meta.join(' · ') + '</div>' : '') +
     '<div class="pipe-card-row"><span class="pipe-price">' + (l.price ? '₪' + fmtMoney(l.price) : '') + '</span>' + probChip(l.close_probability) + '</div>' +
+    '<select class="form-input pipe-stage-select" data-id="' + l.id + '" onclick="event.stopPropagation()" style="font-size:11px;padding:2px 4px;margin-top:8px">' + ['lead','quote','closed','cancelled'].map(function(s) { return '<option value="' + s + '"' + (l.status === s ? ' selected' : '') + '>' + artistaStatusLabel(s) + '</option>'; }).join('') + '</select>' +
     actions +
   '</div>';
 }
@@ -7078,6 +7081,12 @@ function bindPipelineCards() {
       e.dataTransfer.setData('text/plain', card.getAttribute('data-id'));
     });
     card.addEventListener('dragend', function() { card.classList.remove('dragging'); });
+  });
+  document.querySelectorAll('#pipe-board .pipe-stage-select').forEach(function(sel) {
+    sel.addEventListener('change', function(e) {
+      e.stopPropagation();
+      movePipelineCard(parseInt(sel.getAttribute('data-id')), sel.value);
+    });
   });
   document.querySelectorAll('#pipe-board .pipe-col').forEach(function(col) {
     col.addEventListener('dragover', function(e) { e.preventDefault(); col.classList.add('drag-over'); });
