@@ -12,6 +12,7 @@ import { handleTenantBusinessSettings } from './src/tenant-business-settings.js'
 import { handleCustomerBilling, isCustomerBillingRoute } from './src/customer-billing.js';
 import { handleStrategicContacts } from './src/strategic-contacts.js';
 import { serveHTML } from './src/ui.js';
+import { privacyPage } from './src/privacy.js';
 import { resolveHostTenant, setHostTenant, unknownTenantPage, inactiveTenantPage } from './src/host.js';
 
 export default {
@@ -32,6 +33,13 @@ export default {
 
     if (path === '/auth/google/callback') {
       return handleGoogleCallback(request, env);
+    }
+
+    // עמוד מדיניות פרטיות ציבורי - נדרש לפרסום מסך ההסכמה של Google OAuth
+    if (path === '/privacy') {
+      return new Response(privacyPage(), {
+        headers: { 'Content-Type': 'text/html;charset=UTF-8', 'Cache-Control': 'no-cache' },
+      });
     }
 
     // זיהוי העסק לפי ה-subdomain (artista.comics-events.co.il -> tenant 'artista')
