@@ -69,7 +69,17 @@ export default {
     // יש כתובת משלו (/crm/leads, /crm/products וכו') והניווט מתבצע בצד הלקוח.
     // נתיבים עם סיומת קובץ (למשל /favicon.ico) ממשיכים ל-404.
     if (method === 'GET' && !path.startsWith('/api/') && !/\/[^/]*\.[^/]+$/.test(path)) {
-      return new Response(serveHTML(), {
+      let appHtml = serveHTML();
+      // מיתוג האתר לפי העסק שזוהה מה-subdomain - כל אתר נראה כמו אתר עצמאי של העסק,
+      // בלי שם או סמל של הפלטפורמה (הדומיין הראשי נשאר עם המיתוג הכללי).
+      const hostTenantName = hostResolution.tenant && hostResolution.tenant.name
+        ? String(hostResolution.tenant.name).replace(/[<>&"]/g, '')
+        : '';
+      if (hostTenantName) {
+        appHtml = appHtml.split('אטרקציות CRM').join(hostTenantName);
+        appHtml = appHtml.split('CRM | אטרקציות לאירועים').join(hostTenantName + ' | ניהול אירועים');
+      }
+      return new Response(appHtml, {
         headers: {
           'Content-Type': 'text/html;charset=UTF-8',
           // ה-HTML תמיד מתאמת מחדש מול השרת - אחרת דפדפנים ממשיכים להציג גרסה ישנה אחרי פריסה

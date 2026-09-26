@@ -2878,6 +2878,16 @@ function updateUrlForPage(page, replace) {
   else window.history.pushState({}, '', path);
 }
 
+// מסך ניהול הפלטפורמה (super admin) זמין רק בדומיין הראשי. בתוך אתר של עסק
+// (סאב-דומיין כמו artista.comics-events.co.il) האתר הוא עצמאי לגמרי - בלי
+// חלונית סופר אדמין, בלי מעברי שכבות, בלי מיתוג של הפלטפורמה.
+function isPlatformHost() {
+  var h = (window.location.hostname || '').toLowerCase();
+  return h === 'comics-events.co.il' || h === 'www.comics-events.co.il' ||
+         h === 'crm.comics-events.co.il' || h === 'localhost' || h === '127.0.0.1' ||
+         h.endsWith('.workers.dev');
+}
+
 function getShellMode() {
   var path = window.location.pathname || '/';
   if (path === '/admin') return 'admin';
@@ -2892,6 +2902,7 @@ function setShellPath(path) {
 }
 
 function goToAdminShell() {
+  if (!isPlatformHost()) { goToCrmShell(); return; }
   setShellPath('/admin');
   applyShellVisibility();
   suppressUrlUpdate = true;
@@ -3654,7 +3665,7 @@ function showApp() {
 
   var shellMode = getShellMode();
   if (shellMode === 'default') {
-    setShellPath(isSuperAdmin() ? '/admin' : '/crm');
+    setShellPath(isSuperAdmin() && isPlatformHost() ? '/admin' : '/crm');
     shellMode = getShellMode();
   }
 
@@ -3662,10 +3673,10 @@ function showApp() {
   var deepLinkPage = pathToPage(window.location.pathname);
   suppressUrlUpdate = true;
   try {
-    if (shellMode === 'admin' && isSuperAdmin()) {
+    if (shellMode === 'admin' && isSuperAdmin() && isPlatformHost()) {
       goTo('super-admin', document.getElementById('nav-super-admin'));
     } else {
-      if (shellMode === 'admin' && !isSuperAdmin()) {
+      if (shellMode === 'admin' && (!isSuperAdmin() || !isPlatformHost())) {
         setShellPath('/crm');
         applySuperAdminVisibility();
       }
