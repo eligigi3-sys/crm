@@ -2178,6 +2178,22 @@ id="customers-search">
 </div>
 <div class="toast-container" id="toasts"></div>
 <script>
+(function consumeImpersonationHash() {
+  var hash = location.hash || '';
+  if (hash.indexOf('#impersonate=') !== 0) return;
+  try {
+    var vals = {};
+    hash.slice(1).split('&').forEach(function(p) {
+      var i = p.indexOf('=');
+      if (i > 0) vals[p.slice(0, i)] = p.slice(i + 1);
+    });
+    if (vals.impersonate) {
+      localStorage.setItem('crm_token', decodeURIComponent(vals.impersonate));
+      if (vals.u) localStorage.setItem('crm_user', decodeURIComponent(vals.u));
+    }
+  } catch (e) {}
+  history.replaceState(null, '', location.pathname + location.search);
+})();
 var token = localStorage.getItem('crm_token');
 var currentUser = JSON.parse(localStorage.getItem('crm_user') || 'null');
 var moduleStateCache = {
@@ -3600,17 +3616,40 @@ function loadSuperAdminTenants() {
     body.innerHTML = tenants.map(function(t) {
       var isSuspended = t.status === 'suspended';
       var isTenantOne = Number(t.id) === 1;
+      var enterBtn = isSuspended
+        ? ''
+        : '<button class="btn btn-primary btn-sm" data-tenant-enter="' + t.id + '">כניסה</button> ';
       var actionBtn = isTenantOne
         ? '<button class="btn btn-secondary btn-sm" disabled title="tenant 1 protected">מוגן</button>'
         : (isSuspended
           ? '<button class="btn btn-secondary btn-sm" data-tenant-activate="' + t.id + '">הפעל</button>'
           : '<button class="btn btn-danger btn-sm" data-tenant-suspend="' + t.id + '">השהה</button>');
       var statusBadge = '<span class="super-admin-list-status ' + (isSuspended ? 'suspended' : 'active') + '">' + escapeHtml(isSuspended ? 'מושהה' : 'פעיל') + '</span>';
-      return '<tr data-tenant-id="' + t.id + '"><td>' + t.id + '</td><td class="bold">' + escapeHtml(t.name || '—') + '<div class="text-muted">' + escapeHtml(t.owner_email || t.contact_email || '—') + '</div></td><td>' + escapeHtml(t.slug || '—') + '</td><td>' + statusBadge + '</td><td>' + escapeHtml(formatDate(t.created_at) || '—') + '</td><td>' + actionBtn + '</td></tr>';
+      return '<tr data-tenant-id="' + t.id + '"><td>' + t.id + '</td><td class="bold">' + escapeHtml(t.name || '—') + '<div class="text-muted">' + escapeHtml(t.owner_email || t.contact_email || '—') + '</div></td><td>' + escapeHtml(t.slug || '—') + '</td><td>' + statusBadge + '</td><td>' + escapeHtml(formatDate(t.created_at) || '—') + '</td><td>' + enterBtn + actionBtn + '</td></tr>';
     }).join('');
     body.querySelectorAll('tr[data-tenant-id]').forEach(function(row) {
       row.addEventListener('click', function() {
         openSuperAdminTenantModal(Number(this.getAttribute('data-tenant-id')));
+      });
+    });
+    body.querySelectorAll('[data-tenant-enter]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var id = Number(this.getAttribute('data-tenant-enter'));
+        var b = this;
+        b.disabled = true;
+        var win = window.open('', '_blank');
+        apiCall('POST', '/api/admin/tenants/' + id + '/enter').then(function(data) {
+          b.disabled = false;
+          if (data && data.url) {
+            if (win) win.location.href = data.url;
+            else window.open(data.url, '_blank');
+          } else if (win) win.close();
+        }).catch(function(err) {
+          b.disabled = false;
+          if (win) win.close();
+          toast(err.message || 'שגיאה בכניסה לעסק', 'error');
+        });
       });
     });
     body.querySelectorAll('[data-tenant-suspend]').forEach(function(btn) {

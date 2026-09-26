@@ -96,6 +96,7 @@ export async function requireAuthUser(request, env) {
     return json({ error: 'המשתמש לא נמצא' }, 401);
   }
 
+  user._tokenPayload = payload;
   return user;
 }
 
@@ -124,6 +125,43 @@ export async function requireTenantContext(request, env) {
 
   if (shouldForcePasswordChange(user)) {
     return json({ error: 'יש להחליף סיסמה ראשונית לפני הכניסה למערכת', must_change_password: true }, 403);
+  }
+
+  const impersonateTenantId = user._tokenPayload && user._tokenPayload.impersonateTenantId;
+  if (impersonateTenantId) {
+    if (String(user.role || '').trim().toLowerCase() !== 'super_admin') {
+      return json({ error: 'גישה זו מותרת לסופר אדמין בלבד' }, 403);
+    }
+    const impersonatedTenant = await env.DB.prepare(
+      'SELECT * FROM tenants WHERE id = ? LIMIT 1'
+    ).bind(impersonateTenantId).first();
+    if (!impersonatedTenant || impersonatedTenant.status !== 'active') {
+      return json({ error: 'העסק לא נמצא או מושהה' }, 403);
+    }
+    const impersonateHostTenant = getHostTenant(request);
+    if (impersonateHostTenant && Number(impersonateHostTenant.id) !== Number(impersonatedTenant.id)) {
+      return json({ error: 'אין למשתמש שיוך פעיל לעסק זה' }, 403);
+    }
+    return {
+      user: {
+        id: user.id,
+        email: user.email
+      },
+      tenant: {
+        id: impersonatedTenant.id,
+        slug: impersonatedTenant.slug,
+        status: impersonatedTenant.status,
+        name: impersonatedTenant.name || null,
+        contact_phone: impersonatedTenant.contact_phone || null,
+        contact_email: impersonatedTenant.contact_email || null
+      },
+      membership: {
+        id: null,
+        role: 'owner',
+        status: 'active'
+      },
+      impersonated: true
+    };
   }
 
   const memberships = await env.DB.prepare(
@@ -478,8 +516,7 @@ export async function handleAuth(request, env, path) {
   return json({ error: 'Auth route not found' }, 404);
 }
 
-async function createToken(userId, email, secret) {
-  const payload = { userId, email, exp: Date.now() + 7 * 24 * 60 * 60 * 1000 };
+async function signTokenPayload(payload, secret) {
   const data = btoa(JSON.stringify(payload));
   const key = await crypto.subtle.importKey(
     'raw', new TextEncoder().encode(secret || 'default-secret'),
@@ -488,6 +525,23 @@ async function createToken(userId, email, secret) {
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data));
   const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig)));
   return `${data}.${sigB64}`;
+}
+
+async function createToken(userId, email, secret) {
+  const payload = { userId, email, exp: Date.now() + 7 * 24 * 60 * 60 * 1000 };
+  return signTokenPayload(payload, secret);
+}
+
+// טוקן כניסה זמני (שעתיים) שמעניק לסופר אדמין הקשר של בעלים על עסק מסוים.
+// משמש בכפתור "כניסה" ממסך הניהול הראשי - בלי להקליד פרטי התחברות של העסק.
+export async function createImpersonationToken(userId, email, tenantId, secret) {
+  const payload = {
+    userId,
+    email,
+    impersonateTenantId: Number(tenantId),
+    exp: Date.now() + 2 * 60 * 60 * 1000
+  };
+  return signTokenPayload(payload, secret);
 }
 
 async function verifyToken(token, secret) {

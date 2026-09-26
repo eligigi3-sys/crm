@@ -1,6 +1,6 @@
-import { requireSuperAdmin } from './auth.js';
+import { requireSuperAdmin, createImpersonationToken } from './auth.js';
 import { hashPassword } from './passwords.js';
-import { RESERVED_SUBDOMAINS } from './host.js';
+import { RESERVED_SUBDOMAINS, BASE_DOMAIN } from './host.js';
 import { handleAdminCleanup } from './cleanup.js';
 
 const MODULE_KEYS = [
@@ -21,6 +21,7 @@ const AUDIT_ACTIONS = new Set([
   'tenant_suspend',
   'tenant_modules_update',
   'tenant_owner_password_reset',
+  'tenant_enter',
   'cleanup_hard_delete'
 ]);
 
@@ -348,6 +349,42 @@ export async function handleAdmin(request, env, path) {
 
     return {
       tenants: (result.results || []).map(mapTenantRow)
+    };
+  }
+
+  const enterMatch = path.match(/^\/api\/admin\/tenants\/(\d+)\/enter$/);
+  if (enterMatch && method === 'POST') {
+    const tenantId = Number(enterMatch[1]);
+    const tenant = await env.DB.prepare(
+      'SELECT id, name, slug, status FROM tenants WHERE id = ? LIMIT 1'
+    ).bind(tenantId).first();
+    if (!tenant) {
+      throw new Error('העסק לא נמצא');
+    }
+    if (tenant.status !== 'active') {
+      throw new Error('לא ניתן להיכנס לעסק מושהה');
+    }
+    if (!tenant.slug || RESERVED_SUBDOMAINS.has(String(tenant.slug).toLowerCase())) {
+      throw new Error('לעסק אין כתובת תקינה עדיין - יש להגדיר slug תחילה');
+    }
+    const adminUser = await env.DB.prepare(
+      'SELECT id, name, email, role FROM users WHERE id = ? LIMIT 1'
+    ).bind(superAdminCtx.user.id).first();
+    const token = await createImpersonationToken(superAdminCtx.user.id, superAdminCtx.user.email, tenant.id, env.JWT_SECRET);
+    const userForClient = {
+      id: adminUser ? adminUser.id : superAdminCtx.user.id,
+      name: adminUser && adminUser.name ? adminUser.name : superAdminCtx.user.email,
+      email: superAdminCtx.user.email,
+      role: 'super_admin',
+      must_change_password: false
+    };
+    const url = 'https://' + tenant.slug + '.' + BASE_DOMAIN + '/crm#impersonate=' +
+      encodeURIComponent(token) + '&u=' + encodeURIComponent(JSON.stringify(userForClient));
+    await logAdminAudit(env, superAdminCtx.user, 'tenant_enter', { type: 'tenant', id: tenant.id, slug: tenant.slug }, {});
+    return {
+      ok: true,
+      url,
+      tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug }
     };
   }
 
