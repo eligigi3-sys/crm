@@ -6363,9 +6363,9 @@ function renderRealCalendar(leads) {
   html += '</div>';
 
   html += '<div style="display:flex;gap:8px">';
-  html += '<button class="btn btn-secondary btn-sm" id="cal-real-prev">‹ קודם</button>';
+  html += '<button class="btn btn-secondary btn-sm" id="cal-real-prev">› קודם</button>';
   html += '<button class="btn btn-secondary btn-sm" id="cal-real-today">היום</button>';
-  html += '<button class="btn btn-secondary btn-sm" id="cal-real-next">הבא ›</button>';
+  html += '<button class="btn btn-secondary btn-sm" id="cal-real-next">הבא ‹</button>';
   html += '</div>';
 
   html += '</div>';
