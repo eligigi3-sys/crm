@@ -2136,6 +2136,7 @@ id="customers-search">
             <div class="form-group"><label class="form-label">מספר אורחים</label><input class="form-input" id="calc-guests" type="number" min="0" placeholder="300"></div>
             <div class="form-group"><label class="form-label">תאריך החתונה</label><input class="form-input" id="calc-date" type="date"></div>
           </div>
+          <div class="form-group"><label class="form-label">תוספות בר (לאדם) — דמי מזיגה מתווספים אוטומטית</label><div id="calc-bar-options"></div></div>
           <div class="form-group"><label class="form-label">כשרות</label><select class="form-input" id="calc-kashrut"></select></div>
           <div class="form-group"><label class="form-label">תוספות מיוחדות</label><div id="calc-extras"></div></div>
         </div>
@@ -7206,11 +7207,17 @@ var PLATE_TIERS = [
 ];
 function plateTierLabel(t) { return t.max ? t.min + '-' + t.max : t.min + '+'; }
 
+function defaultBarOptions() {
+  return [
+    { name: 'אלכוהול תוצרת חוץ', price: 14 },
+    { name: 'אלכוהול פרימיום', price: 29 }
+  ];
+}
 function defaultPricingConfig() {
   return {
     plate_prices: [0, 0, 0, 0, 0, 0],
-    bar: { price: 0, mode: 'per_guest' },
-    av: { price: 0, mode: 'fixed' },
+    bar: { pouring_fee: 15, options: defaultBarOptions() },
+    av: { price: 8900 },
     day_pricing: {},
     kashrut: [{ name: 'רגיל', price: 0 }],
     extras: []
@@ -7222,12 +7229,24 @@ function normalizePricingConfig(c) {
     plate_prices: PLATE_TIERS.map(function(t, i) {
       return Array.isArray(c.plate_prices) ? (Number(c.plate_prices[i]) || 0) : (Number(c.plate_price) || 0);
     }),
-    bar: { price: Number(c.bar && c.bar.price) || 0, mode: (c.bar && c.bar.mode) === 'fixed' ? 'fixed' : 'per_guest' },
-    av: { price: Number(c.av && c.av.price) || 0, mode: (c.av && c.av.mode) === 'per_guest' ? 'per_guest' : 'fixed' },
+    bar: { pouring_fee: 15, options: defaultBarOptions() },
+    av: { price: 8900 },
     day_pricing: {},
     kashrut: [],
     extras: []
   };
+  if (c.bar && typeof c.bar === 'object') {
+    if (typeof c.bar.pouring_fee !== 'undefined') out.bar.pouring_fee = Number(c.bar.pouring_fee) || 0;
+    else if (typeof c.bar.price !== 'undefined') out.bar.pouring_fee = (c.bar.mode === 'fixed' ? 0 : (Number(c.bar.price) || 0));
+    if (Array.isArray(c.bar.options)) {
+      out.bar.options = [];
+      c.bar.options.forEach(function(o) {
+        if (!o || !o.name) return;
+        out.bar.options.push({ name: String(o.name), price: Number(o.price) || 0 });
+      });
+    }
+  }
+  if (c.av && typeof c.av === 'object' && typeof c.av.price !== 'undefined') out.av.price = Number(c.av.price) || 0;
   var dp = c.day_pricing && typeof c.day_pricing === 'object' ? c.day_pricing : {};
   for (var i = 0; i <= 6; i++) out.day_pricing[String(i)] = Number(dp[String(i)]) || 0;
   (Array.isArray(c.kashrut) ? c.kashrut : defaultPricingConfig().kashrut).forEach(function(k) {
@@ -7250,9 +7269,12 @@ function loadPricingConfig() {
     return pricingConfigCache;
   });
 }
-function loadPricingSettings() {
+function loadPricingSettings(retries) {
   var body = document.getElementById('pricing-settings-body');
-  if (!body) return;
+  if (!body) {
+    if ((retries || 0) < 10) setTimeout(function() { loadPricingSettings((retries || 0) + 1); }, 400);
+    return;
+  }
   body.innerHTML = '<div class="dash-empty">טוען...</div>';
   loadPricingConfig().then(function(cfg) {
     var html = '';
@@ -7261,14 +7283,9 @@ function loadPricingSettings() {
       html += '<div class="form-group"><label class="form-label">' + plateTierLabel(t) + ' אורחים</label><input class="form-input" id="ps-tier-' + i + '" type="number" min="0" value="' + (cfg.plate_prices[i] || 0) + '"></div>';
     });
     html += '</div></div>';
-    html += '<div class="form-row">';
-    html += '<div class="form-group"><label class="form-label">שירותי בר (₪)</label><input class="form-input" id="ps-bar-price" type="number" min="0" value="' + cfg.bar.price + '"></div>';
-    html += '<div class="form-group"><label class="form-label">אופן חישוב בר</label><select class="form-select" id="ps-bar-mode"><option value="per_guest"' + (cfg.bar.mode === 'per_guest' ? ' selected' : '') + '>לאורח</option><option value="fixed"' + (cfg.bar.mode === 'fixed' ? ' selected' : '') + '>מחיר קבוע</option></select></div>';
-    html += '</div>';
-    html += '<div class="form-row">';
-    html += '<div class="form-group"><label class="form-label">תאורה, הגברה ומסכים (₪)</label><input class="form-input" id="ps-av-price" type="number" min="0" value="' + cfg.av.price + '"></div>';
-    html += '<div class="form-group"><label class="form-label">אופן חישוב תאורה/הגברה</label><select class="form-select" id="ps-av-mode"><option value="fixed"' + (cfg.av.mode === 'fixed' ? ' selected' : '') + '>מחיר קבוע</option><option value="per_guest"' + (cfg.av.mode === 'per_guest' ? ' selected' : '') + '>לאורח</option></select></div>';
-    html += '</div>';
+    html += '<div class="form-group"><label class="form-label">דמי מזיגה (₪ לאורח) — חובה, מתווסף אוטומטית לכל הצעה</label><input class="form-input" id="ps-bar-pouring" type="number" min="0" value="' + cfg.bar.pouring_fee + '" style="max-width:180px"></div>';
+    html += '<div class="form-group"><label class="form-label">תוספות בר לאורח (שם + ₪ לאדם) — אופציונלי, לבחירה במחשבון</label><div id="ps-bar-rows"></div><button class="btn btn-secondary btn-sm" id="ps-bar-add" type="button">+ הוסף תוספת בר</button></div>';
+    html += '<div class="form-group"><label class="form-label">תאורה, הגברה ומסכים (₪ קבוע) — סטנדרט בכל אירוע, מתווסף אוטומטית</label><input class="form-input" id="ps-av-price" type="number" min="0" value="' + cfg.av.price + '" style="max-width:180px"></div>';
     html += '<div class="form-group"><label class="form-label">תוספת מחיר לפי יום בשבוע (₪)</label><div class="pricing-day-grid">';
     for (var i = 0; i <= 6; i++) {
       html += '<div class="form-group"><label class="form-label">' + DAY_NAMES[i] + '</label><input class="form-input" id="ps-day-' + i + '" type="number" min="0" value="' + (cfg.day_pricing[String(i)] || 0) + '"></div>';
@@ -7278,8 +7295,10 @@ function loadPricingSettings() {
     html += '<div class="form-group"><label class="form-label">תוספות מיוחדות (שם + מחיר ₪)</label><div id="ps-extras-rows"></div><button class="btn btn-secondary btn-sm" id="ps-extras-add" type="button">+ הוסף תוספת</button></div>';
     html += '<button class="btn btn-primary" id="ps-save" type="button">שמור מחירי בסיס</button>';
     body.innerHTML = html;
+    renderPricingListRows('ps-bar-rows', cfg.bar.options, 'bar');
     renderPricingListRows('ps-kashrut-rows', cfg.kashrut, true);
     renderPricingListRows('ps-extras-rows', cfg.extras, false);
+    document.getElementById('ps-bar-add').addEventListener('click', function() { addPricingListRow('ps-bar-rows', 'bar', '', 0); });
     document.getElementById('ps-kashrut-add').addEventListener('click', function() { addPricingListRow('ps-kashrut-rows', true, '', 0); });
     document.getElementById('ps-extras-add').addEventListener('click', function() { addPricingListRow('ps-extras-rows', false, '', 0); });
     document.getElementById('ps-save').addEventListener('click', savePricingSettings);
@@ -7296,17 +7315,21 @@ function addPricingListRow(containerId, isKashrut, name, price) {
   if (!box) return;
   var row = document.createElement('div');
   row.className = 'pricing-list-row';
-  row.innerHTML = '<input class="form-input pricing-name" placeholder="' + (isKashrut ? 'למשל: מהדרין' : 'למשל: עמדת קבלת פנים') + '" value="' + String(name || '').replace(/"/g, '&quot;') + '"><input class="form-input pricing-price" type="number" min="0" placeholder="0" value="' + (Number(price) || 0) + '" style="max-width:110px"><button class="btn btn-ghost btn-sm pricing-remove" type="button">✕</button>';
+  row.innerHTML = '<input class="form-input pricing-name" placeholder="' + (isKashrut === 'bar' ? 'למשל: אלכוהול פרימיום' : (isKashrut ? 'למשל: מהדרין' : 'למשל: עמדת קבלת פנים')) + '" value="' + String(name || '').replace(/"/g, '&quot;') + '"><input class="form-input pricing-price" type="number" min="0" placeholder="0" value="' + (Number(price) || 0) + '" style="max-width:110px"><button class="btn btn-ghost btn-sm pricing-remove" type="button">✕</button>';
   row.querySelector('.pricing-remove').addEventListener('click', function() { row.remove(); });
   box.appendChild(row);
 }
 function collectPricingSettings() {
   var cfg = defaultPricingConfig();
   cfg.plate_prices = PLATE_TIERS.map(function(t, i) { return Number(document.getElementById('ps-tier-' + i).value) || 0; });
-  cfg.bar.price = Number(document.getElementById('ps-bar-price').value) || 0;
-  cfg.bar.mode = document.getElementById('ps-bar-mode').value === 'fixed' ? 'fixed' : 'per_guest';
+  cfg.bar.pouring_fee = Number(document.getElementById('ps-bar-pouring').value) || 0;
+  cfg.bar.options = [];
+  document.querySelectorAll('#ps-bar-rows .pricing-list-row').forEach(function(row) {
+    var name = row.querySelector('.pricing-name').value.trim();
+    if (!name) return;
+    cfg.bar.options.push({ name: name, price: Number(row.querySelector('.pricing-price').value) || 0 });
+  });
   cfg.av.price = Number(document.getElementById('ps-av-price').value) || 0;
-  cfg.av.mode = document.getElementById('ps-av-mode').value === 'per_guest' ? 'per_guest' : 'fixed';
   for (var i = 0; i <= 6; i++) cfg.day_pricing[String(i)] = Number(document.getElementById('ps-day-' + i).value) || 0;
   cfg.kashrut = [];
   document.querySelectorAll('#ps-kashrut-rows .pricing-list-row').forEach(function(row) {
@@ -7329,9 +7352,12 @@ function savePricingSettings() {
     toast('מחירי הבסיס נשמרו', 'success');
   }).catch(function(e) { toast(e.message, 'error'); });
 }
-function loadCalculator() {
+function loadCalculator(retries) {
   var coupleSel = document.getElementById('calc-couple');
-  if (!coupleSel) return;
+  if (!coupleSel) {
+    if ((retries || 0) < 10) setTimeout(function() { loadCalculator((retries || 0) + 1); }, 400);
+    return;
+  }
   loadPricingConfig().then(function(cfg) {
     renderCalculatorInputs(cfg);
   });
@@ -7353,6 +7379,13 @@ function renderCalculatorInputs(cfg) {
     kashrutSel.innerHTML = cfg.kashrut.map(function(k, i) {
       return '<option value="' + i + '">' + k.name + (k.price ? ' (+₪' + fmtMoney(k.price) + ')' : '') + '</option>';
     }).join('');
+  }
+  var barBox = document.getElementById('calc-bar-options');
+  if (barBox) {
+    barBox.innerHTML = cfg.bar.options.length ? cfg.bar.options.map(function(o, i) {
+      return '<label class="check-item" style="display:inline-flex;margin:0 0 6px 8px"><input type="checkbox" class="calc-bar-opt" value="' + i + '"> ' + o.name + ' (+₪' + fmtMoney(o.price) + ' לאדם)</label>';
+    }).join('') : '<div style="font-size:12px;color:var(--text3)">לא הוגדרו תוספות בר — אפשר להוסיף אותן בהגדרות עסק</div>';
+    barBox.querySelectorAll('.calc-bar-opt').forEach(function(cb) { cb.addEventListener('change', renderCalculation); });
   }
   var extrasBox = document.getElementById('calc-extras');
   if (extrasBox) {
@@ -7387,13 +7420,15 @@ function renderCalculation() {
   } else if (guests > 0) {
     rows.push({ label: tierIdx < 0 ? 'אין מדרגת מנה מוגדרת ל-' + guests + ' אורחים (המדרגות מתחילות מ-200)' : 'מחיר המנה במדרגה הזו עדיין 0 — אפשר לעדכן בהגדרות', amount: 0 });
   }
-  if (cfg.bar.price) {
-    var barAmt = cfg.bar.mode === 'per_guest' ? cfg.bar.price * guests : cfg.bar.price;
-    if (barAmt) rows.push({ label: 'שירותי בר' + (cfg.bar.mode === 'per_guest' ? ' (₪' + fmtMoney(cfg.bar.price) + ' לאורח)' : ''), amount: barAmt });
+  if (cfg.bar.pouring_fee && guests > 0) {
+    rows.push({ label: 'דמי מזיגה (חובה): ₪' + fmtMoney(cfg.bar.pouring_fee) + ' × ' + guests + ' אורחים', amount: cfg.bar.pouring_fee * guests });
   }
+  document.querySelectorAll('#calc-bar-options .calc-bar-opt:checked').forEach(function(cb) {
+    var o = cfg.bar.options[Number(cb.value)];
+    if (o && o.price && guests > 0) rows.push({ label: o.name + ': ₪' + fmtMoney(o.price) + ' × ' + guests + ' אורחים', amount: o.price * guests });
+  });
   if (cfg.av.price) {
-    var avAmt = cfg.av.mode === 'per_guest' ? cfg.av.price * guests : cfg.av.price;
-    if (avAmt) rows.push({ label: 'תאורה, הגברה ומסכים' + (cfg.av.mode === 'per_guest' ? ' (₪' + fmtMoney(cfg.av.price) + ' לאורח)' : ''), amount: avAmt });
+    rows.push({ label: 'תאורה, הגברה ומסכים (סטנדרט בכל אירוע)', amount: cfg.av.price });
   }
   if (dateVal) {
     var wd = new Date(dateVal + 'T12:00:00').getDay();
