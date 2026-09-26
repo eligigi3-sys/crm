@@ -412,6 +412,31 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .drawer.open{transform:translateX(0)}
 .drawer-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .drawer-title{font-size:15px;font-weight:800;color:var(--text)}
+.pipe-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.pipe-stat{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow)}
+.pipe-stat-label{font-size:12px;color:var(--text3);font-weight:600}
+.pipe-stat-value{font-size:22px;font-weight:800;margin-top:4px}
+.pipe-board{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:start}
+.pipe-col{background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:10px;min-height:200px}
+.pipe-col.drag-over{border-color:var(--accent);background:var(--accent-light)}
+.pipe-col-head{display:flex;align-items:center;justify-content:space-between;font-weight:700;font-size:13px;padding:4px 6px 10px}
+.pipe-count{background:var(--border);border-radius:99px;font-size:11px;padding:2px 8px}
+.pipe-cards{display:flex;flex-direction:column;gap:8px}
+.pipe-card{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:10px 12px;cursor:pointer;box-shadow:var(--shadow)}
+.pipe-card:hover{border-color:var(--accent)}
+.pipe-card.dragging{opacity:.5}
+.pipe-card-name{font-weight:700;font-size:14px}
+.pipe-card-meta{font-size:12px;color:var(--text2);margin-top:3px}
+.pipe-card-row{display:flex;align-items:center;justify-content:space-between;margin-top:8px;gap:6px}
+.pipe-price{font-weight:800;font-size:13px}
+.pipe-prob{font-size:11px;font-weight:700;border-radius:99px;padding:2px 8px;white-space:nowrap}
+.pipe-prob-low{background:#fee2e2;color:#b91c1c}
+.pipe-prob-mid{background:#fef3c7;color:#92400e}
+.pipe-prob-high{background:#dcfce7;color:#166534}
+.pipe-card-actions{display:flex;gap:6px;margin-top:8px}
+.pipe-empty{color:var(--text3);font-size:12px;text-align:center;padding:14px 4px}
+@media (max-width: 1100px){.pipe-board{grid-template-columns:1fr 1fr}.pipe-stats{grid-template-columns:1fr 1fr}}
+@media (max-width: 560px){.pipe-board{grid-template-columns:1fr}}
 .drawer-body{flex:1;overflow-y:auto;padding:18px 20px}
 .drawer-footer{padding:12px 20px;border-top:1px solid var(--border)}
 .info-section{margin-bottom:18px}
@@ -1810,6 +1835,7 @@ body.crm-shell .fab-add{display:flex}
       <button class="logout-btn" id="logout-btn">יציאה</button>
     </div>
     <div class="nav-item active" id="nav-dashboard"><span class="nav-icon">📊</span> <span class="nav-label" data-mobile="דאשבורד">דאשבורד</span></div>
+    <div class="nav-item" id="nav-pipeline" style="display:none"><span class="nav-icon">💍</span> <span class="nav-label" data-mobile="צינור זוגות">צינור זוגות</span></div>
     <div class="nav-item" id="nav-leads"><span class="nav-icon">👥</span> <span class="nav-label" data-mobile="לקוחות">לקוחות</span> <span class="nav-badge" id="nav-leads-count" style="display:none">0</span></div>
     <div class="nav-item" id="nav-employees"><span class="nav-icon">🧑‍💼</span> <span class="nav-label" data-mobile="עובדים">עובדים</span></div>
     <div class="nav-item" id="nav-team" style="display:none"><span class="nav-icon">👤</span> <span class="nav-label" data-mobile="צוות">צוות</span></div>
@@ -1845,7 +1871,7 @@ body.crm-shell .fab-add{display:flex}
       </div>
       <div class="smart-strip" id="smart-strip" style="display:none"></div>
       <div class="stats-grid">
-        <div class="stat-card purple"><div class="stat-icon-wrap">👥</div><div><div class="stat-label">סה"כ לידים</div><div class="stat-value" id="stat-total">—</div></div></div>
+        <div class="stat-card purple"><div class="stat-icon-wrap">👥</div><div><div class="stat-label" id="stat-total-label">סה"כ לידים</div><div class="stat-value" id="stat-total">—</div></div></div>
         <div class="stat-card green"><div class="stat-icon-wrap">✅</div><div><div class="stat-label">עסקאות סגורות</div><div class="stat-value" id="stat-closed">—</div></div></div>
         <div class="stat-card orange"><div class="stat-icon-wrap">📋</div><div><div class="stat-label">הצעות מחיר</div><div class="stat-value" id="stat-quotes">—</div></div></div>
         <div class="stat-card blue" style="flex-direction:column;align-items:flex-start;gap:6px">
@@ -1874,7 +1900,7 @@ body.crm-shell .fab-add{display:flex}
         <div class="dash-section"><div class="dash-section-title">📅 אירועים בתאריכים קרובים</div><div id="dash-upcoming"><div class="dash-empty">טוען...</div></div></div>
         <div class="mini-cal" id="mini-cal"><div class="dash-empty">טוען...</div></div>
       </div>
-      <div class="dash-section" style="margin-top:18px"><div class="dash-section-title">🕐 לידים אחרונים</div><div id="dash-recent"><div class="dash-empty">טוען...</div></div></div>
+      <div class="dash-section" style="margin-top:18px"><div class="dash-section-title" id="dash-recent-title">🕐 לידים אחרונים</div><div id="dash-recent"><div class="dash-empty">טוען...</div></div></div>
     </div>
     <div id="page-leads" class="page">
       <div class="page-header"><div class="page-title">לקוחות ולידים</div><button class="btn btn-primary" id="btn-new-lead2">+ ליד חדש</button></div>
@@ -1886,7 +1912,22 @@ body.crm-shell .fab-add{display:flex}
           <select class="filter-select" id="leads-event-filter"><option value="">כל סוגי האירועים</option><option>חתונה</option><option>בר מצווה</option><option>בת מצווה</option><option>יום הולדת</option><option>אירוע חברה</option><option>ברית</option><option>הפרשת חלה</option><option>אחר</option></select>
           <button class="filter-chip" id="leads-overdue-filter" type="button" onclick="toggleOverdueFilter()">🔥 מעקב באיחור</button>
         </div>
-        <table><thead><tr><th></th><th>שם לקוח</th><th>טלפון</th><th>סוג אירוע</th><th>תאריך</th><th>אולם</th><th>מחיר</th><th>סטטוס</th><th>מעקב הבא</th><th></th></tr></thead><tbody id="leads-body"><tr class="empty-row"><td colspan="10">טוען...</td></tr></tbody></table>
+        <table><thead><tr><th></th><th id="leads-th-name">שם לקוח</th><th>טלפון</th><th>סוג אירוע</th><th>תאריך</th><th>אולם</th><th>מחיר</th><th>סטטוס</th><th>מעקב הבא</th><th></th></tr></thead><tbody id="leads-body"><tr class="empty-row"><td colspan="10">טוען...</td></tr></tbody></table>
+      </div>
+    </div>
+    <div id="page-pipeline" class="page">
+      <div class="page-header"><div class="page-title">💍 צינור זוגות <small>כל הזוגות, הפגישות, ההצעות והסיכויים במקום אחד</small></div><button class="btn btn-primary" id="btn-new-lead-pipeline">+ זוג חדש</button></div>
+      <div class="pipe-stats">
+        <div class="pipe-stat"><div class="pipe-stat-label">זוגות פעילים בצינור</div><div class="pipe-stat-value" id="pipe-stat-open">—</div></div>
+        <div class="pipe-stat"><div class="pipe-stat-label">צפי הכנסות משוקלל (לפי סיכוי)</div><div class="pipe-stat-value" id="pipe-stat-weighted">—</div></div>
+        <div class="pipe-stat"><div class="pipe-stat-label">זוגות שסגרו</div><div class="pipe-stat-value" id="pipe-stat-closed">—</div></div>
+        <div class="pipe-stat"><div class="pipe-stat-label">שווי סגירות</div><div class="pipe-stat-value" id="pipe-stat-revenue">—</div></div>
+      </div>
+      <div class="pipe-board" id="pipe-board">
+        <div class="pipe-col" data-stage="lead"><div class="pipe-col-head"><span>📅 פגישות נקבעו</span><span class="pipe-count" id="pipe-count-lead">0</span></div><div class="pipe-cards" id="pipe-cards-lead"></div></div>
+        <div class="pipe-col" data-stage="quote"><div class="pipe-col-head"><span>📄 הוצאתה הצעה</span><span class="pipe-count" id="pipe-count-quote">0</span></div><div class="pipe-cards" id="pipe-cards-quote"></div></div>
+        <div class="pipe-col" data-stage="closed"><div class="pipe-col-head"><span>🎉 סגרו</span><span class="pipe-count" id="pipe-count-closed">0</span></div><div class="pipe-cards" id="pipe-cards-closed"></div></div>
+        <div class="pipe-col" data-stage="cancelled"><div class="pipe-col-head"><span>✖️ לא סגרו</span><span class="pipe-count" id="pipe-count-cancelled">0</span></div><div class="pipe-cards" id="pipe-cards-cancelled"></div></div>
       </div>
     </div>
     <div id="page-customers" class="page">
@@ -2216,9 +2257,9 @@ id="customers-search">
     <div class="modal-header"><h2 id="modal-lead-title">ליד חדש</h2><button class="modal-close" id="modal-close-btn">✕</button></div>
     <div class="modal-body">
       <input type="hidden" id="lead-id">
-      <div class="form-section">פרטי לקוח</div>
+      <div class="form-section" id="lead-modal-client-section">פרטי לקוח</div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">שם לקוח *</label>
+        <div class="form-group"><label class="form-label" id="l-name-label">שם לקוח *</label>
           <div style="position:relative">
             <input class="form-input" id="l-name" placeholder="ישראל ישראלי" autocomplete="off">
             <div id="ac-name" class="ac-dropdown"></div>
@@ -2245,11 +2286,18 @@ id="customers-search">
         <div class="form-group"><label class="form-label">סטטוס</label><select class="form-select" id="l-status"><option value="lead">ליד</option><option value="quote">הצעת מחיר</option><option value="closed">סגור</option><option value="cancelled">בוטל</option></select></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">תאריך אירוע</label><input class="form-input" id="l-event-date" type="date"></div>
+        <div class="form-group"><label class="form-label" id="l-event-date-label">תאריך אירוע</label><input class="form-input" id="l-event-date" type="date"></div>
         <div class="form-group"><label class="form-label">שעה</label><input class="form-input" id="l-event-time" type="time"></div>
       </div>
       <div class="form-group"><label class="form-label">אולם / מיקום</label><input class="form-input" id="l-venue" placeholder="שם האולם / עיר"></div>
-      <div class="form-section">אטרקציות</div>
+      <div id="artista-fields" style="display:none">
+        <div class="form-section">פגישה וסיכויים</div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">תאריך פגישה</label><input class="form-input" id="l-meeting-date" type="date"></div>
+          <div class="form-group"><label class="form-label">סיכוי סגירה</label><select class="form-select" id="l-close-probability"><option value="">לא צויין</option><option value="10">10% - נמוך</option><option value="25">25%</option><option value="50">50% - בינוני</option><option value="75">75%</option><option value="90">90% - גבוה</option></select></div>
+        </div>
+      </div>
+      <div class="form-section" id="attractions-section">אטרקציות</div>
       <div class="check-grid" id="attractions-grid">
         <label class="check-item"><input type="checkbox" value="בלונים"> 🎈 בלונים</label>
         <label class="check-item"><input type="checkbox" value="עמדת צילום"> 📸 עמדת צילום</label>
@@ -2346,9 +2394,11 @@ var allLeadsCache = [];
 var monthlyClientReportData = null;
 var calYear, calMonth;
 var currentTenantContext = null;
+var artistaHomeApplied = false;
 
 var CRM_MOBILE_NAV_ITEMS = [
   { navId: 'nav-dashboard', page: 'dashboard', label: 'דאשבורד', icon: '📊' },
+  { navId: 'nav-pipeline', page: 'pipeline', label: 'צינור זוגות', icon: '💍', moduleKey: 'leads', artistaOnly: true },
   { navId: 'nav-calendar', page: 'calendar', label: 'יומן אירועים', icon: '📅', moduleKey: 'leads' },
   { navId: 'nav-leads', page: 'customers', label: 'לקוחות', icon: '👥', moduleKey: 'contacts' },
   { navId: 'nav-employees', page: 'employees', label: 'עובדים', icon: '🧑💼', moduleKey: 'employees' },
@@ -2512,6 +2562,7 @@ function getModuleSortOrder(moduleKey, fallback) {
 function getAvailableCrmMobileNavItems() {
   return CRM_MOBILE_NAV_ITEMS.filter(function(item) {
     if (item.teamOnly && !isTeamManagerAllowed()) return false;
+    if (item.artistaOnly && !isArtistaMode()) return false;
     if (item.moduleKey && !isModuleEnabled(item.moduleKey)) return false;
     return true;
   });
@@ -2615,6 +2666,8 @@ function applySidebarModuleOrder() {
   ];
   var dashboard = document.getElementById('nav-dashboard');
   if (dashboard) dashboard.style.order = 10;
+  var pipelineNav = document.getElementById('nav-pipeline');
+  if (pipelineNav) pipelineNav.style.order = 15;
   var businessSettings = document.getElementById('nav-business-settings');
   if (businessSettings) businessSettings.style.order = 95;
   orderedNav.forEach(function(item) {
@@ -2702,6 +2755,7 @@ function applyModuleVisibility() {
 // כתובת ייעודית לכל עמוד במערכת - /crm/<page> לעמודי העסק, /admin לניהול הפלטפורמה
 var PAGE_ROUTES = {
   dashboard: '/crm',
+  pipeline: '/crm/pipeline',
   leads: '/crm/leads',
   customers: '/crm/customers',
   employees: '/crm/employees',
@@ -2896,6 +2950,9 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   document.getElementById('add-note-btn').addEventListener('click', addNote);
   document.getElementById('nav-dashboard').addEventListener('click', function() { goTo('dashboard', this); });
   document.getElementById('nav-leads').addEventListener('click', function() { goTo('customers', this); });
+  document.getElementById('nav-pipeline').addEventListener('click', function() { goTo('pipeline', this); });
+  var btnNewLeadPipeline = document.getElementById('btn-new-lead-pipeline');
+  if (btnNewLeadPipeline) btnNewLeadPipeline.addEventListener('click', function() { openLeadModal(); });
   var navEmployees = document.getElementById('nav-employees');
   if (navEmployees) navEmployees.addEventListener('click', function() { goTo('employees', this); });
   var navTeam = document.getElementById('nav-team');
@@ -3058,6 +3115,7 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
 function goTo(page, el) {
   var pageModuleMap = {
     leads: 'leads',
+    pipeline: 'leads',
     customers: 'contacts',
     employees: 'employees',
     products: 'products',
@@ -3091,6 +3149,7 @@ function goTo(page, el) {
   if (el) el.classList.add('active');
   if (page === 'dashboard') loadDashboard();
   if (page === 'leads') loadLeads();
+  if (page === 'pipeline') loadPipeline();
   if (page === 'shopping') loadShoppingLists();
   if (page === 'strategic-contacts') loadStrategicContacts();
   if (page === 'sales-documents') loadSalesDocuments();
@@ -3169,6 +3228,14 @@ function loadTenantContext() {
   return apiCall('GET', '/api/auth/tenant-context').then(function(data) {
     currentTenantContext = data || null;
     applySuperAdminVisibility();
+    applyArtistaMode();
+    if (isArtistaMode() && !artistaHomeApplied) {
+      artistaHomeApplied = true;
+      var crmPath = window.location.pathname;
+      if ((crmPath === '/crm' || crmPath === '/crm/') && document.getElementById('app').style.display !== 'none') {
+        goTo('pipeline', document.getElementById('nav-pipeline'));
+      }
+    }
     maybeShowTenantOwnerSetup();
     return data;
   }).catch(function(err) {
@@ -3500,6 +3567,7 @@ function showApp() {
         applySuperAdminVisibility();
       }
       var initialPage = (deepLinkPage && deepLinkPage !== 'super-admin') ? deepLinkPage : 'dashboard';
+      if (isArtistaMode() && initialPage === 'dashboard') initialPage = 'pipeline';
       var initialNavId = navIdForPage(initialPage);
       goTo(initialPage, initialNavId ? document.getElementById(initialNavId) : null);
       if (initialPage === 'dashboard') loadDashboard();
@@ -3521,6 +3589,7 @@ function showApp() {
 
 function logout() {
   currentTenantContext = null;
+  artistaHomeApplied = false;
   currentTeamMembers = [];
   showLoggedOutState();
 }
@@ -4300,7 +4369,7 @@ function loadDashboard() {
     var fuEl = document.getElementById('dash-followups');
     fuEl.innerHTML = d.followUps.length ? d.followUps.map(function(l) {
       return '<div class="dash-item" data-id="' + l.id + '"><div><div class="dash-item-name">' + l.name + '</div><div class="dash-item-sub">' + (l.event_type||'') + (l.event_date ? ' - ' + formatDate(l.event_date) : '') + '</div></div>' + statusBadge(l.status) + '</div>';
-    }).join('') : renderGuidedEmptyState('אין מעקבים להיום', 'כשתוסיף לידים ואירועים, המשימות הקרובות יופיעו כאן.', 'צור ליד ראשון', 'openLeadModal()');
+    }).join('') : renderGuidedEmptyState('אין מעקבים להיום', isArtistaMode() ? 'כשתוסיף זוגות ופגישות, המשימות הקרובות יופיעו כאן.' : 'כשתוסיף לידים ואירועים, המשימות הקרובות יופיעו כאן.', isArtistaMode() ? 'צור זוג ראשון' : 'צור ליד ראשון', 'openLeadModal()');
     var upEl = document.getElementById('dash-upcoming');
     var today = getTodayYMD();
     var todayEvents = [];
@@ -4320,7 +4389,7 @@ function loadDashboard() {
     var recEl = document.getElementById('dash-recent');
     recEl.innerHTML = d.recentLeads.length ? d.recentLeads.map(function(l) {
       return '<div class="dash-item" data-id="' + l.id + '"><div><div class="dash-item-name">' + l.name + '</div><div class="dash-item-sub">' + (l.phone||'') + (l.event_type ? ' - ' + l.event_type : '') + '</div></div>' + statusBadge(l.status) + '</div>';
-    }).join('') : renderGuidedEmptyState('אין לידים עדיין', 'זה מקום טוב להתחיל ממנו. הוסף ליד ראשון ותראה כאן את הפעילות האחרונה שלך.', 'צור ליד ראשון', 'openLeadModal()');
+    }).join('') : renderGuidedEmptyState(isArtistaMode() ? 'אין זוגות עדיין' : 'אין לידים עדיין', isArtistaMode() ? 'הוסף את הזוג הראשון שקבע פגישה ותראה כאן את הפעילות האחרונה.' : 'זה מקום טוב להתחיל ממנו. הוסף ליד ראשון ותראה כאן את הפעילות האחרונה שלך.', isArtistaMode() ? 'צור זוג ראשון' : 'צור ליד ראשון', 'openLeadModal()');
     document.querySelectorAll('.dash-item[data-id]').forEach(function(el) {
       el.addEventListener('click', function() { openEventDetailsModal(parseInt(this.getAttribute('data-id'))); });
     });
@@ -4468,9 +4537,13 @@ function loadLeads() {
     if (eventType) leads = leads.filter(function(l) { return l.event_type === eventType; });
     if (leadsOverdueOnly) leads = leads.filter(function(l) { var ed = (l.event_date || '').substring(0, 10); return isOverdue(l.next_contact) && (!ed || ed >= today) && (l.status || '') !== 'cancelled'; });
     var leadsCountEl = document.getElementById('leads-count');
-    if (leadsCountEl) leadsCountEl.textContent = leads.length + ' אירועים';
+    if (leadsCountEl) leadsCountEl.textContent = leads.length + (isArtistaMode() ? ' זוגות' : ' אירועים');
     var tbody = document.getElementById('leads-body');
-    if (!leads.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="10"><div class="guided-empty"><div class="guided-empty-title">אין לידים עדיין</div><div class="guided-empty-sub">אפשר להתחיל בקלות עם ליד ראשון ולהוסיף ממנו גם אירוע ופרטי לקוח.</div><button class="btn btn-primary btn-sm" onclick="openLeadModal()">צור ליד ראשון</button></div></td></tr>'; return; }
+    if (!leads.length) {
+      var artistaEmpty = isArtistaMode();
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="10"><div class="guided-empty"><div class="guided-empty-title">' + (artistaEmpty ? 'אין זוגות עדיין' : 'אין לידים עדיין') + '</div><div class="guided-empty-sub">' + (artistaEmpty ? 'הוסף את הזוג הראשון שקבע פגישה, ותראה כאן את כל הפרטים.' : 'אפשר להתחיל בקלות עם ליד ראשון ולהוסיף ממנו גם אירוע ופרטי לקוח.') + '</div><button class="btn btn-primary btn-sm" onclick="openLeadModal()">' + (artistaEmpty ? 'צור זוג ראשון' : 'צור ליד ראשון') + '</button></div></td></tr>';
+      return;
+    }
 
     var today = getTodayYMD();
     var futureLeads = [];
@@ -4484,7 +4557,9 @@ function loadLeads() {
 
     function renderLeadRow(l) {
       var payBadge = l.price > 0 ? (l.balance_paid ? '<span class="badge badge-green">שולם</span>' : (l.deposit > 0 ? '<span class="badge badge-yellow">מקדמה</span>' : '<span class="badge badge-red">טרם שולם</span>')) : '';
-      return '<tr data-id="' + l.id + '"><td><div class="dot ' + getUrgencyDot(l.next_contact) + '"></div></td><td class="bold">' + l.name + '</td><td>' + (l.phone ? '<a href="tel:' + l.phone + '" onclick="event.stopPropagation()" style="color:inherit;text-decoration:none">' + l.phone + '</a>' : '—') + '</td><td>' + (l.event_type||'—') + '</td><td>' + (l.event_date?formatDate(l.event_date):'—') + '</td><td>' + (l.venue||'—') + '</td><td>' + (l.price?'₪'+fmtMoney(l.price):payBadge||'—') + '</td><td>' + statusBadge(l.status) + '</td><td style="font-size:12px;' + (isOverdue(l.next_contact)?'color:var(--red);font-weight:700':'') + '">' + (l.next_contact?formatDate(l.next_contact):'—') + '</td><td><button class="btn btn-ghost btn-sm edit-btn" data-id="' + l.id + '">עריכה</button> <button class="btn btn-danger btn-sm del-btn" data-id="' + l.id + '">מחיקה</button></td></tr>';
+      var priceCell = (l.price ? '₪' + fmtMoney(l.price) : payBadge || '—');
+      if (isArtistaMode()) priceCell += ' ' + probChip(l.close_probability);
+      return '<tr data-id="' + l.id + '"><td><div class="dot ' + getUrgencyDot(l.next_contact) + '"></div></td><td class="bold">' + l.name + '</td><td>' + (l.phone ? '<a href="tel:' + l.phone + '" onclick="event.stopPropagation()" style="color:inherit;text-decoration:none">' + l.phone + '</a>' : '—') + '</td><td>' + (l.event_type||'—') + '</td><td>' + (l.event_date?formatDate(l.event_date):'—') + '</td><td>' + (l.venue||'—') + '</td><td>' + priceCell + '</td><td>' + statusBadge(l.status) + '</td><td style="font-size:12px;' + (isOverdue(l.next_contact)?'color:var(--red);font-weight:700':'') + '">' + (l.next_contact?formatDate(l.next_contact):'—') + '</td><td><button class="btn btn-ghost btn-sm edit-btn" data-id="' + l.id + '">עריכה</button> <button class="btn btn-danger btn-sm del-btn" data-id="' + l.id + '">מחיקה</button></td></tr>';
     }
 
     function renderLeadSection(title, sectionLeads, emptyText) {
@@ -4494,8 +4569,8 @@ function loadLeads() {
     }
 
     tbody.innerHTML =
-      renderLeadSection('אירועים עתידיים', futureLeads, 'אין אירועים עתידיים להצגה') +
-      renderLeadSection('ארכיון אירועים', archivedLeads, 'אין אירועים בארכיון');
+      renderLeadSection(isArtistaMode() ? 'חתונות קרובות' : 'אירועים עתידיים', futureLeads, isArtistaMode() ? 'אין חתונות קרובות להצגה' : 'אין אירועים עתידיים להצגה') +
+      renderLeadSection(isArtistaMode() ? 'חתונות שעברו' : 'ארכיון אירועים', archivedLeads, 'אין אירועים בארכיון');
 
     tbody.querySelectorAll('tr[data-id]').forEach(function(row) {
       row.addEventListener('click', function(e) { if (!e.target.classList.contains('edit-btn') && !e.target.classList.contains('del-btn')) openDrawer(parseInt(this.getAttribute('data-id'))); });
@@ -6644,11 +6719,21 @@ function buildLeadWaMessage(l, kind) {
 }
 
 function renderDrawer(l, notes) {
-  document.getElementById('drawer-title').textContent = 'אירוע #' + (l.lead_num || l.id) + ' · ' + l.name;
+  var artista = isArtistaMode();
+  document.getElementById('drawer-title').textContent = (artista ? 'זוג #' : 'אירוע #') + (l.lead_num || l.id) + ' · ' + l.name;
   var attrs = safeJSON(l.attractions);
   var balance = (l.price||0) - (l.deposit||0);
   var html = '<div class="info-section"><div style="display:flex;gap:8px;margin-bottom:12px"><span class="badge badge-purple">אירוע #' + (l.lead_num || l.id) + '</span>' + statusBadge(l.status) + (l.event_type ? '<span class="badge badge-purple">' + l.event_type + '</span>' : '') + '</div>';
-  html += '<div class="info-section-title">פרטי לקוח</div>';
+  if (artista) {
+    var stageOpts = ['lead','quote','closed','cancelled'].map(function(s) { return '<option value="' + s + '"' + (l.status === s ? ' selected' : '') + '>' + artistaStatusLabel(s) + '</option>'; }).join('');
+    var probCur = (l.close_probability === null || l.close_probability === undefined) ? '' : String(l.close_probability);
+    var probOpts = ['', '10', '25', '50', '75', '90'].map(function(p) { return '<option value="' + p + '"' + (probCur === p ? ' selected' : '') + '>' + (p === '' ? 'לא צויין' : p + '%') + '</option>'; }).join('');
+    html += '<div class="info-section-title">💍 צינור מכירות</div>';
+    html += '<div class="info-row"><span class="info-label">שלב בצינור</span><span class="info-value"><select class="form-input" id="drawer-stage-select">' + stageOpts + '</select></span></div>';
+    html += '<div class="info-row"><span class="info-label">תאריך פגישה</span><span class="info-value"><input type="date" class="form-input" id="drawer-meeting-date" value="' + (l.meeting_date || '') + '"></span></div>';
+    html += '<div class="info-row"><span class="info-label">סיכוי סגירה</span><span class="info-value"><select class="form-input" id="drawer-prob-select">' + probOpts + '</select></span></div>';
+  }
+  html += '<div class="info-section-title">' + (artista ? 'פרטי הזוג' : 'פרטי לקוח') + '</div>';
   html += '<div class="info-row">' +
     '<span class="info-label">טלפון</span>' +
     '<span class="info-value" style="display:flex;align-items:center;gap:8px">' +
@@ -6663,8 +6748,8 @@ function renderDrawer(l, notes) {
     html += '<textarea class="form-input" id="wa-template-text" rows="5" style="resize:vertical"></textarea>';
     html += '<button class="btn btn-primary" id="wa-template-open" style="width:100%;margin-top:8px">פתח בוואטסאפ</button></div>';
   }
-  html += '<div class="info-section"><div class="info-section-title">פרטי האירוע</div>';
-  html += '<div class="info-row"><span class="info-label">תאריך</span><span class="info-value" style="font-weight:700;color:var(--accent)">' + (l.event_date?formatDate(l.event_date):'—') + '</span></div>';
+  html += '<div class="info-section"><div class="info-section-title">' + (artista ? 'פרטי החתונה' : 'פרטי האירוע') + '</div>';
+  html += '<div class="info-row"><span class="info-label">' + (artista ? 'תאריך החתונה' : 'תאריך') + '</span><span class="info-value" style="font-weight:700;color:var(--accent)">' + (l.event_date?formatDate(l.event_date):'—') + '</span></div>';
   html += '<div class="info-row"><span class="info-label">שעה</span><span class="info-value">' + (l.event_time||'—') + '</span></div>';
   html += '<div class="info-row"><span class="info-label">אולם</span><span class="info-value">' + (l.venue||'—') + '</span></div>';
   if (attrs.length) html += '<div class="info-row"><span class="info-label">אטרקציות</span><div class="attraction-tags">' + attrs.map(function(a) { return '<span class="attraction-tag">' + a + '</span>'; }).join('') + '</div></div>';
@@ -6681,6 +6766,14 @@ function renderDrawer(l, notes) {
   html += notes.length ? notes.map(function(n) { return '<div class="note-item">' + n.note + '<div class="note-date">' + fmtDT(n.created_at) + '</div></div>'; }).join('') : '<div style="color:var(--text3);font-size:13px">אין הערות עדיין</div>';
   html += '</div>';
   document.getElementById('drawer-body').innerHTML = html;
+  if (artista) {
+    var drawerStageSel = document.getElementById('drawer-stage-select');
+    if (drawerStageSel) drawerStageSel.addEventListener('change', function() { patchLeadField(l.id, { status: drawerStageSel.value }, 'השלב עודכן'); });
+    var drawerMeetingInput = document.getElementById('drawer-meeting-date');
+    if (drawerMeetingInput) drawerMeetingInput.addEventListener('change', function() { patchLeadField(l.id, { meeting_date: drawerMeetingInput.value || null }, 'תאריך הפגישה עודכן'); });
+    var drawerProbSel = document.getElementById('drawer-prob-select');
+    if (drawerProbSel) drawerProbSel.addEventListener('change', function() { patchLeadField(l.id, { close_probability: drawerProbSel.value === '' ? null : Number(drawerProbSel.value) }, 'סיכוי הסגירה עודכן'); });
+  }
   var waSelect = document.getElementById('wa-template-select');
   if (waSelect) {
     var waText = document.getElementById('wa-template-text');
@@ -6725,13 +6818,16 @@ var acSetupDone = false;
 function openLeadModal() {
   if (!acSetupDone) { setupAutocomplete(); acSetupDone = true; }
   document.getElementById('lead-id').value = '';
-  document.getElementById('modal-lead-title').textContent = 'ליד חדש';
+  document.getElementById('modal-lead-title').textContent = isArtistaMode() ? 'זוג חדש' : 'ליד חדש';
   var deleteBtn = document.getElementById('modal-delete-btn');
   if (deleteBtn) deleteBtn.style.display = 'none';
   ['l-name','l-phone','l-email','l-venue','l-details','l-notes','l-price','l-deposit'].forEach(function(id) { document.getElementById(id).value = ''; });
   ['l-event-date','l-event-time','l-deposit-date','l-last-contact','l-next-contact'].forEach(function(id) { document.getElementById(id).value = ''; });
   document.getElementById('l-event-type').value = '';
   document.getElementById('l-status').value = 'lead';
+  document.getElementById('l-meeting-date').value = '';
+  document.getElementById('l-close-probability').value = '';
+  applyLeadModalMode();
   document.getElementById('l-balance-paid').checked = false;
   document.getElementById('balance-paid-check').classList.remove('checked');
   document.getElementById('dup-name').style.display = 'none';
@@ -6767,6 +6863,9 @@ function editLead(id) {
     document.getElementById('l-next-contact').value = l.next_contact||'';
     document.getElementById('l-details').value = l.details||'';
     document.getElementById('l-notes').value = l.notes||'';
+    document.getElementById('l-meeting-date').value = l.meeting_date||'';
+    document.getElementById('l-close-probability').value = (l.close_probability === null || l.close_probability === undefined) ? '' : String(l.close_probability);
+    applyLeadModalMode();
     document.getElementById('dup-name').style.display = 'none';
     document.getElementById('dup-phone').style.display = 'none';
     var attrs = safeJSON(l.attractions);
@@ -6813,7 +6912,10 @@ function saveLead() {
     details: document.getElementById('l-details').value,
     notes: document.getElementById('l-notes').value
   };
-  if (!body.name) { toast('שם לקוח חובה', 'error'); return; }
+  body.meeting_date = document.getElementById('l-meeting-date').value || null;
+  var probVal = document.getElementById('l-close-probability').value;
+  body.close_probability = probVal === '' ? null : Number(probVal);
+  if (!body.name) { toast(isArtistaMode() ? 'שם הזוג חובה' : 'שם לקוח חובה', 'error'); return; }
   var req = id ? apiCall('PUT', '/api/leads/' + id, body) : apiCall('POST', '/api/leads', body);
   req.then(function() {
     closeLeadModal();
@@ -6847,7 +6949,172 @@ function isOverdue(d) { if (!d) return false; return d.substring(0,10) < getToda
 function getUrgencyDot(nc) { if (!nc) return 'dot-gray'; var t = getTodayYMD(); if (nc < t) return 'dot-red'; var tm = shiftYMD(t, 1); return nc <= tm ? 'dot-orange' : 'dot-green'; }
 function safeJSON(v) { try { var r = JSON.parse(v); return Array.isArray(r)?r:[]; } catch(e) { return []; } }
 function fmtMoney(n) { return Number(n||0).toLocaleString('he-IL'); }
-function statusBadge(s) { var m={lead:'badge-blue',quote:'badge-orange',closed:'badge-green',cancelled:'badge-gray'}; var l={lead:'ליד',quote:'הצעת מחיר',closed:'סגור',cancelled:'בוטל'}; return '<span class="badge '+(m[s]||'badge-gray')+'">'+(l[s]||s)+'</span>'; }
+function statusBadge(s) { var m={lead:'badge-blue',quote:'badge-orange',closed:'badge-green',cancelled:'badge-gray'}; var l={lead:'ליד',quote:'הצעת מחיר',closed:'סגור',cancelled:'בוטל'}; var label = isArtistaMode() ? artistaStatusLabel(s) : (l[s]||s); return '<span class="badge '+(m[s]||'badge-gray')+'">'+label+'</span>'; }
+// ---- Artista: מצב צינור זוגות (tenant 82) ----
+function isArtistaMode() {
+  var t = currentTenantContext && currentTenantContext.tenant;
+  if (!t) return false;
+  return String(t.slug || '').toLowerCase() === 'artista' || Number(t.id) === 82;
+}
+function artistaStatusLabel(s) {
+  var l = { lead: 'פגישה נקבעה', quote: 'הוצאתה הצעה', closed: 'סגרו 🎉', cancelled: 'לא סגרו' };
+  return l[s] || s;
+}
+function setTextIf(id, txt) { var el = document.getElementById(id); if (el) el.textContent = txt; }
+function probChip(p) {
+  if (p === null || p === undefined || p === '') return '';
+  var n = Number(p);
+  if (!n && n !== 0) return '';
+  var cls = n >= 70 ? 'pipe-prob-high' : (n >= 40 ? 'pipe-prob-mid' : 'pipe-prob-low');
+  return '<span class="pipe-prob ' + cls + '">' + n + '% סיכוי</span>';
+}
+function applyArtistaMode() {
+  var artista = isArtistaMode();
+  var navPipeline = document.getElementById('nav-pipeline');
+  if (navPipeline) navPipeline.style.display = artista ? 'flex' : 'none';
+  if (!artista) return;
+  var navLeadsLabel = document.querySelector('#nav-leads .nav-label');
+  if (navLeadsLabel) { navLeadsLabel.textContent = 'זוגות'; navLeadsLabel.setAttribute('data-mobile', 'זוגות'); }
+  var leadsTitle = document.querySelector('#page-leads .page-title');
+  if (leadsTitle) leadsTitle.textContent = 'זוגות ופגישות';
+  setTextIf('btn-new-lead', '+ זוג חדש');
+  setTextIf('btn-new-lead2', '+ זוג חדש');
+  var fab = document.getElementById('fab-add');
+  if (fab) fab.title = 'זוג חדש (N)';
+  setTextIf('stat-total-label', 'סה"כ זוגות');
+  setTextIf('dash-recent-title', '🕐 זוגות אחרונים');
+  var thName = document.getElementById('leads-th-name');
+  if (thName) thName.textContent = 'הזוג';
+  var statusFilter = document.getElementById('leads-status-filter');
+  if (statusFilter && statusFilter.getAttribute('data-artista') !== '1') {
+    var curStatus = statusFilter.value;
+    statusFilter.innerHTML = '<option value="">כל הסטטוסים</option><option value="lead">פגישה נקבעה</option><option value="quote">הוצאתה הצעה</option><option value="closed">סגרו</option><option value="cancelled">לא סגרו</option>';
+    statusFilter.setAttribute('data-artista', '1');
+    statusFilter.value = curStatus;
+  }
+  CRM_MOBILE_NAV_ITEMS.forEach(function(item) { if (item.navId === 'nav-leads') item.label = 'זוגות'; });
+  if (typeof applyMobileNavigationPreferences === 'function') { try { applyMobileNavigationPreferences(); } catch (e) {} }
+  applyLeadModalMode();
+}
+function applyLeadModalMode() {
+  var artista = isArtistaMode();
+  var af = document.getElementById('artista-fields');
+  if (af) af.style.display = artista ? '' : 'none';
+  var attrSec = document.getElementById('attractions-section');
+  if (attrSec) attrSec.style.display = artista ? 'none' : '';
+  var attrGrid = document.getElementById('attractions-grid');
+  if (attrGrid) attrGrid.style.display = artista ? 'none' : '';
+  if (!artista) return;
+  setTextIf('lead-modal-client-section', 'פרטי הזוג');
+  setTextIf('l-name-label', 'שם הזוג *');
+  setTextIf('l-event-date-label', 'תאריך החתונה');
+  var lname = document.getElementById('l-name');
+  if (lname) lname.placeholder = 'דני ומיכל';
+  var statusSel = document.getElementById('l-status');
+  if (statusSel) {
+    var cur = statusSel.value;
+    statusSel.innerHTML = '<option value="lead">פגישה נקבעה</option><option value="quote">הוצאתה הצעה</option><option value="closed">סגרו</option><option value="cancelled">לא סגרו</option>';
+    statusSel.value = cur;
+  }
+}
+var PIPELINE_STAGES = [
+  { key: 'lead' },
+  { key: 'quote' },
+  { key: 'closed' },
+  { key: 'cancelled' }
+];
+function loadPipeline() {
+  var board = document.getElementById('pipe-board');
+  if (!board) return;
+  apiCall('GET', '/api/leads').then(function(data) {
+    var leads = data.leads || [];
+    var byStage = { lead: [], quote: [], closed: [], cancelled: [] };
+    leads.forEach(function(l) { var s = byStage[l.status] ? l.status : 'lead'; byStage[s].push(l); });
+    var open = byStage.lead.concat(byStage.quote);
+    var weighted = 0;
+    open.forEach(function(l) {
+      var p = (l.close_probability === null || l.close_probability === undefined || l.close_probability === '') ? 50 : Number(l.close_probability);
+      weighted += (Number(l.price) || 0) * p / 100;
+    });
+    var revenue = 0;
+    byStage.closed.forEach(function(l) { revenue += Number(l.price) || 0; });
+    setTextIf('pipe-stat-open', String(open.length));
+    setTextIf('pipe-stat-weighted', '₪' + fmtMoney(Math.round(weighted)));
+    setTextIf('pipe-stat-closed', String(byStage.closed.length));
+    setTextIf('pipe-stat-revenue', '₪' + fmtMoney(revenue));
+    PIPELINE_STAGES.forEach(function(stage) {
+      var box = document.getElementById('pipe-cards-' + stage.key);
+      var countEl = document.getElementById('pipe-count-' + stage.key);
+      var items = byStage[stage.key];
+      if (countEl) countEl.textContent = String(items.length);
+      if (!box) return;
+      box.innerHTML = items.length ? items.map(renderPipelineCard).join('') : '<div class="pipe-empty">אין זוגות כאן עדיין</div>';
+    });
+    bindPipelineCards();
+  }).catch(function(e) { toast(e.message, 'error'); });
+}
+function renderPipelineCard(l) {
+  var meta = [];
+  if (l.event_date) meta.push('💍 חתונה ' + formatDate(l.event_date));
+  if (l.meeting_date) meta.push('🗓️ פגישה ' + formatDate(l.meeting_date));
+  if (!meta.length && l.event_type) meta.push(l.event_type);
+  var actions = '';
+  if (l.phone) {
+    var waNum = String(l.phone).replace(/[^0-9]/g, '').replace(/^0/, '972');
+    actions = '<div class="pipe-card-actions"><a onclick="event.stopPropagation()" target="_blank" href="https://wa.me/' + waNum + '" title="וואטסאפ"><img src="/whatsapp-icon.png" style="width:22px;height:22px"></a><a onclick="event.stopPropagation()" href="tel:' + l.phone + '" title="התקשר"><img src="/phone-icon.png" style="width:22px;height:22px"></a></div>';
+  }
+  return '<div class="pipe-card" draggable="true" data-id="' + l.id + '">' +
+    '<div class="pipe-card-name">' + (l.name || '') + '</div>' +
+    (meta.length ? '<div class="pipe-card-meta">' + meta.join(' · ') + '</div>' : '') +
+    '<div class="pipe-card-row"><span class="pipe-price">' + (l.price ? '₪' + fmtMoney(l.price) : '') + '</span>' + probChip(l.close_probability) + '</div>' +
+    actions +
+  '</div>';
+}
+function bindPipelineCards() {
+  document.querySelectorAll('#pipe-board .pipe-card').forEach(function(card) {
+    card.addEventListener('click', function() { openDrawer(parseInt(card.getAttribute('data-id'))); });
+    card.addEventListener('dragstart', function(e) {
+      card.classList.add('dragging');
+      e.dataTransfer.setData('text/plain', card.getAttribute('data-id'));
+    });
+    card.addEventListener('dragend', function() { card.classList.remove('dragging'); });
+  });
+  document.querySelectorAll('#pipe-board .pipe-col').forEach(function(col) {
+    col.addEventListener('dragover', function(e) { e.preventDefault(); col.classList.add('drag-over'); });
+    col.addEventListener('dragleave', function() { col.classList.remove('drag-over'); });
+    col.addEventListener('drop', function(e) {
+      e.preventDefault();
+      col.classList.remove('drag-over');
+      var id = e.dataTransfer.getData('text/plain');
+      var stage = col.getAttribute('data-stage');
+      if (!id || !stage) return;
+      var card = document.querySelector('#pipe-board .pipe-card[data-id="' + id + '"]');
+      if (card) {
+        var parentCol = card.closest('.pipe-col');
+        if (parentCol && parentCol.getAttribute('data-stage') === stage) return;
+      }
+      movePipelineCard(parseInt(id), stage);
+    });
+  });
+}
+function movePipelineCard(id, status) {
+  apiCall('PATCH', '/api/leads/' + id, { status: status }).then(function() {
+    toast(status === 'closed' ? 'מזל טוב! הזוג סגר 🎉' : 'הזוג עבר לשלב "' + artistaStatusLabel(status) + '"', 'success');
+    loadPipeline();
+    preloadLeads();
+  }).catch(function(e) { toast(e.message, 'error'); loadPipeline(); });
+}
+function patchLeadField(id, fields, msg) {
+  apiCall('PATCH', '/api/leads/' + id, fields).then(function() {
+    toast(msg, 'success');
+    openDrawer(id);
+    preloadLeads();
+    var pipePage = document.getElementById('page-pipeline');
+    if (pipePage && pipePage.classList.contains('active')) loadPipeline();
+    var leadsPage = document.getElementById('page-leads');
+    if (leadsPage && leadsPage.classList.contains('active')) loadLeads();
+  }).catch(function(e) { toast(e.message, 'error'); });
+}
 function toast(msg, type) { type = type||'success'; var c = document.getElementById('toasts'); var el = document.createElement('div'); el.className = 'toast '+type; el.textContent = msg; c.appendChild(el); setTimeout(function() { el.remove(); }, 3000); }
 
 

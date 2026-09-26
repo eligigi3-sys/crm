@@ -490,6 +490,21 @@ async function validateAllocationPayloadForTenant(payload, env, eventId, existin
   };
 }
 
+let pipelineColumnsEnsured = false;
+async function ensurePipelineColumns(env) {
+  if (pipelineColumnsEnsured) return;
+  try {
+    const { results } = await env.DB.prepare('PRAGMA table_info(leads)').all();
+    const names = {};
+    (results || []).forEach(function(c) { names[c.name] = true; });
+    if (!names.meeting_date) await env.DB.prepare('ALTER TABLE leads ADD COLUMN meeting_date TEXT').run();
+    if (!names.close_probability) await env.DB.prepare('ALTER TABLE leads ADD COLUMN close_probability INTEGER').run();
+    pipelineColumnsEnsured = true;
+  } catch (e) {
+    console.log('pipeline columns ensure failed:', e.message);
+  }
+}
+
 export async function handleLeads(request, env, path) {
   const method = request.method;
   const url = new URL(request.url);
@@ -1271,6 +1286,8 @@ export async function handleLeads(request, env, path) {
 
     if (!b.name) throw new Error('שם חובה');
 
+    await ensurePipelineColumns(env);
+
     const contact = await findOrCreateContactForTenant(
       b.name,
       b.phone,
@@ -1298,9 +1315,11 @@ export async function handleLeads(request, env, path) {
         status,
         details,
         notes,
+        meeting_date,
+        close_probability,
         tenant_id
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       leadNum,
       contact.id,
@@ -1317,6 +1336,8 @@ export async function handleLeads(request, env, path) {
       b.status || 'lead',
       b.details || null,
       b.notes || null,
+      b.meeting_date || null,
+      (b.close_probability === null || b.close_probability === undefined || b.close_probability === '') ? null : Number(b.close_probability),
       tenantId
     ).run();
 
@@ -1354,6 +1375,8 @@ export async function handleLeads(request, env, path) {
     const existingLead = await getLeadByIdForTenant(id, tenantId, env);
     if (!existingLead) throw new Error('Lead not found');
 
+    await ensurePipelineColumns(env);
+
     await env.DB.prepare(`
       UPDATE leads SET
         event_type = ?,
@@ -1366,6 +1389,8 @@ export async function handleLeads(request, env, path) {
         status = ?,
         details = ?,
         notes = ?,
+        meeting_date = ?,
+        close_probability = ?,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
         AND tenant_id = ?
@@ -1380,6 +1405,8 @@ export async function handleLeads(request, env, path) {
       b.status || 'lead',
       b.details || null,
       b.notes || null,
+      b.meeting_date || null,
+      (b.close_probability === null || b.close_probability === undefined || b.close_probability === '') ? null : Number(b.close_probability),
       id,
       tenantId
     ).run();
@@ -1388,6 +1415,62 @@ export async function handleLeads(request, env, path) {
       await autoSyncToCalendar(id, b.status || 'lead', env);
     } catch (e) {
       console.log('Google auto-sync failed after update:', e.message);
+    }
+
+    return { success: true };
+  }
+
+  // ===============================
+  // PATCH - עדכון חלקי (צינור מכירות: שלב, סיכוי סגירה, תאריך פגישה ועוד)
+  // ===============================
+  if (idMatch && method === 'PATCH') {
+    const tenantCtx = await requireTenantContext(request, env);
+    if (tenantCtx instanceof Response) return tenantCtx;
+
+    const moduleState = await assertTenantModuleEnabled(tenantCtx, env, 'leads');
+    if (moduleState instanceof Response) return moduleState;
+
+    const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
+    if (roleState instanceof Response) return roleState;
+
+    const tenantId = tenantCtx.tenant.id;
+    const id = idMatch[1];
+    const b = await request.json();
+
+    const existingLead = await getLeadByIdForTenant(id, tenantId, env);
+    if (!existingLead) throw new Error('Lead not found');
+
+    await ensurePipelineColumns(env);
+
+    if (b.status !== undefined && ['lead', 'quote', 'closed', 'cancelled'].indexOf(b.status) === -1) {
+      throw new Error('Invalid status');
+    }
+
+    const allowed = ['status', 'meeting_date', 'close_probability', 'price', 'deposit', 'next_contact', 'event_date', 'event_time', 'venue'];
+    const sets = [];
+    const binds = [];
+    allowed.forEach(function(field) {
+      if (b[field] !== undefined) {
+        let val = b[field];
+        if (val === '') val = null;
+        if (field === 'close_probability' && val !== null) val = Number(val);
+        if ((field === 'price' || field === 'deposit') && val !== null) val = Number(val);
+        sets.push(field + ' = ?');
+        binds.push(val);
+      }
+    });
+    if (!sets.length) return { success: true };
+
+    sets.push('updated_at = CURRENT_TIMESTAMP');
+    binds.push(id, tenantId);
+    await env.DB.prepare('UPDATE leads SET ' + sets.join(', ') + ' WHERE id = ? AND tenant_id = ?').bind(...binds).run();
+
+    if (b.status !== undefined) {
+      try {
+        await autoSyncToCalendar(id, b.status, env);
+      } catch (e) {
+        console.log('Google auto-sync failed after patch:', e.message);
+      }
     }
 
     return { success: true };
