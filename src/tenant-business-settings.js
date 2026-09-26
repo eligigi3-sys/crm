@@ -204,10 +204,103 @@ async function updateTenantBusinessSettings(request, env, tenantCtx) {
   return { success: true, settings: await getTenantBusinessSettings(tenantCtx.tenant.id, env) };
 }
 
+let pricingColumnEnsured = false;
+async function ensurePricingColumn(env) {
+  if (pricingColumnEnsured) return;
+  try {
+    const { results } = await env.DB.prepare('PRAGMA table_info(tenant_business_settings)').all();
+    const names = {};
+    (results || []).forEach(function(c) { names[c.name] = true; });
+    if (!names.pricing_config) await env.DB.prepare('ALTER TABLE tenant_business_settings ADD COLUMN pricing_config TEXT').run();
+    pricingColumnEnsured = true;
+  } catch (e) {
+    console.log('pricing column ensure failed:', e.message);
+  }
+}
+
 export async function handleTenantBusinessSettings(request, env, path) {
   const method = request.method;
   const tenantCtx = await requireTenantContext(request, env);
   if (tenantCtx instanceof Response) return tenantCtx;
+
+  if (path === '/api/tenant-business-settings/pricing' && method === 'GET') {
+    await ensurePricingColumn(env);
+    const row = await env.DB.prepare(
+      'SELECT pricing_config FROM tenant_business_settings WHERE tenant_id = ? LIMIT 1'
+    ).bind(tenantCtx.tenant.id).first();
+    let config = null;
+    try {
+      config = row && row.pricing_config ? JSON.parse(row.pricing_config) : null;
+    } catch (e) {
+      config = null;
+    }
+    return { config };
+  }
+
+  if (path === '/api/tenant-business-settings/pricing' && method === 'PUT') {
+    const access = await assertTenantRole(tenantCtx, ['owner', 'admin']);
+    if (access instanceof Response) return access;
+    const body = await parseJson(request);
+    if (!body || typeof body.config !== 'object' || body.config === null || Array.isArray(body.config)) {
+      return json({ error: 'בקשה לא תקינה' }, 400);
+    }
+    const text = JSON.stringify(body.config);
+    if (text.length > 20000) return json({ error: 'הגדרות התמחור גדולות מדי' }, 400);
+    await ensurePricingColumn(env);
+    const tenantId = tenantCtx.tenant.id;
+    const existing = await env.DB.prepare(
+      'SELECT tenant_id FROM tenant_business_settings WHERE tenant_id = ? LIMIT 1'
+    ).bind(tenantId).first();
+    if (existing) {
+      await env.DB.prepare(
+        'UPDATE tenant_business_settings SET pricing_config = ?, updated_at = CURRENT_TIMESTAMP WHERE tenant_id = ?'
+      ).bind(text, tenantId).run();
+    } else {
+      const tenant = await getTenantForSettings(tenantId, env);
+      if (!tenant) throw new Error('העסק לא נמצא');
+      const payload = normalizeSettingsPayload({}, tenant);
+      await env.DB.prepare(
+        `INSERT INTO tenant_business_settings (
+           tenant_id,
+           business_legal_name,
+           business_display_name,
+           business_tax_id,
+           business_type,
+           vat_mode,
+           default_vat_rate,
+           business_address,
+           business_phone,
+           business_email,
+           logo_url,
+           default_payment_terms,
+           default_cancellation_policy,
+           default_document_footer,
+           default_notes,
+           pricing_config,
+           created_at,
+           updated_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+      ).bind(
+        tenantId,
+        payload.business_legal_name,
+        payload.business_display_name,
+        payload.business_tax_id,
+        payload.business_type,
+        payload.vat_mode,
+        payload.default_vat_rate,
+        payload.business_address,
+        payload.business_phone,
+        payload.business_email,
+        payload.logo_url,
+        payload.default_payment_terms,
+        payload.default_cancellation_policy,
+        payload.default_document_footer,
+        payload.default_notes,
+        text
+      ).run();
+    }
+    return { success: true };
+  }
 
   if (path === '/api/tenant-business-settings' && method === 'GET') {
     return { settings: await getTenantBusinessSettings(tenantCtx.tenant.id, env) };

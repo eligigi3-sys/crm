@@ -437,6 +437,18 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .pipe-empty{color:var(--text3);font-size:12px;text-align:center;padding:14px 4px}
 @media (max-width: 1100px){.pipe-board{grid-template-columns:1fr 1fr}.pipe-stats{grid-template-columns:1fr 1fr}}
 @media (max-width: 560px){.pipe-board{grid-template-columns:1fr}}
+.calc-layout{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+.calc-card{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:18px;box-shadow:var(--shadow)}
+.calc-result-head{font-weight:800;font-size:15px;margin-bottom:10px}
+.calc-breakdown-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed var(--border);font-size:13px}
+.calc-breakdown-row span:last-child{font-weight:700}
+.calc-total-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0 2px;font-size:18px;font-weight:800;color:var(--accent)}
+.pricing-day-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.pricing-day-grid .form-group{margin:0}
+.pricing-day-grid .form-label{font-size:11px}
+.pricing-list-row{display:flex;gap:8px;margin-bottom:8px;align-items:center}
+.pricing-list-row .form-input{margin:0}
+@media (max-width: 900px){.calc-layout{grid-template-columns:1fr}.pricing-day-grid{grid-template-columns:repeat(4,1fr)}}
 .drawer-body{flex:1;overflow-y:auto;padding:18px 20px}
 .drawer-footer{padding:12px 20px;border-top:1px solid var(--border)}
 .info-section{margin-bottom:18px}
@@ -1836,6 +1848,7 @@ body.crm-shell .fab-add{display:flex}
     </div>
     <div class="nav-item active" id="nav-dashboard"><span class="nav-icon">📊</span> <span class="nav-label" data-mobile="דאשבורד">דאשבורד</span></div>
     <div class="nav-item" id="nav-pipeline" style="display:none"><span class="nav-icon">💍</span> <span class="nav-label" data-mobile="צינור זוגות">צינור זוגות</span></div>
+    <div class="nav-item" id="nav-calculator" style="display:none"><span class="nav-icon">🧮</span> <span class="nav-label" data-mobile="מחשבון מחיר">מחשבון מחיר</span></div>
     <div class="nav-item" id="nav-leads"><span class="nav-icon">👥</span> <span class="nav-label" data-mobile="לקוחות">לקוחות</span> <span class="nav-badge" id="nav-leads-count" style="display:none">0</span></div>
     <div class="nav-item" id="nav-employees"><span class="nav-icon">🧑‍💼</span> <span class="nav-label" data-mobile="עובדים">עובדים</span></div>
     <div class="nav-item" id="nav-team" style="display:none"><span class="nav-icon">👤</span> <span class="nav-label" data-mobile="צוות">צוות</span></div>
@@ -2092,6 +2105,15 @@ id="customers-search">
             <div id="gcal-status" style="padding:10px 12px;border-radius:8px;font-size:12px;display:none"></div>
           </div>
         </div>
+        <div class="business-settings-card" id="pricing-settings-card" style="display:none">
+          <div class="business-settings-head">
+            <div>
+              <div class="business-settings-title">💍 תמחור אירועים — מחירי בסיס</div>
+              <div class="business-settings-sub">אלה מחירי הבסיס להצעות במחשבון המחיר. אפשר לעדכן אותם בכל רגע, והמחשבון ישתמש תמיד במחירים העדכניים.</div>
+            </div>
+          </div>
+          <div class="business-settings-body" style="padding-top:14px" id="pricing-settings-body"><div class="dash-empty">טוען...</div></div>
+        </div>
         <div class="business-settings-card">
           <div class="business-settings-head">
             <div>
@@ -2102,6 +2124,27 @@ id="customers-search">
           </div>
           <div class="business-settings-body" id="business-settings-body"><div class="dash-empty">טוען...</div></div>
           <div class="business-settings-footer" id="business-settings-footer" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+    <div id="page-calculator" class="page">
+      <div class="page-header"><div class="page-title">🧮 מחשבון מחיר <small>הצעת מחיר אוטומטית ממחירי הבסיס שהוגדרו בהגדרות עסק</small></div></div>
+      <div class="calc-layout">
+        <div class="calc-card">
+          <div class="form-group"><label class="form-label">זוג (לא חובה)</label><select class="form-input" id="calc-couple"><option value="">ללא שיוך לזוג</option></select></div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">מספר אורחים</label><input class="form-input" id="calc-guests" type="number" min="0" placeholder="300"></div>
+            <div class="form-group"><label class="form-label">תאריך החתונה</label><input class="form-input" id="calc-date" type="date"></div>
+          </div>
+          <div class="form-group"><label class="form-label">כשרות</label><select class="form-input" id="calc-kashrut"></select></div>
+          <div class="form-group"><label class="form-label">תוספות מיוחדות</label><div id="calc-extras"></div></div>
+        </div>
+        <div class="calc-card">
+          <div class="calc-result-head">פירוט ההצעה</div>
+          <div id="calc-breakdown"></div>
+          <div class="calc-total-row"><span>סה״כ להצעה</span><span id="calc-total">₪0</span></div>
+          <button class="btn btn-primary" id="calc-apply" style="width:100%;margin-top:12px">עדכן את ההצעה לזוג</button>
+          <div id="calc-note" style="font-size:12px;color:var(--text3);margin-top:8px"></div>
         </div>
       </div>
     </div>
@@ -2399,6 +2442,7 @@ var artistaHomeApplied = false;
 var CRM_MOBILE_NAV_ITEMS = [
   { navId: 'nav-dashboard', page: 'dashboard', label: 'דאשבורד', icon: '📊' },
   { navId: 'nav-pipeline', page: 'pipeline', label: 'צינור זוגות', icon: '💍', moduleKey: 'leads', artistaOnly: true },
+  { navId: 'nav-calculator', page: 'calculator', label: 'מחשבון', icon: '🧮', moduleKey: 'leads', artistaOnly: true },
   { navId: 'nav-calendar', page: 'calendar', label: 'יומן אירועים', icon: '📅', moduleKey: 'leads' },
   { navId: 'nav-leads', page: 'customers', label: 'לקוחות', icon: '👥', moduleKey: 'contacts' },
   { navId: 'nav-employees', page: 'employees', label: 'עובדים', icon: '🧑💼', moduleKey: 'employees' },
@@ -2668,6 +2712,8 @@ function applySidebarModuleOrder() {
   if (dashboard) dashboard.style.order = 10;
   var pipelineNav = document.getElementById('nav-pipeline');
   if (pipelineNav) pipelineNav.style.order = 15;
+  var calculatorNav = document.getElementById('nav-calculator');
+  if (calculatorNav) calculatorNav.style.order = 16;
   var businessSettings = document.getElementById('nav-business-settings');
   if (businessSettings) businessSettings.style.order = 95;
   orderedNav.forEach(function(item) {
@@ -2756,6 +2802,7 @@ function applyModuleVisibility() {
 var PAGE_ROUTES = {
   dashboard: '/crm',
   pipeline: '/crm/pipeline',
+  calculator: '/crm/calculator',
   leads: '/crm/leads',
   customers: '/crm/customers',
   employees: '/crm/employees',
@@ -2953,6 +3000,17 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   document.getElementById('nav-pipeline').addEventListener('click', function() { goTo('pipeline', this); });
   var btnNewLeadPipeline = document.getElementById('btn-new-lead-pipeline');
   if (btnNewLeadPipeline) btnNewLeadPipeline.addEventListener('click', function() { openLeadModal(); });
+  document.getElementById('nav-calculator').addEventListener('click', function() { goTo('calculator', this); });
+  var calcCoupleSel = document.getElementById('calc-couple');
+  if (calcCoupleSel) calcCoupleSel.addEventListener('change', onCalculatorCoupleChange);
+  var calcGuestsInput = document.getElementById('calc-guests');
+  if (calcGuestsInput) calcGuestsInput.addEventListener('input', renderCalculation);
+  var calcDateInput = document.getElementById('calc-date');
+  if (calcDateInput) calcDateInput.addEventListener('change', renderCalculation);
+  var calcKashrutSel = document.getElementById('calc-kashrut');
+  if (calcKashrutSel) calcKashrutSel.addEventListener('change', renderCalculation);
+  var calcApplyBtn = document.getElementById('calc-apply');
+  if (calcApplyBtn) calcApplyBtn.addEventListener('click', calculatorApply);
   var navEmployees = document.getElementById('nav-employees');
   if (navEmployees) navEmployees.addEventListener('click', function() { goTo('employees', this); });
   var navTeam = document.getElementById('nav-team');
@@ -3116,6 +3174,7 @@ function goTo(page, el) {
   var pageModuleMap = {
     leads: 'leads',
     pipeline: 'leads',
+    calculator: 'leads',
     customers: 'contacts',
     employees: 'employees',
     products: 'products',
@@ -3150,10 +3209,11 @@ function goTo(page, el) {
   if (page === 'dashboard') loadDashboard();
   if (page === 'leads') loadLeads();
   if (page === 'pipeline') loadPipeline();
+  if (page === 'calculator') loadCalculator();
   if (page === 'shopping') loadShoppingLists();
   if (page === 'strategic-contacts') loadStrategicContacts();
   if (page === 'sales-documents') loadSalesDocuments();
-  if (page === 'business-settings') loadBusinessSettings();
+  if (page === 'business-settings') { loadBusinessSettings(); if (isArtistaMode()) loadPricingSettings(); }
   if (page === 'calendar') loadCalendar();
   if (page === 'customers') loadCustomers();
   if (page === 'employees') loadEmployees();
@@ -6732,6 +6792,7 @@ function renderDrawer(l, notes) {
     html += '<div class="info-row"><span class="info-label">שלב בצינור</span><span class="info-value"><select class="form-input" id="drawer-stage-select">' + stageOpts + '</select></span></div>';
     html += '<div class="info-row"><span class="info-label">תאריך פגישה</span><span class="info-value"><input type="date" class="form-input" id="drawer-meeting-date" value="' + (l.meeting_date || '') + '"></span></div>';
     html += '<div class="info-row"><span class="info-label">סיכוי סגירה</span><span class="info-value"><select class="form-input" id="drawer-prob-select">' + probOpts + '</select></span></div>';
+    html += '<button class="btn btn-secondary btn-sm" id="drawer-calc-btn" style="width:100%;margin-top:8px">🧮 פתח מחשבון מחיר לזוג</button>';
   }
   html += '<div class="info-section-title">' + (artista ? 'פרטי הזוג' : 'פרטי לקוח') + '</div>';
   html += '<div class="info-row">' +
@@ -6773,6 +6834,8 @@ function renderDrawer(l, notes) {
     if (drawerMeetingInput) drawerMeetingInput.addEventListener('change', function() { patchLeadField(l.id, { meeting_date: drawerMeetingInput.value || null }, 'תאריך הפגישה עודכן'); });
     var drawerProbSel = document.getElementById('drawer-prob-select');
     if (drawerProbSel) drawerProbSel.addEventListener('change', function() { patchLeadField(l.id, { close_probability: drawerProbSel.value === '' ? null : Number(drawerProbSel.value) }, 'סיכוי הסגירה עודכן'); });
+    var drawerCalcBtn = document.getElementById('drawer-calc-btn');
+    if (drawerCalcBtn) drawerCalcBtn.addEventListener('click', function() { openCalculatorForLead(l.id); });
   }
   var waSelect = document.getElementById('wa-template-select');
   if (waSelect) {
@@ -6973,6 +7036,10 @@ function applyArtistaMode() {
   var artista = isArtistaMode();
   var navPipeline = document.getElementById('nav-pipeline');
   if (navPipeline) navPipeline.style.display = artista ? 'flex' : 'none';
+  var navCalculator = document.getElementById('nav-calculator');
+  if (navCalculator) navCalculator.style.display = artista ? 'flex' : 'none';
+  var pricingCard = document.getElementById('pricing-settings-card');
+  if (pricingCard) pricingCard.style.display = artista ? '' : 'none';
   if (!artista) return;
   var navLeadsLabel = document.querySelector('#nav-leads .nav-label');
   if (navLeadsLabel) { navLeadsLabel.textContent = 'זוגות'; navLeadsLabel.setAttribute('data-mobile', 'זוגות'); }
@@ -7123,6 +7190,245 @@ function patchLeadField(id, fields, msg) {
     var leadsPage = document.getElementById('page-leads');
     if (leadsPage && leadsPage.classList.contains('active')) loadLeads();
   }).catch(function(e) { toast(e.message, 'error'); });
+}
+// ---- Artista: תמחור אירועים + מחשבון מחיר (tenant 82) ----
+var pricingConfigCache = null;
+var calculatorCouples = [];
+var calculatorPrefillLeadId = null;
+var DAY_NAMES = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+var PLATE_TIERS = [
+  { min: 200, max: 249 },
+  { min: 250, max: 299 },
+  { min: 300, max: 349 },
+  { min: 350, max: 399 },
+  { min: 400, max: 449 },
+  { min: 450, max: null }
+];
+function plateTierLabel(t) { return t.max ? t.min + '-' + t.max : t.min + '+'; }
+
+function defaultPricingConfig() {
+  return {
+    plate_prices: [0, 0, 0, 0, 0, 0],
+    bar: { price: 0, mode: 'per_guest' },
+    av: { price: 0, mode: 'fixed' },
+    day_pricing: {},
+    kashrut: [{ name: 'רגיל', price: 0 }],
+    extras: []
+  };
+}
+function normalizePricingConfig(c) {
+  c = c && typeof c === 'object' ? c : {};
+  var out = {
+    plate_prices: PLATE_TIERS.map(function(t, i) {
+      return Array.isArray(c.plate_prices) ? (Number(c.plate_prices[i]) || 0) : (Number(c.plate_price) || 0);
+    }),
+    bar: { price: Number(c.bar && c.bar.price) || 0, mode: (c.bar && c.bar.mode) === 'fixed' ? 'fixed' : 'per_guest' },
+    av: { price: Number(c.av && c.av.price) || 0, mode: (c.av && c.av.mode) === 'per_guest' ? 'per_guest' : 'fixed' },
+    day_pricing: {},
+    kashrut: [],
+    extras: []
+  };
+  var dp = c.day_pricing && typeof c.day_pricing === 'object' ? c.day_pricing : {};
+  for (var i = 0; i <= 6; i++) out.day_pricing[String(i)] = Number(dp[String(i)]) || 0;
+  (Array.isArray(c.kashrut) ? c.kashrut : defaultPricingConfig().kashrut).forEach(function(k) {
+    if (!k || !k.name) return;
+    out.kashrut.push({ name: String(k.name), price: Number(k.price) || 0 });
+  });
+  if (!out.kashrut.length) out.kashrut.push({ name: 'רגיל', price: 0 });
+  (Array.isArray(c.extras) ? c.extras : []).forEach(function(x) {
+    if (!x || !x.name) return;
+    out.extras.push({ name: String(x.name), price: Number(x.price) || 0 });
+  });
+  return out;
+}
+function loadPricingConfig() {
+  return apiCall('GET', '/api/tenant-business-settings/pricing').then(function(data) {
+    pricingConfigCache = normalizePricingConfig(data && data.config);
+    return pricingConfigCache;
+  }).catch(function() {
+    pricingConfigCache = normalizePricingConfig(null);
+    return pricingConfigCache;
+  });
+}
+function loadPricingSettings() {
+  var body = document.getElementById('pricing-settings-body');
+  if (!body) return;
+  body.innerHTML = '<div class="dash-empty">טוען...</div>';
+  loadPricingConfig().then(function(cfg) {
+    var html = '';
+    html += '<div class="form-group"><label class="form-label">מחיר מנה (₪ לאורח) — לפי מדרגות אורחים</label><div class="pricing-day-grid">';
+    PLATE_TIERS.forEach(function(t, i) {
+      html += '<div class="form-group"><label class="form-label">' + plateTierLabel(t) + ' אורחים</label><input class="form-input" id="ps-tier-' + i + '" type="number" min="0" value="' + (cfg.plate_prices[i] || 0) + '"></div>';
+    });
+    html += '</div></div>';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label class="form-label">שירותי בר (₪)</label><input class="form-input" id="ps-bar-price" type="number" min="0" value="' + cfg.bar.price + '"></div>';
+    html += '<div class="form-group"><label class="form-label">אופן חישוב בר</label><select class="form-select" id="ps-bar-mode"><option value="per_guest"' + (cfg.bar.mode === 'per_guest' ? ' selected' : '') + '>לאורח</option><option value="fixed"' + (cfg.bar.mode === 'fixed' ? ' selected' : '') + '>מחיר קבוע</option></select></div>';
+    html += '</div>';
+    html += '<div class="form-row">';
+    html += '<div class="form-group"><label class="form-label">תאורה, הגברה ומסכים (₪)</label><input class="form-input" id="ps-av-price" type="number" min="0" value="' + cfg.av.price + '"></div>';
+    html += '<div class="form-group"><label class="form-label">אופן חישוב תאורה/הגברה</label><select class="form-select" id="ps-av-mode"><option value="fixed"' + (cfg.av.mode === 'fixed' ? ' selected' : '') + '>מחיר קבוע</option><option value="per_guest"' + (cfg.av.mode === 'per_guest' ? ' selected' : '') + '>לאורח</option></select></div>';
+    html += '</div>';
+    html += '<div class="form-group"><label class="form-label">תוספת מחיר לפי יום בשבוע (₪)</label><div class="pricing-day-grid">';
+    for (var i = 0; i <= 6; i++) {
+      html += '<div class="form-group"><label class="form-label">' + DAY_NAMES[i] + '</label><input class="form-input" id="ps-day-' + i + '" type="number" min="0" value="' + (cfg.day_pricing[String(i)] || 0) + '"></div>';
+    }
+    html += '</div></div>';
+    html += '<div class="form-group"><label class="form-label">כשרות (אפשרות + תוספת ₪)</label><div id="ps-kashrut-rows"></div><button class="btn btn-secondary btn-sm" id="ps-kashrut-add" type="button">+ הוסף אפשרות כשרות</button></div>';
+    html += '<div class="form-group"><label class="form-label">תוספות מיוחדות (שם + מחיר ₪)</label><div id="ps-extras-rows"></div><button class="btn btn-secondary btn-sm" id="ps-extras-add" type="button">+ הוסף תוספת</button></div>';
+    html += '<button class="btn btn-primary" id="ps-save" type="button">שמור מחירי בסיס</button>';
+    body.innerHTML = html;
+    renderPricingListRows('ps-kashrut-rows', cfg.kashrut, true);
+    renderPricingListRows('ps-extras-rows', cfg.extras, false);
+    document.getElementById('ps-kashrut-add').addEventListener('click', function() { addPricingListRow('ps-kashrut-rows', true, '', 0); });
+    document.getElementById('ps-extras-add').addEventListener('click', function() { addPricingListRow('ps-extras-rows', false, '', 0); });
+    document.getElementById('ps-save').addEventListener('click', savePricingSettings);
+  });
+}
+function renderPricingListRows(containerId, items, isKashrut) {
+  var box = document.getElementById(containerId);
+  if (!box) return;
+  box.innerHTML = '';
+  (items || []).forEach(function(item) { addPricingListRow(containerId, isKashrut, item.name, item.price); });
+}
+function addPricingListRow(containerId, isKashrut, name, price) {
+  var box = document.getElementById(containerId);
+  if (!box) return;
+  var row = document.createElement('div');
+  row.className = 'pricing-list-row';
+  row.innerHTML = '<input class="form-input pricing-name" placeholder="' + (isKashrut ? 'למשל: מהדרין' : 'למשל: עמדת קבלת פנים') + '" value="' + String(name || '').replace(/"/g, '&quot;') + '"><input class="form-input pricing-price" type="number" min="0" placeholder="0" value="' + (Number(price) || 0) + '" style="max-width:110px"><button class="btn btn-ghost btn-sm pricing-remove" type="button">✕</button>';
+  row.querySelector('.pricing-remove').addEventListener('click', function() { row.remove(); });
+  box.appendChild(row);
+}
+function collectPricingSettings() {
+  var cfg = defaultPricingConfig();
+  cfg.plate_prices = PLATE_TIERS.map(function(t, i) { return Number(document.getElementById('ps-tier-' + i).value) || 0; });
+  cfg.bar.price = Number(document.getElementById('ps-bar-price').value) || 0;
+  cfg.bar.mode = document.getElementById('ps-bar-mode').value === 'fixed' ? 'fixed' : 'per_guest';
+  cfg.av.price = Number(document.getElementById('ps-av-price').value) || 0;
+  cfg.av.mode = document.getElementById('ps-av-mode').value === 'per_guest' ? 'per_guest' : 'fixed';
+  for (var i = 0; i <= 6; i++) cfg.day_pricing[String(i)] = Number(document.getElementById('ps-day-' + i).value) || 0;
+  cfg.kashrut = [];
+  document.querySelectorAll('#ps-kashrut-rows .pricing-list-row').forEach(function(row) {
+    var name = row.querySelector('.pricing-name').value.trim();
+    if (!name) return;
+    cfg.kashrut.push({ name: name, price: Number(row.querySelector('.pricing-price').value) || 0 });
+  });
+  cfg.extras = [];
+  document.querySelectorAll('#ps-extras-rows .pricing-list-row').forEach(function(row) {
+    var name = row.querySelector('.pricing-name').value.trim();
+    if (!name) return;
+    cfg.extras.push({ name: name, price: Number(row.querySelector('.pricing-price').value) || 0 });
+  });
+  return cfg;
+}
+function savePricingSettings() {
+  var cfg = collectPricingSettings();
+  apiCall('PUT', '/api/tenant-business-settings/pricing', { config: cfg }).then(function() {
+    pricingConfigCache = cfg;
+    toast('מחירי הבסיס נשמרו', 'success');
+  }).catch(function(e) { toast(e.message, 'error'); });
+}
+function loadCalculator() {
+  var coupleSel = document.getElementById('calc-couple');
+  if (!coupleSel) return;
+  loadPricingConfig().then(function(cfg) {
+    renderCalculatorInputs(cfg);
+  });
+  apiCall('GET', '/api/leads').then(function(data) {
+    calculatorCouples = (data.leads || []).filter(function(l) { return l.status !== 'cancelled'; });
+    var sel = document.getElementById('calc-couple');
+    var wanted = calculatorPrefillLeadId ? String(calculatorPrefillLeadId) : sel.value;
+    sel.innerHTML = '<option value="">ללא שיוך לזוג</option>' + calculatorCouples.map(function(l) {
+      return '<option value="' + l.id + '">' + l.name + (l.event_date ? ' · ' + formatDate(l.event_date) : '') + '</option>';
+    }).join('');
+    if (wanted) sel.value = wanted;
+    calculatorPrefillLeadId = null;
+    onCalculatorCoupleChange();
+  }).catch(function(e) { toast(e.message, 'error'); });
+}
+function renderCalculatorInputs(cfg) {
+  var kashrutSel = document.getElementById('calc-kashrut');
+  if (kashrutSel) {
+    kashrutSel.innerHTML = cfg.kashrut.map(function(k, i) {
+      return '<option value="' + i + '">' + k.name + (k.price ? ' (+₪' + fmtMoney(k.price) + ')' : '') + '</option>';
+    }).join('');
+  }
+  var extrasBox = document.getElementById('calc-extras');
+  if (extrasBox) {
+    extrasBox.innerHTML = cfg.extras.length ? cfg.extras.map(function(x, i) {
+      return '<label class="check-item" style="display:inline-flex;margin:0 0 6px 8px"><input type="checkbox" class="calc-extra" value="' + i + '"> ' + x.name + ' (₪' + fmtMoney(x.price) + ')</label>';
+    }).join('') : '<div style="font-size:12px;color:var(--text3)">לא הוגדרו תוספות — אפשר להוסיף אותן בהגדרות עסק</div>';
+    extrasBox.querySelectorAll('.calc-extra').forEach(function(cb) { cb.addEventListener('change', renderCalculation); });
+  }
+  renderCalculation();
+}
+function onCalculatorCoupleChange() {
+  var sel = document.getElementById('calc-couple');
+  var lead = calculatorCouples.filter(function(l) { return String(l.id) === sel.value; })[0] || null;
+  if (lead && lead.event_date) document.getElementById('calc-date').value = String(lead.event_date).substring(0, 10);
+  var note = document.getElementById('calc-note');
+  if (note) note.textContent = lead ? (lead.price ? 'לזוג הזה כבר יש הצעה של ₪' + fmtMoney(lead.price) + ' — עדכון מהמחשבון ידרוס אותה.' : '') : 'בחר זוג כדי לשייך אליו את ההצעה.';
+  var applyBtn = document.getElementById('calc-apply');
+  if (applyBtn) applyBtn.disabled = !lead;
+  renderCalculation();
+}
+function renderCalculation() {
+  var cfg = pricingConfigCache || defaultPricingConfig();
+  var guests = Number(document.getElementById('calc-guests').value) || 0;
+  var dateVal = document.getElementById('calc-date').value;
+  var kashrutIdx = Number(document.getElementById('calc-kashrut').value) || 0;
+  var rows = [];
+  var total = 0;
+  var tierIdx = -1;
+  PLATE_TIERS.forEach(function(t, i) { if (guests >= t.min && (t.max === null || guests <= t.max)) tierIdx = i; });
+  if (tierIdx >= 0 && cfg.plate_prices[tierIdx]) {
+    rows.push({ label: 'מנות: ₪' + fmtMoney(cfg.plate_prices[tierIdx]) + ' × ' + guests + ' אורחים (מדרגת ' + plateTierLabel(PLATE_TIERS[tierIdx]) + ')', amount: cfg.plate_prices[tierIdx] * guests });
+  } else if (guests > 0) {
+    rows.push({ label: tierIdx < 0 ? 'אין מדרגת מנה מוגדרת ל-' + guests + ' אורחים (המדרגות מתחילות מ-200)' : 'מחיר המנה במדרגה הזו עדיין 0 — אפשר לעדכן בהגדרות', amount: 0 });
+  }
+  if (cfg.bar.price) {
+    var barAmt = cfg.bar.mode === 'per_guest' ? cfg.bar.price * guests : cfg.bar.price;
+    if (barAmt) rows.push({ label: 'שירותי בר' + (cfg.bar.mode === 'per_guest' ? ' (₪' + fmtMoney(cfg.bar.price) + ' לאורח)' : ''), amount: barAmt });
+  }
+  if (cfg.av.price) {
+    var avAmt = cfg.av.mode === 'per_guest' ? cfg.av.price * guests : cfg.av.price;
+    if (avAmt) rows.push({ label: 'תאורה, הגברה ומסכים' + (cfg.av.mode === 'per_guest' ? ' (₪' + fmtMoney(cfg.av.price) + ' לאורח)' : ''), amount: avAmt });
+  }
+  if (dateVal) {
+    var wd = new Date(dateVal + 'T12:00:00').getDay();
+    var dayExtra = Number(cfg.day_pricing[String(wd)]) || 0;
+    if (dayExtra) rows.push({ label: 'תוספת יום ' + DAY_NAMES[wd], amount: dayExtra });
+  }
+  var kashrutOpt = cfg.kashrut[kashrutIdx];
+  if (kashrutOpt && kashrutOpt.price) rows.push({ label: 'כשרות: ' + kashrutOpt.name, amount: kashrutOpt.price });
+  document.querySelectorAll('#calc-extras .calc-extra:checked').forEach(function(cb) {
+    var x = cfg.extras[Number(cb.value)];
+    if (x && x.price) rows.push({ label: 'תוספת: ' + x.name, amount: x.price });
+  });
+  rows.forEach(function(r) { total += r.amount; });
+  var box = document.getElementById('calc-breakdown');
+  if (box) box.innerHTML = rows.length ? rows.map(function(r) { return '<div class="calc-breakdown-row"><span>' + r.label + '</span><span>₪' + fmtMoney(r.amount) + '</span></div>'; }).join('') : '<div class="dash-empty">הזן מספר אורחים ובחר אפשרויות — או הגדר קודם מחירי בסיס בהגדרות עסק</div>';
+  setTextIf('calc-total', '₪' + fmtMoney(total));
+  return total;
+}
+function calculatorApply() {
+  var sel = document.getElementById('calc-couple');
+  var leadId = sel ? sel.value : '';
+  if (!leadId) { toast('בחר זוג כדי לעדכן לו הצעה', 'error'); return; }
+  var total = renderCalculation();
+  if (!total) { toast('ההצעה עדיין ₪0 — בדוק אורחים ומחירי בסיס', 'error'); return; }
+  apiCall('PATCH', '/api/leads/' + leadId, { price: total }).then(function() {
+    toast('ההצעה עודכנה לזוג: ₪' + fmtMoney(total), 'success');
+    preloadLeads();
+    loadPipeline();
+    loadCalculator();
+  }).catch(function(e) { toast(e.message, 'error'); });
+}
+function openCalculatorForLead(id) {
+  calculatorPrefillLeadId = id;
+  closeDrawer();
+  goTo('calculator', document.getElementById('nav-calculator'));
 }
 function toast(msg, type) { type = type||'success'; var c = document.getElementById('toasts'); var el = document.createElement('div'); el.className = 'toast '+type; el.textContent = msg; c.appendChild(el); setTimeout(function() { el.remove(); }, 3000); }
 
