@@ -12,7 +12,7 @@ import { handleTenantBusinessSettings } from './src/tenant-business-settings.js'
 import { handleCustomerBilling, isCustomerBillingRoute } from './src/customer-billing.js';
 import { handleStrategicContacts } from './src/strategic-contacts.js';
 import { serveHTML } from './src/ui.js';
-import { resolveHostTenant, unknownTenantPage, inactiveTenantPage } from './src/host.js';
+import { resolveHostTenant, setHostTenant, unknownTenantPage, inactiveTenantPage } from './src/host.js';
 
 export default {
   async fetch(request, env, ctx) {
@@ -55,7 +55,7 @@ export default {
       }
       return inactiveTenantPage(hostResolution.tenant);
     }
-    request.hostTenant = hostResolution.tenant;
+    setHostTenant(request, hostResolution.tenant);
 
     if (path === '/' || path === '/index.html' || path === '/admin' || path === '/crm') {
       return new Response(serveHTML(), {

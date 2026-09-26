@@ -32,6 +32,18 @@ export function isValidAppHost(host) {
   return !!slug;
 }
 
+// העברת ה-tenant שזוהה לשאר המודולים - WeakMap פר-בקשה, בלי שינוי אובייקט ה-Request
+// ובלי headers פנימיים שאפשר לזייף מבחוץ.
+const hostTenantByRequest = new WeakMap();
+
+export function setHostTenant(request, tenant) {
+  if (tenant) hostTenantByRequest.set(request, tenant);
+}
+
+export function getHostTenant(request) {
+  return hostTenantByRequest.get(request) || null;
+}
+
 // פותר את ה-tenant מהבקשה. מחזיר { slug, tenant } - tenant=null אם לא נמצא
 export async function resolveHostTenant(request, env) {
   const slug = extractTenantSlug(new URL(request.url).hostname);

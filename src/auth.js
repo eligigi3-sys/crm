@@ -1,4 +1,5 @@
 import { hashPassword, verifyPassword } from './passwords.js';
+import { getHostTenant } from './host.js';
 
 function normalizeOptionalText(value) {
   if (value === undefined || value === null) return null;
@@ -149,7 +150,7 @@ export async function requireTenantContext(request, env) {
 
   // כשהבקשה הגיעה מכתובת של עסק ספציפי (subdomain), ההקשר מצומצם לאותו עסק בלבד.
   // זה גם פותר משתמשים עם כמה שיוכים: בכתובת העסק נבחר אוטומטית השיוך הנכון.
-  const hostTenant = request.hostTenant || null;
+  const hostTenant = getHostTenant(request);
   if (hostTenant) {
     activeMemberships = activeMemberships.filter(function(item) {
       return item.tenant_id === hostTenant.id;
@@ -320,7 +321,7 @@ export async function handleAuth(request, env, path) {
   const method = request.method;
 
   if (path === '/api/auth/tenant-by-host' && method === 'GET') {
-    const hostTenant = request.hostTenant || null;
+    const hostTenant = getHostTenant(request);
     if (!hostTenant) return { tenant: null };
     return {
       tenant: {
