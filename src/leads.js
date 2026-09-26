@@ -1,5 +1,13 @@
 import { requireTenantContext, assertTenantModuleEnabled, assertTenantRole } from './auth.js';
 
+// תאריך היום לפי שעון ישראל - השרת רץ ב-UTC, ו-toISOString() היה מחזיר אתמול בין חצות ל-03:00
+function todayIL() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+}
+function monthIL() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit' }).format(new Date());
+}
+
 // ============================================================
 // leads.js - לוגיקת אירועים (נפרדת מלקוחות!)
 // ============================================================
@@ -1143,7 +1151,11 @@ export async function handleLeads(request, env, path) {
     if (moduleState instanceof Response) return moduleState;
 
     const tenantId = tenantCtx.tenant.id;
-    const { results } = await env.DB.prepare(`
+    const url = new URL(request.url);
+    const search = String(url.searchParams.get('search') || '').trim();
+    const status = String(url.searchParams.get('status') || '').trim();
+
+    let sql = `
       SELECT
         leads.*,
         contacts.contact_num,
@@ -1151,9 +1163,20 @@ export async function handleLeads(request, env, path) {
       FROM leads
       LEFT JOIN contacts ON leads.contact_id = contacts.id AND contacts.tenant_id = leads.tenant_id
       WHERE leads.tenant_id = ?
-      ORDER BY leads.created_at DESC
-      LIMIT 200
-    `).bind(tenantId).all();
+    `;
+    const binds = [tenantId];
+    if (status && ['lead', 'quote', 'closed', 'cancelled'].includes(status)) {
+      sql += ' AND leads.status = ?';
+      binds.push(status);
+    }
+    if (search) {
+      sql += ` AND (leads.name LIKE ? OR leads.phone LIKE ? OR leads.venue LIKE ?)`;
+      const like = '%' + search.replace(/[%_]/g, '') + '%';
+      binds.push(like, like, like);
+    }
+    sql += ' ORDER BY leads.created_at DESC LIMIT 200';
+
+    const { results } = await env.DB.prepare(sql).bind(...binds).all();
 
     return { leads: results };
   }
@@ -1425,12 +1448,12 @@ export async function handleDashboard(request, env, path) {
     const url = new URL(request.url);
     const now = new Date();
     const requestedMonth = String(url.searchParams.get('month') || '').trim();
-    const month = /^\d{4}-\d{2}$/.test(requestedMonth) ? requestedMonth : now.toISOString().slice(0, 7);
+    const month = /^\d{4}-\d{2}$/.test(requestedMonth) ? requestedMonth : monthIL();
     const start = `${month}-01`;
     const monthStart = new Date(`${month}-01T00:00:00Z`);
     const endDate = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 0));
     const end = endDate.toISOString().slice(0, 10);
-    const today = now.toISOString().slice(0, 10);
+    const today = todayIL();
 
     const { results: clients } = await env.DB.prepare(`
       SELECT
@@ -1489,9 +1512,10 @@ export async function handleDashboard(request, env, path) {
   }
 
   const now = new Date();
+  const ilNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
 
-  const y = now.getFullYear();
-  const m = now.getMonth() + 1;
+  const y = ilNow.getFullYear();
+  const m = ilNow.getMonth() + 1;
 
   const prevM = m === 1 ? 12 : m - 1;
   const prevY = m === 1 ? y - 1 : y;
@@ -1546,7 +1570,7 @@ export async function handleDashboard(request, env, path) {
     ).bind(tenantId, nextStart, nextEnd).first()
   ]);
 
-  const today = now.toISOString().split('T')[0];
+  const today = todayIL();
 
   const { results: followUps } = await env.DB.prepare(
     `SELECT

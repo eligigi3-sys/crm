@@ -2271,6 +2271,12 @@ function getTodayYMD() {
   return map.year + '-' + map.month + '-' + map.day;
 }
 
+function shiftYMD(ymd, days) {
+  var d = new Date(ymd + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+}
+
 function getMonthYearLabel(dateStr) {
   if (!dateStr) return 'ללא חודש';
   var parts = String(dateStr).substring(0, 10).split('-');
@@ -2829,6 +2835,8 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(function() { loadLeads(); }, 300);
   });
+  var shoppingSearch = document.getElementById('shopping-search');
+  if (shoppingSearch) shoppingSearch.addEventListener('input', renderShoppingGrid);
   document.getElementById('leads-status-filter').addEventListener('change', loadLeads);
   document.getElementById('leads-event-filter').addEventListener('change', loadLeads);
   document.getElementById('new-note-input').addEventListener('keydown', function(e) { if (e.key === 'Enter') addNote(); });
@@ -4235,7 +4243,7 @@ function renderMiniCal(leads) {
   var firstDay = new Date(year, month, 1).getDay();
   var daysInMonth = new Date(year, month+1, 0).getDate();
   var daysInPrev = new Date(year, month, 0).getDate();
-  var todayStr = new Date().toISOString().split('T')[0];
+  var todayStr = getTodayYMD();
   var daysHTML = '';
   for (var i = firstDay - 1; i >= 0; i--) {
     daysHTML += '<div class="cal-day other-month"><span class="cal-day-num">' + (daysInPrev - i) + '</span></div>';
@@ -4278,7 +4286,7 @@ function loadLeads() {
     var tbody = document.getElementById('leads-body');
     if (!leads.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="10"><div class="guided-empty"><div class="guided-empty-title">אין לידים עדיין</div><div class="guided-empty-sub">אפשר להתחיל בקלות עם ליד ראשון ולהוסיף ממנו גם אירוע ופרטי לקוח.</div><button class="btn btn-primary btn-sm" onclick="openLeadModal()">צור ליד ראשון</button></div></td></tr>'; return; }
 
-    var today = new Date().toISOString().split('T')[0];
+    var today = getTodayYMD();
     var futureLeads = [];
     var archivedLeads = [];
 
@@ -5825,18 +5833,40 @@ function saveSalesDocumentDraft() {
   });
 }
 
+var shoppingListsCache = [];
+
 function loadShoppingLists() {
   var grid = document.getElementById('shopping-grid');
   if (!grid) return;
 
   apiCall('GET', '/api/shopping-lists').then(function(data) {
-    var lists = data.lists || [];
+    shoppingListsCache = data.lists || [];
+    renderShoppingGrid();
+  }).catch(function(e) {
+    toast(e.message, 'error');
+  });
+}
 
-    if (!lists.length) {
-      grid.innerHTML = '<div class="dash-empty">אין עדיין רשימות קניות</div>';
-      return;
-    }
+function renderShoppingGrid() {
+  var grid = document.getElementById('shopping-grid');
+  if (!grid) return;
+  var searchEl = document.getElementById('shopping-search');
+  var q = searchEl ? searchEl.value.trim().toLowerCase() : '';
+  var lists = shoppingListsCache;
+  if (q) {
+    lists = lists.filter(function(l) {
+      return (l.name || '').toLowerCase().indexOf(q) !== -1 ||
+        (l.contact_name || '').toLowerCase().indexOf(q) !== -1 ||
+        (l.address || '').toLowerCase().indexOf(q) !== -1;
+    });
+  }
 
+  if (!lists.length) {
+    grid.innerHTML = '<div class="dash-empty">' + (q ? 'לא נמצאו חנויות מתאימות' : 'אין עדיין רשימות קניות') + '</div>';
+    return;
+  }
+
+  {
     grid.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">' +
       lists.map(function(l) {
         return '<div class="customer-card" data-shopping-id="' + l.id + '" style="cursor:pointer">' +
@@ -5856,9 +5886,7 @@ function loadShoppingLists() {
         openShoppingList(parseInt(this.getAttribute('data-shopping-id')));
       };
     });
-  }).catch(function(e) {
-    toast(e.message, 'error');
-  });
+  }
 }
 
 
@@ -6605,8 +6633,8 @@ function deleteCustomer(id, onDone) {
 
 function formatDate(d) { if (!d) return '—'; var p = d.substring(0,10).split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
 function fmtDT(d) { if (!d) return '—'; return new Date(d).toLocaleString('he-IL'); }
-function isOverdue(d) { if (!d) return false; return d.substring(0,10) < new Date().toISOString().split('T')[0]; }
-function getUrgencyDot(nc) { if (!nc) return 'dot-gray'; var t = new Date().toISOString().split('T')[0]; if (nc < t) return 'dot-red'; var tm = new Date(Date.now()+86400000).toISOString().split('T')[0]; return nc <= tm ? 'dot-orange' : 'dot-green'; }
+function isOverdue(d) { if (!d) return false; return d.substring(0,10) < getTodayYMD(); }
+function getUrgencyDot(nc) { if (!nc) return 'dot-gray'; var t = getTodayYMD(); if (nc < t) return 'dot-red'; var tm = shiftYMD(t, 1); return nc <= tm ? 'dot-orange' : 'dot-green'; }
 function safeJSON(v) { try { var r = JSON.parse(v); return Array.isArray(r)?r:[]; } catch(e) { return []; } }
 function fmtMoney(n) { return Number(n||0).toLocaleString('he-IL'); }
 function statusBadge(s) { var m={lead:'badge-blue',quote:'badge-orange',closed:'badge-green',cancelled:'badge-gray'}; var l={lead:'ליד',quote:'הצעת מחיר',closed:'סגור',cancelled:'בוטל'}; return '<span class="badge '+(m[s]||'badge-gray')+'">'+(l[s]||s)+'</span>'; }
@@ -8382,10 +8410,7 @@ function formatProductReportDate(dateStr) {
 }
 
 function getProductReportLast30Start() {
-  var today = getTodayYMD();
-  var base = new Date(today + 'T00:00:00');
-  base.setDate(base.getDate() - 29);
-  return base.toISOString().slice(0, 10);
+  return shiftYMD(getTodayYMD(), -29);
 }
 
 function getProductReportSourceLabel(purchase, shoppingListsMap) {
@@ -9443,7 +9468,7 @@ function renderEmployeeAssignmentsProfile(container, employee, assignments) {
   employee = employee || {};
   assignments = assignments || [];
 
-  var today = new Date().toISOString().split('T')[0];
+  var today = getTodayYMD();
   var upcoming = [];
   var past = [];
   var totalPlanned = 0;
@@ -11958,7 +11983,7 @@ window.openShoppingPurchaseModal = function(listId, items) {
         '<button class="modal-close" id="purchase-close">✕</button>' +
       '</div>' +
       '<div class="modal-body">' +
-        '<div class="form-group"><label class="form-label">תאריך קנייה</label><input type="date" class="form-input" id="purchase-date" value="' + new Date().toISOString().slice(0,10) + '"></div>' +
+        '<div class="form-group"><label class="form-label">תאריך קנייה</label><input type="date" class="form-input" id="purchase-date" value="' + getTodayYMD() + '"></div>' +
         '<div class="form-group"><label class="form-label">סכום קנייה</label><input type="number" class="form-input" id="purchase-total" value="' + defaultTotal + '"></div>' +
         '<div class="form-group"><label class="form-label">תמונת חשבונית</label><input type="file" class="form-input" id="purchase-receipt" accept="image/*"></div>' +
         '<div class="form-group"><label class="form-label">הערות</label><textarea class="form-input" id="purchase-notes" style="min-height:80px"></textarea></div>' +
