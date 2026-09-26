@@ -143,9 +143,21 @@ export async function requireTenantContext(request, env) {
      ORDER BY tm.id ASC`
   ).bind(user.id).all();
 
-  const activeMemberships = (memberships.results || []).filter(function(item) {
+  let activeMemberships = (memberships.results || []).filter(function(item) {
     return item.tenant_status === 'active';
   });
+
+  // כשהבקשה הגיעה מכתובת של עסק ספציפי (subdomain), ההקשר מצומצם לאותו עסק בלבד.
+  // זה גם פותר משתמשים עם כמה שיוכים: בכתובת העסק נבחר אוטומטית השיוך הנכון.
+  const hostTenant = request.hostTenant || null;
+  if (hostTenant) {
+    activeMemberships = activeMemberships.filter(function(item) {
+      return item.tenant_id === hostTenant.id;
+    });
+    if (activeMemberships.length === 0) {
+      return json({ error: 'אין למשתמש שיוך פעיל לעסק זה' }, 403);
+    }
+  }
 
   if (activeMemberships.length === 0) {
     return json({ error: 'אין למשתמש שיוך פעיל לעסק' }, 403);
@@ -306,6 +318,17 @@ async function loginWithUser(user, password, env) {
 
 export async function handleAuth(request, env, path) {
   const method = request.method;
+
+  if (path === '/api/auth/tenant-by-host' && method === 'GET') {
+    const hostTenant = request.hostTenant || null;
+    if (!hostTenant) return { tenant: null };
+    return {
+      tenant: {
+        slug: hostTenant.slug,
+        name: hostTenant.name || null
+      }
+    };
+  }
 
   if (path === '/api/auth/login') {
     if (method !== 'POST') {
