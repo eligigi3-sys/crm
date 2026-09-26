@@ -6931,7 +6931,7 @@ function deleteLead(id) {
     closeLeadModal();
     closeDrawer();
     invalidatePages();
-    refreshAfterLeadMutation('האירוע נמחק');
+    refreshAfterLeadMutation(isArtistaMode() ? 'הזוג נמחק' : 'האירוע נמחק');
   }).catch(function(e) { toast(e.message, 'error'); });
 }
 
