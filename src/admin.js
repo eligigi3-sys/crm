@@ -1,5 +1,6 @@
 import { requireSuperAdmin } from './auth.js';
 import { hashPassword } from './passwords.js';
+import { RESERVED_SUBDOMAINS } from './host.js';
 import { handleAdminCleanup } from './cleanup.js';
 
 const MODULE_KEYS = [
@@ -528,16 +529,31 @@ export async function handleAdmin(request, env, path) {
     const status = normalizeTenantStatus(body.status || tenant.status);
     const beforeTenant = mapTenantRow(tenant);
 
+    // אפשרות לערוך את ה-slug - הוא כתובת העסק במערכת: <slug>.comics-events.co.il
+    let nextSlug = tenant.slug;
+    if (body.slug !== undefined && String(body.slug).trim() !== '' && String(body.slug).trim().toLowerCase() !== tenant.slug) {
+      const candidate = normalizeTenantSlug(body.slug);
+      if (RESERVED_SUBDOMAINS.has(candidate)) {
+        throw new Error('הכתובת הזו שמורה למערכת');
+      }
+      const existing = await getTenantBySlug(candidate, env);
+      if (existing && existing.id !== tenantId) {
+        throw new Error('הכתובת כבר תפוסה על ידי עסק אחר');
+      }
+      nextSlug = candidate;
+    }
+
     await env.DB.prepare(`
       UPDATE tenants
       SET name = ?,
+          slug = ?,
           contact_name = ?,
           contact_phone = ?,
           contact_email = ?,
           status = ?,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).bind(name, contactName, contactPhone, contactEmail, status, tenantId).run();
+    `).bind(name, nextSlug, contactName, contactPhone, contactEmail, status, tenantId).run();
 
     const updatedTenant = await getTenantById(tenantId, env);
     await logAdminAudit(env, superAdminCtx.user, 'tenant_update', {

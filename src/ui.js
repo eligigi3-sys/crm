@@ -3703,7 +3703,8 @@ function saveSuperAdminTenantDetails(tenantId) {
     contact_name: (document.getElementById('super-admin-edit-contact-name').value || '').trim(),
     contact_phone: (document.getElementById('super-admin-edit-contact-phone').value || '').trim(),
     contact_email: (document.getElementById('super-admin-edit-contact-email').value || '').trim(),
-    status: (document.getElementById('super-admin-edit-status').value || '').trim()
+    status: (document.getElementById('super-admin-edit-status').value || '').trim(),
+    slug: (document.getElementById('super-admin-edit-slug').value || '').trim()
   };
   if (!body.name) { toast('שם עסק חובה', 'error'); return; }
   if (!body.contact_name) { toast('שם איש קשר חובה', 'error'); return; }
@@ -3797,7 +3798,7 @@ function openSuperAdminTenantModal(tenantId) {
         '</div>' +
         '<div class="form-row-3">' +
           '<div class="form-group"><label class="form-label">שם העסק</label><input class="form-input" id="super-admin-edit-name" value="' + escapeHtml(tenant.name || '') + '"></div>' +
-          '<div class="form-group"><label class="form-label">Slug</label><input class="form-input" value="' + escapeHtml(tenant.slug || '') + '" disabled></div>' +
+          '<div class="form-group"><label class="form-label">כתובת העסק (Slug)</label><input class="form-input" id="super-admin-edit-slug" dir="ltr" value="' + escapeHtml(tenant.slug || '') + '"><div class="form-hint">' + escapeHtml((tenant.slug || 'slug') + '.comics-events.co.il') + '</div></div>' +
           '<div class="form-group"><label class="form-label">סטטוס</label><select class="form-select" id="super-admin-edit-status"><option value="active"' + (tenant.status === 'active' ? ' selected' : '') + '>פעיל</option><option value="suspended"' + (tenant.status === 'suspended' ? ' selected' : '') + '>מושהה</option></select></div>' +
         '</div>' +
         '<div class="form-row-3">' +
