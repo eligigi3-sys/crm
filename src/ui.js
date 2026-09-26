@@ -1876,6 +1876,7 @@ body.crm-shell .fab-add{display:flex}
     <div class="nav-item active" id="nav-dashboard"><span class="nav-icon">📊</span> <span class="nav-label" data-mobile="דאשבורד">דאשבורד</span></div>
     <div class="nav-item" id="nav-pipeline" style="display:none"><span class="nav-icon">💍</span> <span class="nav-label" data-mobile="צינור זוגות">צינור זוגות</span></div>
     <div class="nav-item" id="nav-calculator" style="display:none"><span class="nav-icon">🧮</span> <span class="nav-label" data-mobile="מחשבון מחיר">מחשבון מחיר</span></div>
+    <div class="nav-item" id="nav-calculator-settings" style="display:none"><span class="nav-icon">💰</span> <span class="nav-label" data-mobile="הגדרות מחשבון">הגדרות מחשבון</span></div>
     <div class="nav-item" id="nav-leads"><span class="nav-icon">👥</span> <span class="nav-label" data-mobile="לקוחות">לקוחות</span> <span class="nav-badge" id="nav-leads-count" style="display:none">0</span></div>
     <div class="nav-item" id="nav-employees"><span class="nav-icon">🧑‍💼</span> <span class="nav-label" data-mobile="עובדים">עובדים</span></div>
     <div class="nav-item" id="nav-team" style="display:none"><span class="nav-icon">👤</span> <span class="nav-label" data-mobile="צוות">צוות</span></div>
@@ -2117,7 +2118,7 @@ id="customers-search">
 
     <div id="page-business-settings" class="page">
       <div class="page-header">
-        <div class="page-title">הגדרות עסק <small>פרטי עסק, מע״מ וברירות מחדל למסמכים</small></div>
+        <div class="page-title" id="business-settings-page-title">הגדרות עסק <small>פרטי עסק, מע״מ וברירות מחדל למסמכים</small></div>
         <button class="btn btn-secondary" id="btn-refresh-business-settings">רענן</button>
       </div>
       <div class="business-settings-layout">
@@ -2132,20 +2133,11 @@ id="customers-search">
             <div id="gcal-status" style="padding:10px 12px;border-radius:8px;font-size:12px;display:none"></div>
           </div>
         </div>
-        <div class="business-settings-card" id="pricing-settings-card" style="display:none">
-          <div class="business-settings-head">
-            <div>
-              <div class="business-settings-title">💍 תמחור אירועים — מחירי בסיס</div>
-              <div class="business-settings-sub">אלה מחירי הבסיס להצעות במחשבון המחיר. אפשר לעדכן אותם בכל רגע, והמחשבון ישתמש תמיד במחירים העדכניים.</div>
-            </div>
-          </div>
-          <div class="business-settings-body" style="padding-top:14px" id="pricing-settings-body"><div class="dash-empty">טוען...</div></div>
-        </div>
         <div class="business-settings-card">
           <div class="business-settings-head">
             <div>
-              <div class="business-settings-title">פרטי העסק למסמכי מכירה</div>
-              <div class="business-settings-sub">הגדרות אלו ישמשו כברירת מחדל למסמכים חדשים בלבד. מסמכים קיימים/נעולים לא ישתנו.</div>
+              <div class="business-settings-title" id="business-settings-card-title">פרטי העסק למסמכי מכירה</div>
+              <div class="business-settings-sub" id="business-settings-card-sub">הגדרות אלו ישמשו כברירת מחדל למסמכים חדשים בלבד. מסמכים קיימים/נעולים לא ישתנו.</div>
             </div>
             <span class="badge badge-blue" id="business-settings-role-badge">טוען...</span>
           </div>
@@ -2154,8 +2146,26 @@ id="customers-search">
         </div>
       </div>
     </div>
+    <div id="page-calculator-settings" class="page">
+      <div class="page-header">
+        <div class="page-title">💰 הגדרות מחשבון <small>מחירי הבסיס והסטנדרט שמחשבון המחיר משתמש בהם</small></div>
+        <button class="btn btn-secondary" id="btn-refresh-calculator-settings">רענן</button>
+      </div>
+      <div class="business-settings-layout">
+        <div class="business-settings-card" id="pricing-settings-card">
+          <div class="business-settings-head">
+            <div>
+              <div class="business-settings-title">💍 תמחור אירועים — מחירי בסיס</div>
+              <div class="business-settings-sub">אלה מחירי הבסיס להצעות במחשבון המחיר. אפשר לעדכן אותם בכל רגע, והמחשבון ישתמש תמיד במחירים העדכניים.</div>
+            </div>
+          </div>
+          <div class="business-settings-body" style="padding-top:14px" id="pricing-settings-body"><div class="dash-empty">טוען...</div></div>
+        </div>
+      </div>
+    </div>
+
     <div id="page-calculator" class="page">
-      <div class="page-header"><div class="page-title">🧮 מחשבון מחיר <small>הצעת מחיר אוטומטית ממחירי הבסיס שהוגדרו בהגדרות עסק</small></div></div>
+      <div class="page-header"><div class="page-title">🧮 מחשבון מחיר <small>הצעת מחיר אוטומטית ממחירי הבסיס שהוגדרו בהגדרות המחשבון</small></div></div>
       <div class="calc-layout">
         <div class="calc-card">
           <div class="form-group"><label class="form-label">זוג (לא חובה)</label><select class="form-input" id="calc-couple"><option value="">ללא שיוך לזוג</option></select></div>
@@ -2471,6 +2481,7 @@ var CRM_MOBILE_NAV_ITEMS = [
   { navId: 'nav-dashboard', page: 'dashboard', label: 'דאשבורד', icon: '📊' },
   { navId: 'nav-pipeline', page: 'pipeline', label: 'צינור זוגות', icon: '💍', moduleKey: 'leads', artistaOnly: true },
   { navId: 'nav-calculator', page: 'calculator', label: 'מחשבון', icon: '🧮', moduleKey: 'leads', artistaOnly: true },
+  { navId: 'nav-calculator-settings', page: 'calculator-settings', label: 'הגדרות מחשבון', icon: '💰', moduleKey: 'leads', artistaOnly: true },
   { navId: 'nav-calendar', page: 'calendar', label: 'יומן אירועים', icon: '📅', moduleKey: 'leads' },
   { navId: 'nav-leads', page: 'customers', label: 'לקוחות', icon: '👥', moduleKey: 'contacts' },
   { navId: 'nav-employees', page: 'employees', label: 'עובדים', icon: '🧑💼', moduleKey: 'employees' },
@@ -2483,7 +2494,7 @@ var CRM_MOBILE_NAV_ITEMS = [
   { navId: 'nav-business-settings', page: 'business-settings', label: 'הגדרות', icon: '⚙️' }
 ];
 var DEFAULT_MOBILE_BOTTOM_NAV = ['nav-calendar', 'nav-leads', 'nav-shopping', 'nav-sales-documents', 'nav-business-settings'];
-var ARTISTA_MOBILE_BOTTOM_NAV = ['nav-pipeline', 'nav-calculator', 'nav-calendar', 'nav-leads', 'nav-business-settings'];
+var ARTISTA_MOBILE_BOTTOM_NAV = ['nav-pipeline', 'nav-calculator', 'nav-calendar', 'nav-leads', 'nav-calculator-settings'];
 function getDefaultMobileBottomNav() {
   return (typeof isArtistaMode === 'function' && isArtistaMode()) ? ARTISTA_MOBILE_BOTTOM_NAV.slice() : DEFAULT_MOBILE_BOTTOM_NAV.slice();
 }
@@ -2835,6 +2846,7 @@ var PAGE_ROUTES = {
   dashboard: '/crm',
   pipeline: '/crm/pipeline',
   calculator: '/crm/calculator',
+  'calculator-settings': '/crm/calculator-settings',
   leads: '/crm/leads',
   customers: '/crm/customers',
   employees: '/crm/employees',
@@ -3047,6 +3059,9 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   var btnNewLeadPipeline = document.getElementById('btn-new-lead-pipeline');
   if (btnNewLeadPipeline) btnNewLeadPipeline.addEventListener('click', function() { openLeadModal(); });
   document.getElementById('nav-calculator').addEventListener('click', function() { goTo('calculator', this); });
+  document.getElementById('nav-calculator-settings').addEventListener('click', function() { goTo('calculator-settings', this); });
+  var btnRefreshCalcSettings = document.getElementById('btn-refresh-calculator-settings');
+  if (btnRefreshCalcSettings) btnRefreshCalcSettings.addEventListener('click', loadPricingSettings);
   var calcCoupleSel = document.getElementById('calc-couple');
   if (calcCoupleSel) calcCoupleSel.addEventListener('change', onCalculatorCoupleChange);
   var calcGuestsInput = document.getElementById('calc-guests');
@@ -3219,6 +3234,7 @@ function goTo(page, el) {
     leads: 'leads',
     pipeline: 'leads',
     calculator: 'leads',
+    'calculator-settings': 'leads',
     customers: 'contacts',
     employees: 'employees',
     products: 'products',
@@ -3257,7 +3273,11 @@ function goTo(page, el) {
   if (page === 'shopping') loadShoppingLists();
   if (page === 'strategic-contacts') loadStrategicContacts();
   if (page === 'sales-documents') loadSalesDocuments();
-  if (page === 'business-settings') { loadBusinessSettings(); if (isArtistaMode()) loadPricingSettings(); }
+  if (page === 'business-settings') loadBusinessSettings();
+  if (page === 'calculator-settings') {
+    if (!isArtistaMode()) { goTo('business-settings', document.getElementById('nav-business-settings')); return; }
+    loadPricingSettings();
+  }
   if (page === 'calendar') loadCalendar();
   if (page === 'customers') loadCustomers();
   if (page === 'employees') loadEmployees();
@@ -4813,6 +4833,15 @@ function renderBusinessSettingsForm() {
   var canEdit = canEditBusinessSettings();
   var disabled = !canEdit || businessSettingsSaving;
   var s = currentBusinessSettings;
+  if (isArtistaMode()) {
+    // בארטיסטה אין משמעות לפרטי עסק/מע״מ/ברירות מסמך - נשאר רק בחירת התפריט התחתון בנייד
+    body.innerHTML = businessSettingsMobileNavControl();
+    var mobileSectionTitle = body.querySelector('.business-settings-section-title');
+    if (mobileSectionTitle) mobileSectionTitle.textContent = 'הגדרות בנייד';
+    bindMobileNavSettings();
+    if (footer) footer.style.display = 'none';
+    return;
+  }
   var isExemptDealer = s.business_type === 'exempt_dealer';
   var isVatExempt = isExemptDealer || s.vat_mode === 'exempt';
   body.innerHTML =
@@ -7099,9 +7128,15 @@ function applyArtistaMode() {
   if (navPipeline) navPipeline.style.display = artista ? 'flex' : 'none';
   var navCalculator = document.getElementById('nav-calculator');
   if (navCalculator) navCalculator.style.display = artista ? 'flex' : 'none';
-  var pricingCard = document.getElementById('pricing-settings-card');
-  if (pricingCard) pricingCard.style.display = artista ? '' : 'none';
+  var navCalculatorSettings = document.getElementById('nav-calculator-settings');
+  if (navCalculatorSettings) { navCalculatorSettings.style.display = artista ? 'flex' : 'none'; navCalculatorSettings.style.order = 17; }
   if (!artista) return;
+  var bsTitle = document.getElementById('business-settings-page-title');
+  if (bsTitle) bsTitle.innerHTML = 'הגדרות <small>חיבור Google Calendar ותצוגת התפריט בנייד</small>';
+  var bsCardTitle = document.getElementById('business-settings-card-title');
+  if (bsCardTitle) bsCardTitle.textContent = 'הגדרות בנייד';
+  var bsCardSub = document.getElementById('business-settings-card-sub');
+  if (bsCardSub) bsCardSub.textContent = 'בחירת המודולים שיופיעו בתפריט התחתון בנייד.';
   var navLeadsLabel = document.querySelector('#nav-leads .nav-label');
   if (navLeadsLabel) { navLeadsLabel.textContent = 'זוגות'; navLeadsLabel.setAttribute('data-mobile', 'זוגות'); }
   var leadsTitle = document.querySelector('#page-leads .page-title');
@@ -7464,14 +7499,14 @@ function renderCalculatorInputs(cfg) {
   if (barBox) {
     barBox.innerHTML = cfg.bar.options.length ? cfg.bar.options.map(function(o, i) {
       return '<label class="check-item" style="display:inline-flex;margin:0 0 6px 8px"><input type="checkbox" class="calc-bar-opt" value="' + i + '"> ' + o.name + ' (+₪' + fmtMoney(o.price) + ' לאדם)</label>';
-    }).join('') : '<div style="font-size:12px;color:var(--text3)">לא הוגדרו תוספות בר — אפשר להוסיף אותן בהגדרות עסק</div>';
+    }).join('') : '<div style="font-size:12px;color:var(--text3)">לא הוגדרו תוספות בר — אפשר להוסיף אותן בהגדרות המחשבון</div>';
     barBox.querySelectorAll('.calc-bar-opt').forEach(function(cb) { cb.addEventListener('change', renderCalculation); });
   }
   var extrasBox = document.getElementById('calc-extras');
   if (extrasBox) {
     extrasBox.innerHTML = cfg.extras.length ? cfg.extras.map(function(x, i) {
       return '<label class="check-item" style="display:inline-flex;margin:0 0 6px 8px"><input type="checkbox" class="calc-extra" value="' + i + '"> ' + x.name + ' (₪' + fmtMoney(x.price) + ')</label>';
-    }).join('') : '<div style="font-size:12px;color:var(--text3)">לא הוגדרו תוספות — אפשר להוסיף אותן בהגדרות עסק</div>';
+    }).join('') : '<div style="font-size:12px;color:var(--text3)">לא הוגדרו תוספות — אפשר להוסיף אותן בהגדרות המחשבון</div>';
     extrasBox.querySelectorAll('.calc-extra').forEach(function(cb) { cb.addEventListener('change', renderCalculation); });
   }
   renderCalculation();
@@ -7538,7 +7573,7 @@ function renderCalculation() {
   });
   rows.forEach(function(r) { total += r.amount; });
   var box = document.getElementById('calc-breakdown');
-  if (box) box.innerHTML = rows.length ? rows.map(function(r) { return '<div class="calc-breakdown-row"><span>' + r.label + '</span><span>₪' + fmtMoney(r.amount) + '</span></div>'; }).join('') : '<div class="dash-empty">הזן מספר אורחים ובחר אפשרויות — או הגדר קודם מחירי בסיס בהגדרות עסק</div>';
+  if (box) box.innerHTML = rows.length ? rows.map(function(r) { return '<div class="calc-breakdown-row"><span>' + r.label + '</span><span>₪' + fmtMoney(r.amount) + '</span></div>'; }).join('') : '<div class="dash-empty">הזן מספר אורחים ובחר אפשרויות — או הגדר קודם מחירי בסיס בהגדרות המחשבון</div>';
   setTextIf('calc-total', '₪' + fmtMoney(total));
   return total;
 }
