@@ -4270,7 +4270,7 @@ function renderSmartStrip(leads) {
     var ed = (l.event_date || '').substring(0, 10);
     if (ed === today) evToday++;
     if (ed > today && ed <= weekEnd) evWeek++;
-    if (isOverdue(l.next_contact)) overdue++;
+    if (isOverdue(l.next_contact) && (!ed || ed >= today)) overdue++;
   });
   var html = '<div class="smart-chip' + (evToday ? ' hot' : '') + '" id="smart-chip-today"><span class="smart-chip-num">' + evToday + '</span><span class="smart-chip-label">אירועים היום</span></div>';
   html += '<div class="smart-chip' + (overdue ? ' alert' : '') + '" id="smart-chip-overdue"><span class="smart-chip-num">' + overdue + '</span><span class="smart-chip-label">מעקבים באיחור</span></div>';
@@ -4466,7 +4466,7 @@ function loadLeads() {
     allLeadsCache = data.leads || [];
     var leads = data.leads;
     if (eventType) leads = leads.filter(function(l) { return l.event_type === eventType; });
-    if (leadsOverdueOnly) leads = leads.filter(function(l) { return isOverdue(l.next_contact) && (l.status || '') !== 'cancelled'; });
+    if (leadsOverdueOnly) leads = leads.filter(function(l) { var ed = (l.event_date || '').substring(0, 10); return isOverdue(l.next_contact) && (!ed || ed >= today) && (l.status || '') !== 'cancelled'; });
     var leadsCountEl = document.getElementById('leads-count');
     if (leadsCountEl) leadsCountEl.textContent = leads.length + ' אירועים';
     var tbody = document.getElementById('leads-body');
