@@ -6547,6 +6547,14 @@ function buildLeadWaMessage(l, kind) {
   if (kind === 'payment') {
     return 'היי ' + name + ', תזכורת ידידותית 😊' + NL + 'היתרה לתשלום עבור האירוע' + (date ? ' בתאריך ' + date : '') + ' עומדת על ₪' + balance + '.' + NL + 'אשמח לסדר את התשלום בהקדם. תודה רבה!';
   }
+  if (kind === 'thanks') {
+    return 'היי ' + name + ', תודה רבה שבחרתם בנו! 😊' + NL + 'היה לנו תענוג אמיתי להיות חלק מהאירוע שלכם' + (date ? ' ב-' + date : '') + '.' + NL + 'נשמח מאוד אם תמליצו עלינו לחברים ומשפחה, ואנחנו כאן לכל אירוע בעתיד! 🎉';
+  }
+  if (kind === 'tomorrow') {
+    var where = l.venue ? ' ב' + l.venue : '';
+    var when = l.event_time ? ' בשעה ' + l.event_time : '';
+    return 'היי ' + name + ', 😊' + NL + 'מחר נפגשים! מתרגשים לקראת האירוע שלכם' + where + when + '.' + NL + 'אם יש שאלה או שינוי של הרגע האחרון - אנחנו כאן.' + NL + 'להתראות מחר! 🎉';
+  }
   return 'היי ' + name + ', 😊' + NL + 'רציתי לעדכן לגבי האירוע שלך' + (date ? ' בתאריך ' + date : '') + '.' + NL + 'אשמח לענות על כל שאלה ולסגור את הפרטים האחרונים!';
 }
 
@@ -6566,7 +6574,7 @@ function renderDrawer(l, notes) {
   html += '<div class="info-row"><span class="info-label">אימייל</span><span class="info-value">' + (l.email||'—') + '</span></div></div>';
   if (l.phone) {
     html += '<div class="info-section"><div class="info-section-title">הודעות WhatsApp מוכנות</div>';
-    html += '<select class="form-input" id="wa-template-select" style="margin-bottom:8px"><option value="followup">מעקב</option><option value="quote">הצעת מחיר</option><option value="payment">תזכורת תשלום</option></select>';
+    html += '<select class="form-input" id="wa-template-select" style="margin-bottom:8px"><option value="followup">מעקב</option><option value="quote">הצעת מחיר</option><option value="payment">תזכורת תשלום</option><option value="tomorrow">מחר נפגשים</option><option value="thanks">תודה אחרי האירוע</option></select>';
     html += '<textarea class="form-input" id="wa-template-text" rows="5" style="resize:vertical"></textarea>';
     html += '<button class="btn btn-primary" id="wa-template-open" style="width:100%;margin-top:8px">פתח בוואטסאפ</button></div>';
   }
