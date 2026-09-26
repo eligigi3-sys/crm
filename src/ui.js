@@ -36,7 +36,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .nav-item.active{background:var(--accent-light);color:var(--accent);font-weight:700}
 .nav-icon{font-size:15px;width:22px;text-align:center}
 .nav-badge{margin-right:auto;background:var(--accent);color:#fff;border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700}
-.sidebar-bottom{margin-top:auto;padding:12px;border-top:1px solid var(--border)}
+.sidebar-bottom{order:200;margin-top:auto;padding:12px;border-top:1px solid var(--border)}
 .user-row{display:flex;align-items:center;gap:9px}
 .user-avatar{width:32px;height:32px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
 .user-name{font-size:12px;font-weight:600;color:var(--text)}
@@ -690,7 +690,8 @@ tr:hover td{background:#fafbfc;cursor:pointer}
   .sidebar-logo,
   .nav-section,
   .sidebar-bottom,
-  #gcal-status {
+  #gcal-status,
+  #sidebar-user-row {
     display: none !important;
   }
 
@@ -930,7 +931,8 @@ tr:hover td{background:#fafbfc;cursor:pointer}
   .sidebar-logo,
   .nav-section,
   .sidebar-bottom,
-  #gcal-status {
+  #gcal-status,
+  #sidebar-user-row {
     display: none !important;
   }
 
@@ -1673,6 +1675,9 @@ body{background:radial-gradient(1200px 620px at 92% -8%,#eeecfb 0%,transparent 6
 .nav-item.active .nav-icon{filter:none}
 .nav-badge{background:linear-gradient(135deg,#e8c877,#b8912f);color:#2a1a05}
 .sidebar-bottom{background:rgba(0,0,0,.18)}
+#sidebar-user-row{margin:2px 8px 12px;padding:11px 12px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:14px}
+#sidebar-user-row .user-name{font-size:13px;font-weight:700}
+#sidebar-user-row .user-role{font-size:11px;color:rgba(255,255,255,.55)}
 #sidebar .user-avatar{background:linear-gradient(135deg,#e8c877,#b8912f);color:#2a1a05}
 #sidebar::-webkit-scrollbar{width:5px}
 #sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:4px}
@@ -1784,6 +1789,11 @@ tbody tr:hover td{background:#f6f4fc}
       </div>
     </div>
     <div class="nav-section">תפריט</div>
+    <div class="user-row" id="sidebar-user-row">
+      <div class="user-avatar" id="user-avatar">מ</div>
+      <div><div class="user-name" id="user-name">טוען...</div><div class="user-role" id="user-role-text">מנהל</div></div>
+      <button class="logout-btn" id="logout-btn">יציאה</button>
+    </div>
     <div class="nav-item active" id="nav-dashboard"><span class="nav-icon">📊</span> <span class="nav-label" data-mobile="דאשבורד">דאשבורד</span></div>
     <div class="nav-item" id="nav-leads"><span class="nav-icon">👥</span> <span class="nav-label" data-mobile="לקוחות">לקוחות</span> <span class="nav-badge" id="nav-leads-count" style="display:none">0</span></div>
     <div class="nav-item" id="nav-employees"><span class="nav-icon">🧑‍💼</span> <span class="nav-label" data-mobile="עובדים">עובדים</span></div>
@@ -1796,17 +1806,12 @@ tbody tr:hover td{background:#f6f4fc}
     <div class="nav-item" id="nav-calendar"><span class="nav-icon">📅</span> <span class="nav-label" data-mobile="יומן אירועים">יומן אירועים</span></div>
     <div class="nav-item" id="nav-archive"><span class="nav-icon">🗂️</span> <span class="nav-label" data-mobile="ארכיון">ארכיון אירועים</span></div>
     <div class="nav-item" id="nav-super-admin" style="display:none"><span class="nav-icon">🛠️</span> <span class="nav-label" data-mobile="Admin">Super Admin</span></div>
-    <div id="gcal-status" style="margin:8px;padding:10px 12px;border-radius:8px;font-size:12px;display:none"></div>
     <div class="sidebar-bottom">
       <div id="shell-switcher" style="display:none;flex-direction:column;gap:8px;margin:0 8px 12px 8px">
         <button class="btn btn-secondary" id="btn-enter-crm" style="display:none;width:100%;justify-content:center">Enter CRM</button>
         <button class="btn btn-secondary" id="btn-back-platform" style="display:none;width:100%;justify-content:center">Back to Platform Admin</button>
       </div>
-      <div class="user-row">
-        <div class="user-avatar" id="user-avatar">מ</div>
-        <div><div class="user-name" id="user-name">טוען...</div><div class="user-role" id="user-role-text">מנהל</div></div>
-        <button class="logout-btn" id="logout-btn">יציאה</button>
-      </div>
+      <div id="gcal-status" style="margin:12px 8px 0 8px;padding:10px 12px;border-radius:8px;font-size:12px;display:none"></div>
     </div>
   </div>
   <div id="main">
@@ -4364,7 +4369,7 @@ function renderMiniCal(leads) {
   for (var i = 1; i <= rem; i++) {
     daysHTML += '<div class="cal-day other-month"><span class="cal-day-num">' + i + '</span></div>';
   }
-  cal.innerHTML = '<div class="cal-header"><button class="cal-nav" id="cal-prev">&#x203A;</button><div class="cal-title">' + monthNames[month] + ' ' + year + '</div><button class="cal-nav" id="cal-next">&#x2039;</button></div><div class="cal-grid"><div class="cal-days-header">' + dayNames.map(function(n) { return '<div class="cal-day-name">' + n + '</div>'; }).join('') + '</div><div class="cal-days">' + daysHTML + '</div></div><div class="cal-legend"><div class="cal-legend-item"><div class="cal-dot cal-dot-e"></div> אירוע</div><div class="cal-legend-item"><div class="cal-dot cal-dot-f"></div> מעקב</div></div>';
+  cal.innerHTML = '<div class="cal-header"><button class="cal-nav" id="cal-prev">&#x2039;</button><div class="cal-title">' + monthNames[month] + ' ' + year + '</div><button class="cal-nav" id="cal-next">&#x203A;</button></div><div class="cal-grid"><div class="cal-days-header">' + dayNames.map(function(n) { return '<div class="cal-day-name">' + n + '</div>'; }).join('') + '</div><div class="cal-days">' + daysHTML + '</div></div><div class="cal-legend"><div class="cal-legend-item"><div class="cal-dot cal-dot-e"></div> אירוע</div><div class="cal-legend-item"><div class="cal-dot cal-dot-f"></div> מעקב</div></div>';
   document.getElementById('cal-prev').addEventListener('click', function() { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } renderMiniCal(allLeadsCache); });
   document.getElementById('cal-next').addEventListener('click', function() { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } renderMiniCal(allLeadsCache); });
   cal.querySelectorAll('.cal-day[data-calid]').forEach(function(el) {
@@ -6363,9 +6368,9 @@ function renderRealCalendar(leads) {
   html += '</div>';
 
   html += '<div style="display:flex;gap:8px">';
-  html += '<button class="btn btn-secondary btn-sm" id="cal-real-prev">› קודם</button>';
+  html += '<button class="btn btn-secondary btn-sm" id="cal-real-prev">‹ קודם</button>';
   html += '<button class="btn btn-secondary btn-sm" id="cal-real-today">היום</button>';
-  html += '<button class="btn btn-secondary btn-sm" id="cal-real-next">הבא ‹</button>';
+  html += '<button class="btn btn-secondary btn-sm" id="cal-real-next">הבא ›</button>';
   html += '</div>';
 
   html += '</div>';
