@@ -3274,10 +3274,7 @@ function goTo(page, el) {
   if (page === 'strategic-contacts') loadStrategicContacts();
   if (page === 'sales-documents') loadSalesDocuments();
   if (page === 'business-settings') loadBusinessSettings();
-  if (page === 'calculator-settings') {
-    if (!isArtistaMode()) { goTo('business-settings', document.getElementById('nav-business-settings')); return; }
-    loadPricingSettings();
-  }
+  if (page === 'calculator-settings') loadPricingSettings();
   if (page === 'calendar') loadCalendar();
   if (page === 'customers') loadCustomers();
   if (page === 'employees') loadEmployees();
