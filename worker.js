@@ -12,6 +12,7 @@ import { handleTenantBusinessSettings } from './src/tenant-business-settings.js'
 import { handleCustomerBilling, isCustomerBillingRoute } from './src/customer-billing.js';
 import { handleStrategicContacts } from './src/strategic-contacts.js';
 import { serveHTML } from './src/ui.js';
+import { resolveHostTenant, unknownTenantPage, inactiveTenantPage } from './src/host.js';
 
 export default {
   async fetch(request, env, ctx) {
@@ -32,6 +33,29 @@ export default {
     if (path === '/auth/google/callback') {
       return handleGoogleCallback(request, env);
     }
+
+    // זיהוי העסק לפי ה-subdomain (artista.comics-events.co.il -> tenant 'artista')
+    // ה-host tenant מצורף ל-request ו-requireTenantContext משתמש בו לצמצום ההרשאות.
+    const hostResolution = await resolveHostTenant(request, env);
+    if (hostResolution.slug && !hostResolution.tenant) {
+      if (path.startsWith('/api/')) {
+        return new Response(JSON.stringify({ error: 'הכתובת לא קיימת במערכת' }), {
+          status: 404,
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+      return unknownTenantPage(hostResolution.slug);
+    }
+    if (hostResolution.tenant && hostResolution.tenant.status !== 'active') {
+      if (path.startsWith('/api/')) {
+        return new Response(JSON.stringify({ error: 'העסק אינו פעיל' }), {
+          status: 403,
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+      return inactiveTenantPage(hostResolution.tenant);
+    }
+    request.hostTenant = hostResolution.tenant;
 
     if (path === '/' || path === '/index.html' || path === '/admin' || path === '/crm') {
       return new Response(serveHTML(), {
