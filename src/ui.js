@@ -7213,12 +7213,15 @@ function defaultBarOptions() {
     { name: 'אלכוהול פרימיום', price: 29 }
   ];
 }
+function defaultDayPricing() {
+  return { '0': 0, '1': 0, '2': 5000, '3': 10000, '4': 24000, '5': 0, '6': 0 };
+}
 function defaultPricingConfig() {
   return {
     plate_prices: [0, 0, 0, 0, 0, 0],
     bar: { pouring_fee: 15, options: defaultBarOptions() },
     av: { price: 8900 },
-    day_pricing: {},
+    day_pricing: defaultDayPricing(),
     kashrut: [{ name: 'רגיל', price: 0 }],
     extras: []
   };
@@ -7248,7 +7251,7 @@ function normalizePricingConfig(c) {
   }
   if (c.av && typeof c.av === 'object' && typeof c.av.price !== 'undefined') out.av.price = Number(c.av.price) || 0;
   var dp = c.day_pricing && typeof c.day_pricing === 'object' ? c.day_pricing : {};
-  for (var i = 0; i <= 6; i++) out.day_pricing[String(i)] = Number(dp[String(i)]) || 0;
+  for (var i = 0; i <= 6; i++) out.day_pricing[String(i)] = (typeof dp[String(i)] !== 'undefined') ? (Number(dp[String(i)]) || 0) : (defaultDayPricing()[String(i)] || 0);
   (Array.isArray(c.kashrut) ? c.kashrut : defaultPricingConfig().kashrut).forEach(function(k) {
     if (!k || !k.name) return;
     out.kashrut.push({ name: String(k.name), price: Number(k.price) || 0 });
