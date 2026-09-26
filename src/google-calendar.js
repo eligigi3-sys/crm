@@ -2,7 +2,7 @@
 // google-calendar.js - חיבור ל-Google Calendar
 // ============================================================
 
-import { requireAuthUser, requireTenantContext, assertTenantModuleEnabled, assertTenantRole } from './auth.js';
+import { requireAuthUser, requireSuperAdmin, requireTenantContext, assertTenantModuleEnabled, assertTenantRole } from './auth.js';
 import { isValidAppHost } from './host.js';
 
 // ה-OAuth תמיד עובר דרך הדומיין הראשי - Google לא מאפשר redirect_uri עם wildcard,
@@ -84,7 +84,17 @@ async function getAccessToken(env) {
   // בדוק אם ה-token פג תוקף
   if (tokens.expires_at && Date.now() > tokens.expires_at - 60000) {
     if (!tokens.refresh_token) throw new Error('נדרש חיבור מחדש ל-Google');
-    const newToken = await refreshToken(tokens.refresh_token, env);
+    let newToken;
+    try {
+      newToken = await refreshToken(tokens.refresh_token, env);
+    } catch (e) {
+      // refresh token מת (בוטל, או שמסך ההסכמה במצב Testing ופג אחרי 7 ימים) -
+      // מנקים את הטוקנים הישנים כדי שהסטטוס ישקף את המצב האמיתי.
+      if (e && e.googleError === 'invalid_grant') {
+        await env.DB.prepare("DELETE FROM app_settings WHERE key = 'google_tokens'").run();
+      }
+      throw e;
+    }
     tokens.access_token = newToken;
     tokens.expires_at = Date.now() + 3500 * 1000;
     await env.DB.prepare(
@@ -252,6 +262,40 @@ export async function handleGoogle(request, env, path) {
     } catch (e) {
       return { connected: false, needs_reconnect: true, message: e.message };
     }
+  }
+
+  // POST /api/google/relink - קישור Google Event ID קיים לליד בלי ליצור אירוע חדש.
+  // שימושי אחרי שאירועים נוצרו בגוגל מחוץ לסנכרון (או שה-ID אבד) - super admin בלבד.
+  if (path === '/api/google/relink' && request.method === 'POST') {
+    const adminCtx = await requireSuperAdmin(request, env);
+    if (adminCtx instanceof Response) return adminCtx;
+
+    const body = await request.json();
+    const links = Array.isArray(body && body.links) ? body.links : [];
+    if (!links.length) return { success: false, error: 'no links provided' };
+    if (links.length > 50) return { success: false, error: 'too many links' };
+
+    const results = [];
+    for (const link of links) {
+      const leadId = Number(link && link.lead_id);
+      const eventId = String((link && link.google_event_id) || '').trim();
+      if (!leadId || !/^[\w-]{10,80}$/.test(eventId)) {
+        results.push({ lead_id: link && link.lead_id, ok: false, error: 'invalid input' });
+        continue;
+      }
+      const lead = await env.DB.prepare('SELECT id, google_event_id FROM leads WHERE id = ?').bind(leadId).first();
+      if (!lead) {
+        results.push({ lead_id: leadId, ok: false, error: 'lead not found' });
+        continue;
+      }
+      if (lead.google_event_id) {
+        results.push({ lead_id: leadId, ok: false, error: 'already linked', existing: lead.google_event_id });
+        continue;
+      }
+      await env.DB.prepare('UPDATE leads SET google_event_id = ? WHERE id = ?').bind(eventId, leadId).run();
+      results.push({ lead_id: leadId, ok: true });
+    }
+    return { success: true, results };
   }
 
   const tenantCtx = await requireTenantContext(request, env);
