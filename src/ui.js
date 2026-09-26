@@ -1652,6 +1652,89 @@ body.crm-shell .mobile-crm-topbar{background:linear-gradient(135deg,#221a4d,#3b1
 body.crm-shell .mobile-crm-topbar .mobile-crm-title{color:#fff}
 body.crm-shell .mobile-crm-topbar .mobile-menu-btn{color:#fff;background:rgba(255,255,255,.14);border:none}
 body.crm-shell .mobile-crm-topbar .mobile-menu-btn:hover{background:rgba(255,255,255,.22)}
+
+/* ============================================================
+   Luxury layer - gold accents, richer surfaces, premium finish
+   ============================================================ */
+:root{
+  --gold:#d8b25c;--gold-deep:#b8912f;
+  --shadow-lg:0 18px 50px -12px rgba(24,16,52,.22);
+}
+body{background:radial-gradient(1200px 620px at 92% -8%,#eeecfb 0%,transparent 60%),radial-gradient(900px 500px at -8% 108%,#f6f3ec 0%,transparent 55%),var(--bg)}
+
+/* Sidebar - near-black plum with gold signature */
+#sidebar{background:linear-gradient(172deg,#160c34 0%,#241150 48%,#3a0f6e 100%);box-shadow:6px 0 34px rgba(20,10,50,.28)}
+.sidebar-logo{padding:22px 16px 18px}
+.logo-icon{background:linear-gradient(140deg,#e8c877,#b8912f);box-shadow:0 8px 20px rgba(184,145,47,.42),inset 0 1px 0 rgba(255,255,255,.4)}
+.logo-title{font-size:15px;letter-spacing:.01em}
+.nav-item{transition:background .18s ease,color .18s ease,box-shadow .18s ease}
+.nav-item.active{background:linear-gradient(90deg,rgba(216,178,92,.2),rgba(255,255,255,.1));box-shadow:inset -3px 0 0 0 var(--gold);color:#fff}
+.nav-item.active .nav-icon{filter:none}
+.nav-badge{background:linear-gradient(135deg,#e8c877,#b8912f);color:#2a1a05}
+.sidebar-bottom{background:rgba(0,0,0,.18)}
+#sidebar .user-avatar{background:linear-gradient(135deg,#e8c877,#b8912f);color:#2a1a05}
+#sidebar::-webkit-scrollbar{width:5px}
+#sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:4px}
+
+/* Surfaces */
+.stat-card{border:none;border-radius:16px;box-shadow:0 1px 2px rgba(24,16,52,.05),0 10px 26px -14px rgba(24,16,52,.18)}
+.stat-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
+.stat-icon-wrap{border-radius:14px}
+.stat-card.purple .stat-icon-wrap{background:linear-gradient(135deg,#ede9fe,#ddd6fe)}
+.stat-card.green .stat-icon-wrap{background:linear-gradient(135deg,#dcfce7,#bbf7d0)}
+.stat-card.orange .stat-icon-wrap{background:linear-gradient(135deg,#ffedd5,#fed7aa)}
+.stat-card.blue .stat-icon-wrap{background:linear-gradient(135deg,#dbeafe,#bfdbfe)}
+.table-card{border:none;border-radius:16px;box-shadow:0 1px 2px rgba(24,16,52,.05),0 10px 26px -14px rgba(24,16,52,.16)}
+.table-toolbar{padding:14px 18px;background:linear-gradient(180deg,#fbfbff,#f6f6fb)}
+th{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#9aa0b4;font-weight:700;padding:11px 14px;background:transparent}
+td{padding:12px 14px}
+tbody tr{transition:background .12s ease}
+tbody tr:hover td{background:#f6f4fc}
+.leads-section-row td{background:#faf9fd;font-size:11px;font-weight:800;letter-spacing:.06em;color:var(--accent);padding:8px 14px}
+.customer-card{border:none;border-radius:16px;box-shadow:0 1px 2px rgba(24,16,52,.05),0 10px 26px -14px rgba(24,16,52,.16);transition:transform .16s ease,box-shadow .16s ease}
+.customer-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
+
+/* Buttons and badges */
+.btn{border-radius:10px;font-weight:700}
+.btn-primary{background:linear-gradient(135deg,#8b5cf6 0%,#6d28d9 60%,#5b21b6 100%);box-shadow:0 5px 16px rgba(109,40,217,.34),inset 0 1px 0 rgba(255,255,255,.22)}
+.btn-primary:hover{box-shadow:0 9px 24px rgba(109,40,217,.42),inset 0 1px 0 rgba(255,255,255,.22)}
+.badge{border-radius:999px;padding:3px 11px;font-weight:700;letter-spacing:.01em}
+.badge-purple{background:linear-gradient(135deg,#ede9fe,#ddd6fe);color:#5b21b6}
+.badge-green{background:linear-gradient(135deg,#dcfce7,#bbf7d0);color:#15803d}
+.badge-yellow{background:linear-gradient(135deg,#fef9c3,#fef08a);color:#a16207}
+.badge-red{background:linear-gradient(135deg,#fee2e2,#fecaca);color:#b91c1c}
+.badge-blue{background:linear-gradient(135deg,#dbeafe,#bfdbfe);color:#1d4ed8}
+.badge-orange{background:linear-gradient(135deg,#ffedd5,#fed7aa);color:#c2410c}
+.badge-gray{background:#eef0f4;color:#64748b}
+
+/* Drawer and modals */
+.drawer{box-shadow:-24px 0 60px rgba(20,10,50,.28)}
+.drawer-header{background:linear-gradient(135deg,#241150,#3a0f6e);border-bottom:none}
+.drawer-header #drawer-title{color:#fff}
+.drawer-header .modal-close{color:rgba(255,255,255,.8)}
+.drawer-header .modal-close:hover{color:#fff}
+.modal{border-radius:20px;box-shadow:var(--shadow-lg)}
+.modal-header{border-bottom:1px solid #efeef6}
+.payment-box{background:linear-gradient(180deg,#faf9fe,#f4f2fb);border:1px solid #ece9f7;border-radius:14px}
+.cal-day{border-radius:8px}
+.cal-today .cal-day-num{background:linear-gradient(135deg,#e8c877,#b8912f);color:#2a1a05;font-weight:800}
+.calendar-day-real.today{background:#fbf7ec;box-shadow:inset 0 0 0 2px var(--gold)}
+
+/* Forms */
+.form-input,.form-select,.filter-select,.search-input{border-radius:10px;transition:border-color .15s ease,box-shadow .15s ease,background .15s ease}
+.search-input:focus,.form-input:focus,.form-select:focus,.filter-select:focus{border-color:#a78bfa;box-shadow:0 0 0 4px rgba(139,92,246,.14)}
+
+/* Login - dark luxury */
+#login-page{background:radial-gradient(820px 540px at 86% 6%,rgba(167,139,250,.34),transparent 60%),radial-gradient(700px 560px at 6% 96%,rgba(216,178,92,.22),transparent 58%),linear-gradient(150deg,#160c34 0%,#241150 52%,#3a0f6e 100%)}
+.login-card{border:1px solid rgba(255,255,255,.5);border-radius:26px;box-shadow:0 34px 90px rgba(10,5,30,.5),0 4px 18px rgba(10,5,30,.25)}
+.login-icon{background:linear-gradient(140deg,#e8c877,#b8912f);box-shadow:0 14px 30px rgba(184,145,47,.45),inset 0 1px 0 rgba(255,255,255,.45)}
+.login-title{background:linear-gradient(135deg,#241150,#5b21b6);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-weight:800}
+.login-sub{color:#7a7794}
+
+/* Scrollbars */
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#d3d1e0;border-radius:6px;border:2px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:#b9b6cc}
 </style>
 </head>
 <body>

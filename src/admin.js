@@ -388,6 +388,17 @@ export async function handleAdmin(request, env, path) {
     };
   }
 
+  // POST /api/admin/users/:id/rename - שינוי שם תצוגה של משתמש (סופר אדמין)
+  const renameMatch = path.match(/^\/api\/admin\/users\/(\d+)\/rename$/);
+  if (renameMatch && method === 'POST') {
+    const body = await request.json();
+    const name = String((body && body.name) || '').trim();
+    if (!name || name.length > 60) throw new Error('שם לא תקין');
+    const result = await env.DB.prepare('UPDATE users SET name = ? WHERE id = ?').bind(name, Number(renameMatch[1])).run();
+    if (!result.meta || !result.meta.changes) throw new Error('משתמש לא נמצא');
+    return { ok: true, name };
+  }
+
   if (path === '/api/admin/tenants' && method === 'POST') {
     let body;
     try {
