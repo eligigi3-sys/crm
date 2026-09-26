@@ -2171,7 +2171,7 @@ id="customers-search">
 <div class="drawer" id="lead-drawer">
   <div class="drawer-header">
     <div class="drawer-title" id="drawer-title">פרטי לקוח</div>
-    <div style="display:flex;gap:8px"><button class="btn btn-ghost btn-sm" id="drawer-edit-btn">עריכה</button><button class="btn btn-ghost btn-sm" id="drawer-sync-btn" title="סנכרן ל-Google Calendar" style="display:none">📅 סנכרן</button><button class="modal-close" id="drawer-close-btn">✕</button></div>
+    <div style="display:flex;gap:8px"><button class="btn btn-ghost btn-sm" id="drawer-edit-btn">עריכה</button><button class="btn btn-danger btn-sm" id="drawer-delete-btn">מחיקה</button><button class="btn btn-ghost btn-sm" id="drawer-sync-btn" title="סנכרן ל-Google Calendar" style="display:none">📅 סנכרן</button><button class="modal-close" id="drawer-close-btn">✕</button></div>
   </div>
   <div class="drawer-body" id="drawer-body">טוען...</div>
   <div class="drawer-footer"><div class="note-input-row"><input class="note-input" id="new-note-input" placeholder="הוסף הערה..."><button class="btn btn-primary btn-sm" id="add-note-btn">הוסף</button></div></div>
@@ -2768,6 +2768,7 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   document.getElementById('drawer-sync-btn').addEventListener('click', function() { if (currentLeadId) syncToGoogle(currentLeadId); });
   document.getElementById('drawer-overlay').addEventListener('click', closeDrawer);
   document.getElementById('drawer-edit-btn').addEventListener('click', function() { if (currentLeadId) editLead(currentLeadId); });
+  document.getElementById('drawer-delete-btn').addEventListener('click', function() { if (currentLeadId) deleteLead(currentLeadId); });
   document.getElementById('add-note-btn').addEventListener('click', addNote);
   document.getElementById('nav-dashboard').addEventListener('click', function() { goTo('dashboard', this); });
   document.getElementById('nav-leads').addEventListener('click', function() { goTo('customers', this); });
