@@ -3402,12 +3402,18 @@ function scheduleSessionRevalidation() {
   });
 }
 
-function apiCall(method, path, body) {
+function apiCall(method, path, body, callOpts) {
+  callOpts = callOpts || {};
+  var timeoutMs = callOpts.timeoutMs || 30000;
+  var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  var timer = controller ? setTimeout(function() { controller.abort(); }, timeoutMs) : null;
   var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
+  if (controller) opts.signal = controller.signal;
   var hasAuthToken = !!token;
   if (token) opts.headers['Authorization'] = 'Bearer ' + token;
   if (body) opts.body = JSON.stringify(body);
   return fetch(path, opts).then(function(res) {
+    if (timer) clearTimeout(timer);
     return res.text().then(function(text) {
       var data = {};
       if (text) {
@@ -3424,6 +3430,10 @@ function apiCall(method, path, body) {
       if (data && data.error) throw new Error(data.error);
       return data;
     });
+  }, function(err) {
+    if (timer) clearTimeout(timer);
+    if (err && err.name === 'AbortError') throw new Error('השרת לא ענה בזמן — בדוק את החיבור ונסה שוב');
+    throw new Error('בעיית חיבור — בדוק את האינטרנט ונסה שוב');
   });
 }
 
@@ -6557,7 +6567,14 @@ function loadCalendar() {
     }
 
     renderRealCalendar(leads);
-  }).catch(function(e) { toast(e.message, 'error'); });
+  }).catch(function(e) {
+    var page = document.getElementById('page-calendar');
+    var tableCard = page ? page.querySelector('.table-card') : null;
+    if (tableCard) {
+      tableCard.innerHTML = '<div class="dash-empty" style="padding:34px 16px;text-align:center">היומן לא נטען: ' + escapeHtml((e && e.message) || 'שגיאה לא ידועה') + '<br><button type="button" class="btn btn-primary btn-sm" style="margin-top:12px" onclick="loadCalendar()">נסה שוב</button></div>';
+    }
+    toast(e.message, 'error');
+  });
 }
 
 function renderRealCalendar(leads) {
@@ -7546,7 +7563,7 @@ function checkGoogleStatus() {
       document.getElementById('sync-google-backlog-btn').onclick = function() {
         if (!confirm('זה יסנכרן/יעדכן את כל האירועים הקיימים ב-CRM ליומן Google, כולל אירועי עבר ועתיד. להמשיך?')) return;
         toast('מסנכרן את כל האירועים ל-Google Calendar...', 'success');
-        apiCall('POST', '/api/google/resync-all').then(function(result) {
+        apiCall('POST', '/api/google/resync-all', null, { timeoutMs: 120000 }).then(function(result) {
           var firstError = result.errors && result.errors.length ? ' — ' + result.errors[0].name + ': ' + result.errors[0].error : '';
           toast('הסתיים: סונכרנו ' + (result.synced || 0) + ' מתוך ' + (result.total || 0) + ', נכשלו ' + (result.failed || 0) + firstError, result.failed ? 'error' : 'success');
         }).catch(function(e) { toast('שגיאה: ' + e.message, 'error'); });
