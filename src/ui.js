@@ -6534,6 +6534,22 @@ function openDrawer(id) {
   apiCall('GET', '/api/leads/' + id).then(function(data) { renderDrawer(data.lead, data.notes); }).catch(function(e) { toast(e.message, 'error'); });
 }
 
+function buildLeadWaMessage(l, kind) {
+  var NL = String.fromCharCode(10);
+  var name = l.name || '';
+  var date = l.event_date ? formatDate(l.event_date) : '';
+  var type = l.event_type || 'האירוע';
+  var price = fmtMoney(l.price || 0);
+  var balance = fmtMoney((l.price || 0) - (l.deposit || 0));
+  if (kind === 'quote') {
+    return 'היי ' + name + ', תודה שפנית אלינו! 😊' + NL + NL + 'הצעת מחיר ל' + type + (date ? ' בתאריך ' + date : '') + ':' + NL + 'מחיר כולל: ₪' + price + NL + NL + 'ההצעה בתוקף לשבוע. אשמח לענות על כל שאלה!';
+  }
+  if (kind === 'payment') {
+    return 'היי ' + name + ', תזכורת ידידותית 😊' + NL + 'היתרה לתשלום עבור האירוע' + (date ? ' בתאריך ' + date : '') + ' עומדת על ₪' + balance + '.' + NL + 'אשמח לסדר את התשלום בהקדם. תודה רבה!';
+  }
+  return 'היי ' + name + ', 😊' + NL + 'רציתי לעדכן לגבי האירוע שלך' + (date ? ' בתאריך ' + date : '') + '.' + NL + 'אשמח לענות על כל שאלה ולסגור את הפרטים האחרונים!';
+}
+
 function renderDrawer(l, notes) {
   document.getElementById('drawer-title').textContent = 'אירוע #' + (l.lead_num || l.id) + ' · ' + l.name;
   var attrs = safeJSON(l.attractions);
@@ -6548,6 +6564,12 @@ function renderDrawer(l, notes) {
       (l.phone ? '<a onclick="event.stopPropagation()" href="tel:' + l.phone + '"><img src="/phone-icon.png" style="width:28px;height:28px"></a>' : '') +
     '</span></div>';
   html += '<div class="info-row"><span class="info-label">אימייל</span><span class="info-value">' + (l.email||'—') + '</span></div></div>';
+  if (l.phone) {
+    html += '<div class="info-section"><div class="info-section-title">הודעות WhatsApp מוכנות</div>';
+    html += '<select class="form-input" id="wa-template-select" style="margin-bottom:8px"><option value="followup">מעקב</option><option value="quote">הצעת מחיר</option><option value="payment">תזכורת תשלום</option></select>';
+    html += '<textarea class="form-input" id="wa-template-text" rows="5" style="resize:vertical"></textarea>';
+    html += '<button class="btn btn-primary" id="wa-template-open" style="width:100%;margin-top:8px">פתח בוואטסאפ</button></div>';
+  }
   html += '<div class="info-section"><div class="info-section-title">פרטי האירוע</div>';
   html += '<div class="info-row"><span class="info-label">תאריך</span><span class="info-value" style="font-weight:700;color:var(--accent)">' + (l.event_date?formatDate(l.event_date):'—') + '</span></div>';
   html += '<div class="info-row"><span class="info-label">שעה</span><span class="info-value">' + (l.event_time||'—') + '</span></div>';
@@ -6566,6 +6588,16 @@ function renderDrawer(l, notes) {
   html += notes.length ? notes.map(function(n) { return '<div class="note-item">' + n.note + '<div class="note-date">' + fmtDT(n.created_at) + '</div></div>'; }).join('') : '<div style="color:var(--text3);font-size:13px">אין הערות עדיין</div>';
   html += '</div>';
   document.getElementById('drawer-body').innerHTML = html;
+  var waSelect = document.getElementById('wa-template-select');
+  if (waSelect) {
+    var waText = document.getElementById('wa-template-text');
+    var waDigits = String(l.phone).replace(/[^0-9]/g, '').replace(/^0/, '972');
+    waText.value = buildLeadWaMessage(l, waSelect.value);
+    waSelect.addEventListener('change', function() { waText.value = buildLeadWaMessage(l, waSelect.value); });
+    document.getElementById('wa-template-open').addEventListener('click', function() {
+      window.open('https://wa.me/' + waDigits + '?text=' + encodeURIComponent(waText.value || ''), '_blank');
+    });
+  }
   loadLeadStrategicSource(l.id);
 }
 
