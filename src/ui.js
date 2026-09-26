@@ -1777,6 +1777,7 @@ body.crm-shell .mobile-crm-topbar .mobile-menu-btn:hover{background:rgba(255,255
       <div class="table-card">
         <div class="table-toolbar">
           <input class="search-input" type="text" placeholder="חיפוש שם / טלפון / אולם..." id="leads-search">
+          <span id="leads-count" style="font-size:12px;color:var(--text3);margin-inline-start:auto"></span>
           <select class="filter-select" id="leads-status-filter"><option value="">כל הסטטוסים</option><option value="lead">ליד</option><option value="quote">הצעת מחיר</option><option value="closed">סגור</option><option value="cancelled">בוטל</option></select>
           <select class="filter-select" id="leads-event-filter"><option value="">כל סוגי האירועים</option><option>חתונה</option><option>בר מצווה</option><option>בת מצווה</option><option>יום הולדת</option><option>אירוע חברה</option><option>ברית</option><option>הפרשת חלה</option><option>אחר</option></select>
         </div>
@@ -4283,6 +4284,8 @@ function loadLeads() {
     allLeadsCache = data.leads || [];
     var leads = data.leads;
     if (eventType) leads = leads.filter(function(l) { return l.event_type === eventType; });
+    var leadsCountEl = document.getElementById('leads-count');
+    if (leadsCountEl) leadsCountEl.textContent = leads.length + ' אירועים';
     var tbody = document.getElementById('leads-body');
     if (!leads.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="10"><div class="guided-empty"><div class="guided-empty-title">אין לידים עדיין</div><div class="guided-empty-sub">אפשר להתחיל בקלות עם ליד ראשון ולהוסיף ממנו גם אירוע ופרטי לקוח.</div><button class="btn btn-primary btn-sm" onclick="openLeadModal()">צור ליד ראשון</button></div></td></tr>'; return; }
 
@@ -4298,7 +4301,7 @@ function loadLeads() {
 
     function renderLeadRow(l) {
       var payBadge = l.price > 0 ? (l.balance_paid ? '<span class="badge badge-green">שולם</span>' : (l.deposit > 0 ? '<span class="badge badge-yellow">מקדמה</span>' : '<span class="badge badge-red">טרם שולם</span>')) : '';
-      return '<tr data-id="' + l.id + '"><td><div class="dot ' + getUrgencyDot(l.next_contact) + '"></div></td><td class="bold">' + l.name + '</td><td>' + (l.phone||'—') + '</td><td>' + (l.event_type||'—') + '</td><td>' + (l.event_date?formatDate(l.event_date):'—') + '</td><td>' + (l.venue||'—') + '</td><td>' + (l.price?'₪'+fmtMoney(l.price):payBadge||'—') + '</td><td>' + statusBadge(l.status) + '</td><td style="font-size:12px;' + (isOverdue(l.next_contact)?'color:var(--red);font-weight:700':'') + '">' + (l.next_contact?formatDate(l.next_contact):'—') + '</td><td><button class="btn btn-ghost btn-sm edit-btn" data-id="' + l.id + '">עריכה</button> <button class="btn btn-danger btn-sm del-btn" data-id="' + l.id + '">מחיקה</button></td></tr>';
+      return '<tr data-id="' + l.id + '"><td><div class="dot ' + getUrgencyDot(l.next_contact) + '"></div></td><td class="bold">' + l.name + '</td><td>' + (l.phone ? '<a href="tel:' + l.phone + '" onclick="event.stopPropagation()" style="color:inherit;text-decoration:none">' + l.phone + '</a>' : '—') + '</td><td>' + (l.event_type||'—') + '</td><td>' + (l.event_date?formatDate(l.event_date):'—') + '</td><td>' + (l.venue||'—') + '</td><td>' + (l.price?'₪'+fmtMoney(l.price):payBadge||'—') + '</td><td>' + statusBadge(l.status) + '</td><td style="font-size:12px;' + (isOverdue(l.next_contact)?'color:var(--red);font-weight:700':'') + '">' + (l.next_contact?formatDate(l.next_contact):'—') + '</td><td><button class="btn btn-ghost btn-sm edit-btn" data-id="' + l.id + '">עריכה</button> <button class="btn btn-danger btn-sm del-btn" data-id="' + l.id + '">מחיקה</button></td></tr>';
     }
 
     function renderLeadSection(title, sectionLeads, emptyText) {
@@ -6439,29 +6442,13 @@ function renderDrawer(l, notes) {
   var balance = (l.price||0) - (l.deposit||0);
   var html = '<div class="info-section"><div style="display:flex;gap:8px;margin-bottom:12px"><span class="badge badge-purple">אירוע #' + (l.lead_num || l.id) + '</span>' + statusBadge(l.status) + (l.event_type ? '<span class="badge badge-purple">' + l.event_type + '</span>' : '') + '</div>';
   html += '<div class="info-section-title">פרטי לקוח</div>';
-'<div class="info-row">' +
-  '<span class="info-label">טלפון</span>' +
-  '<span class="info-value" style="display:flex;align-items:center;gap:8px">' +
-
-    '<span style="font-weight:600;color:var(--text)">' + (c.phone || '') + '</span>' +
-
-    (c.phone ? 
-      '<a onclick="event.stopPropagation()" target="_blank" href="https://wa.me/' + 
-      String(c.phone).replace(/[^0-9]/g,'').replace(/^0/,'972') + '">' +
-      '<img src="/whatsapp-icon.png" style="width:30px;height:30px">' +
-      '</a>' 
-    : '') +
-
-    (c.phone ? 
-      '<a onclick="event.stopPropagation()" href="tel:' + c.phone + '">' +
-      '<img src="/phone-icon.png" style="width:30px;height:30px">' +
-      '</a>' 
-    : '') +
-
-  '</span>' +
-'</div>'    (c.phone ? '<a onclick="event.stopPropagation()" target="_blank" href="https://wa.me/' + String(c.phone).replace(/[^0-9]/g,'').replace(/^0/,'972') + '"><img src="/whatsapp-icon.png" style="width:28px;height:28px"></a>' : '') +
-    (c.phone ? '<a onclick="event.stopPropagation()" href="tel:' + c.phone + '"><img src="/phone-icon.png" style="width:28px;height:28px"></a>' : '') +
-  '</span></div>';
+  html += '<div class="info-row">' +
+    '<span class="info-label">טלפון</span>' +
+    '<span class="info-value" style="display:flex;align-items:center;gap:8px">' +
+      '<span style="font-weight:600;color:var(--text)">' + (l.phone || '—') + '</span>' +
+      (l.phone ? '<a onclick="event.stopPropagation()" target="_blank" href="https://wa.me/' + String(l.phone).replace(/[^0-9]/g, '').replace(/^0/, '972') + '"><img src="/whatsapp-icon.png" style="width:28px;height:28px"></a>' : '') +
+      (l.phone ? '<a onclick="event.stopPropagation()" href="tel:' + l.phone + '"><img src="/phone-icon.png" style="width:28px;height:28px"></a>' : '') +
+    '</span></div>';
   html += '<div class="info-row"><span class="info-label">אימייל</span><span class="info-value">' + (l.email||'—') + '</span></div></div>';
   html += '<div class="info-section"><div class="info-section-title">פרטי האירוע</div>';
   html += '<div class="info-row"><span class="info-label">תאריך</span><span class="info-value" style="font-weight:700;color:var(--accent)">' + (l.event_date?formatDate(l.event_date):'—') + '</span></div>';
