@@ -2530,7 +2530,7 @@ function navIdForPage(page) {
 }
 
 function pathToPage(path) {
-  var normalized = (path || '/').replace(/\/+$/, '') || '/';
+  var normalized = (path || '/'); while (normalized.length > 1 && normalized.charAt(normalized.length - 1) === '/') { normalized = normalized.slice(0, -1); }
   for (var page in PAGE_ROUTES) {
     if (PAGE_ROUTES[page] === normalized) return page;
   }
