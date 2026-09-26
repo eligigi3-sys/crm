@@ -448,7 +448,31 @@ tr:hover td{background:#fafbfc;cursor:pointer}
 .pricing-day-grid .form-label{font-size:11px}
 .pricing-list-row{display:flex;gap:8px;margin-bottom:8px;align-items:center}
 .pricing-list-row .form-input{margin:0}
-@media (max-width: 900px){.calc-layout{grid-template-columns:1fr}.pricing-day-grid{grid-template-columns:repeat(4,1fr)}}
+.pricing-list-row .pricing-name{flex:1 1 auto;min-width:0}
+.pricing-list-row .pricing-price{flex:0 0 110px}
+@media (max-width: 900px){.calc-layout{grid-template-columns:1fr}.pricing-day-grid{grid-template-columns:repeat(4,1fr)}.pricing-tiers-grid{grid-template-columns:repeat(3,1fr)}}
+@media (max-width: 760px){
+  #page-calculator{min-width:0;max-width:100%;overflow-x:hidden}
+  #page-calculator .page-header{gap:8px!important;margin-bottom:10px!important;min-width:0}
+  #page-calculator .page-title{font-size:18px!important;line-height:1.25;min-width:0;overflow-wrap:anywhere}
+  #page-calculator .page-title small{display:block;margin-right:0;font-size:11px!important;line-height:1.4;overflow-wrap:anywhere}
+  #page-calculator .calc-card{padding:12px;min-width:0;max-width:100%}
+  #page-calculator .form-row{grid-template-columns:1fr}
+  #page-calculator .form-group{min-width:0}
+  #page-calculator .form-input,#page-calculator .form-select{min-width:0;max-width:100%}
+  #page-calculator .check-item{display:flex!important;margin:0 0 8px!important}
+  #page-business-settings .pricing-day-grid .form-label{overflow-wrap:anywhere}
+  .calc-breakdown-row{font-size:12px;gap:8px}
+  .calc-breakdown-row span:first-child{min-width:0;overflow-wrap:anywhere}
+  .calc-breakdown-row span:last-child{white-space:nowrap}
+  .calc-total-row{font-size:16px}
+}
+@media (max-width: 480px){
+  .pricing-day-grid{grid-template-columns:repeat(3,1fr)}
+  .pricing-tiers-grid{grid-template-columns:repeat(2,1fr)}
+  .pricing-list-row{gap:6px}
+  .pricing-list-row .pricing-price{flex-basis:84px}
+}
 .drawer-body{flex:1;overflow-y:auto;padding:18px 20px}
 .drawer-footer{padding:12px 20px;border-top:1px solid var(--border)}
 .info-section{margin-bottom:18px}
@@ -7281,7 +7305,7 @@ function loadPricingSettings(retries) {
   body.innerHTML = '<div class="dash-empty">טוען...</div>';
   loadPricingConfig().then(function(cfg) {
     var html = '';
-    html += '<div class="form-group"><label class="form-label">מחיר מנה (₪ לאורח) — לפי מדרגות אורחים</label><div class="pricing-day-grid">';
+    html += '<div class="form-group"><label class="form-label">מחיר מנה (₪ לאורח) — לפי מדרגות אורחים</label><div class="pricing-day-grid pricing-tiers-grid">';
     PLATE_TIERS.forEach(function(t, i) {
       html += '<div class="form-group"><label class="form-label">' + plateTierLabel(t) + ' אורחים</label><input class="form-input" id="ps-tier-' + i + '" type="number" min="0" value="' + (cfg.plate_prices[i] || 0) + '"></div>';
     });
