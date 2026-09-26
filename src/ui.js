@@ -1656,6 +1656,7 @@ body.crm-shell .mobile-crm-topbar .mobile-menu-btn:hover{background:rgba(255,255
 /* ============================================================
    Luxury layer - gold accents, richer surfaces, premium finish
    ============================================================ */
+html{background:linear-gradient(150deg,#160c34,#3a0f6e)}
 :root{
   --gold:#d8b25c;--gold-deep:#b8912f;
   --shadow-lg:0 18px 50px -12px rgba(24,16,52,.22);
