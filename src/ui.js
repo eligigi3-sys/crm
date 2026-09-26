@@ -2502,10 +2502,56 @@ function applyModuleVisibility() {
   applySidebarModuleOrder();
 }
 
+// כתובת ייעודית לכל עמוד במערכת - /crm/<page> לעמודי העסק, /admin לניהול הפלטפורמה
+var PAGE_ROUTES = {
+  dashboard: '/crm',
+  leads: '/crm/leads',
+  customers: '/crm/customers',
+  employees: '/crm/employees',
+  team: '/crm/team',
+  products: '/crm/products',
+  shopping: '/crm/shopping',
+  'strategic-contacts': '/crm/strategic-contacts',
+  'sales-documents': '/crm/documents',
+  'business-settings': '/crm/settings',
+  calendar: '/crm/calendar',
+  archive: '/crm/archive',
+  'super-admin': '/admin'
+};
+
+function pageToPath(page) {
+  return PAGE_ROUTES[page] || null;
+}
+
+function navIdForPage(page) {
+  var map = { leads: 'nav-leads', customers: 'nav-leads' };
+  var id = map[page] || ('nav-' + page);
+  return document.getElementById(id) ? id : null;
+}
+
+function pathToPage(path) {
+  var normalized = (path || '/').replace(/\/+$/, '') || '/';
+  for (var page in PAGE_ROUTES) {
+    if (PAGE_ROUTES[page] === normalized) return page;
+  }
+  if (normalized.indexOf('/crm') === 0) return 'dashboard';
+  return null;
+}
+
+var suppressUrlUpdate = false;
+
+function updateUrlForPage(page, replace) {
+  if (suppressUrlUpdate) return;
+  var path = pageToPath(page);
+  if (!path || window.location.pathname === path) return;
+  if (replace) window.history.replaceState({}, '', path);
+  else window.history.pushState({}, '', path);
+}
+
 function getShellMode() {
   var path = window.location.pathname || '/';
   if (path === '/admin') return 'admin';
-  if (path === '/crm') return 'crm';
+  if (path === '/crm' || path.indexOf('/crm/') === 0) return 'crm';
   return 'default';
 }
 
@@ -2518,13 +2564,17 @@ function setShellPath(path) {
 function goToAdminShell() {
   setShellPath('/admin');
   applyShellVisibility();
-  goTo('super-admin', document.getElementById('nav-super-admin'));
+  suppressUrlUpdate = true;
+  try { goTo('super-admin', document.getElementById('nav-super-admin')); }
+  finally { suppressUrlUpdate = false; }
 }
 
 function goToCrmShell() {
   setShellPath('/crm');
   applyShellVisibility();
-  goTo('dashboard', document.getElementById('nav-dashboard'));
+  suppressUrlUpdate = true;
+  try { goTo('dashboard', document.getElementById('nav-dashboard')); }
+  finally { suppressUrlUpdate = false; }
 }
 
 function applyShellVisibility() {
@@ -2734,6 +2784,17 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') { closeLeadModal(); closeDrawer(); closeCustomerModal(); closeMobileNavigationDrawer(); skipTenantOwnerSetup(); closeSuperAdminCreateModal(); closeSuperAdminTenantModal(); }
   });
+  window.addEventListener('popstate', function() {
+    if (!token || !currentUser) return;
+    if (document.getElementById('app').style.display === 'none') return;
+    var page = pathToPage(window.location.pathname);
+    if (!page) return;
+    if (page === 'super-admin' && !isSuperAdmin()) return;
+    var navId = navIdForPage(page);
+    suppressUrlUpdate = true;
+    try { goTo(page, navId ? document.getElementById(navId) : null); }
+    finally { suppressUrlUpdate = false; }
+  });
   window.addEventListener('storage', function(e) {
     if (e.key !== 'crm_token' && e.key !== 'crm_user') return;
     if (!token || !currentUser) return;
@@ -2827,6 +2888,7 @@ function goTo(page, el) {
   if (page === 'products') loadProducts();
   if (page === 'archive') loadEventArchive();
   if (page === 'super-admin') { loadSuperAdminTenants(); loadSuperAdminCleanupCandidates(); }
+  updateUrlForPage(page, false);
   syncMobileNavigationState(page);
 }
 
@@ -3199,17 +3261,25 @@ function showApp() {
   }
 
   applySuperAdminVisibility();
-  if (shellMode === 'admin' && isSuperAdmin()) {
-    goTo('super-admin', document.getElementById('nav-super-admin'));
-  } else {
-    if (shellMode === 'admin' && !isSuperAdmin()) {
-      setShellPath('/crm');
-      applySuperAdminVisibility();
+  var deepLinkPage = pathToPage(window.location.pathname);
+  suppressUrlUpdate = true;
+  try {
+    if (shellMode === 'admin' && isSuperAdmin()) {
+      goTo('super-admin', document.getElementById('nav-super-admin'));
+    } else {
+      if (shellMode === 'admin' && !isSuperAdmin()) {
+        setShellPath('/crm');
+        applySuperAdminVisibility();
+      }
+      var initialPage = (deepLinkPage && deepLinkPage !== 'super-admin') ? deepLinkPage : 'dashboard';
+      var initialNavId = navIdForPage(initialPage);
+      goTo(initialPage, initialNavId ? document.getElementById(initialNavId) : null);
+      if (initialPage === 'dashboard') loadDashboard();
+      preloadLeads();
+      checkGoogleStatus();
     }
-    goTo('dashboard', document.getElementById('nav-dashboard'));
-    loadDashboard();
-    preloadLeads();
-    checkGoogleStatus();
+  } finally {
+    suppressUrlUpdate = false;
   }
   if (shouldOfferTenantOwnerSetup()) {
     setTimeout(function() {

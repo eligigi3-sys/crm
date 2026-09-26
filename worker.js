@@ -57,7 +57,10 @@ export default {
     }
     setHostTenant(request, hostResolution.tenant);
 
-    if (path === '/' || path === '/index.html' || path === '/admin' || path === '/crm') {
+    // כל נתיב GET שאינו API מגיש את אפליקציית ה-SPA - כך לכל עמוד במערכת
+    // יש כתובת משלו (/crm/leads, /crm/products וכו') והניווט מתבצע בצד הלקוח.
+    // נתיבים עם סיומת קובץ (למשל /favicon.ico) ממשיכים ל-404.
+    if (method === 'GET' && !/\/[^/]*\.[^/]+$/.test(path)) {
       return new Response(serveHTML(), {
         headers: { 'Content-Type': 'text/html;charset=UTF-8' },
       });
