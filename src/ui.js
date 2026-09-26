@@ -2182,6 +2182,7 @@ id="customers-search">
           <div id="calc-breakdown"></div>
           <div class="calc-total-row"><span>סה״כ להצעה</span><span id="calc-total">₪0</span></div>
           <button class="btn btn-primary" id="calc-apply" style="width:100%;margin-top:12px">עדכן את ההצעה לזוג</button>
+          <button class="btn btn-secondary" id="calc-quote" style="width:100%;margin-top:8px">📄 הפק הצעת מחיר להדפסה</button>
           <div id="calc-note" style="font-size:12px;color:var(--text3);margin-top:8px"></div>
         </div>
       </div>
@@ -3070,6 +3071,8 @@ document.getElementById('btn-new-lead2').addEventListener('click', function() {
   if (calcDateInput) calcDateInput.addEventListener('change', renderCalculation);
   var calcApplyBtn = document.getElementById('calc-apply');
   if (calcApplyBtn) calcApplyBtn.addEventListener('click', calculatorApply);
+  var calcQuoteBtn = document.getElementById('calc-quote');
+  if (calcQuoteBtn) calcQuoteBtn.addEventListener('click', generateArtistaQuote);
   var navEmployees = document.getElementById('nav-employees');
   if (navEmployees) navEmployees.addEventListener('click', function() { goTo('employees', this); });
   var navTeam = document.getElementById('nav-team');
@@ -7606,6 +7609,99 @@ function renderCalculation() {
   setTextIf('calc-total', '₪' + fmtMoney(total));
   return total;
 }
+function generateArtistaQuote() {
+  var cfg = pricingConfigCache || defaultPricingConfig();
+  var sel = document.getElementById('calc-couple');
+  var leadId = sel ? sel.value : '';
+  var lead = calculatorCouples.filter(function(l) { return String(l.id) === String(leadId); })[0] || null;
+  if (!lead) { toast('בחר זוג כדי להפיק הצעת מחיר', 'error'); return; }
+  var guests = Number(document.getElementById('calc-guests').value) || 0;
+  if (!guests) { toast('הזן מספר אורחים', 'error'); return; }
+  var dateVal = document.getElementById('calc-date').value;
+  if (!dateVal) { toast('בחר תאריך אירוע', 'error'); return; }
+  var total = renderCalculation();
+  if (!total) { toast('ההצעה עדיין ₪0 — בדוק מחירי בסיס', 'error'); return; }
+
+  var tierIdx = -1;
+  PLATE_TIERS.forEach(function(t, i) { if (guests >= t.min && (t.max === null || guests <= t.max)) tierIdx = i; });
+  var platePrice = tierIdx >= 0 ? (cfg.plate_prices[tierIdx] || 0) : 0;
+  var dayName = DAY_NAMES[new Date(dateVal + 'T12:00:00').getDay()];
+  var barSum = 0;
+  document.querySelectorAll('#calc-bar-options .calc-bar-opt:checked').forEach(function(cb) {
+    var o = cfg.bar.options[Number(cb.value)];
+    if (o && o.price) barSum += o.price;
+  });
+
+  // פירוט נוסף - רק כשקיים (תוספת יום, כשרות בתשלום, תוספות מיוחדות, מנות מצומצם)
+  var extraBits = [];
+  var wd = new Date(dateVal + 'T12:00:00').getDay();
+  var dayExtra = Number(cfg.day_pricing[String(wd)]) || 0;
+  if (dayExtra) extraBits.push('תוספת יום ' + DAY_NAMES[wd] + ' ₪' + fmtMoney(dayExtra));
+  document.querySelectorAll('#calc-kashrut .calc-kashrut-qty').forEach(function(inp) {
+    var opt = cfg.kashrut[Number(inp.getAttribute('data-idx'))];
+    var qty = Number(inp.value) || 0;
+    if (opt && qty > 0 && opt.price) extraBits.push('כשרות ' + opt.name + ': ' + qty + ' מנות × ₪' + fmtMoney(opt.price));
+  });
+  var limitedQtyEl = document.getElementById('calc-limited-qty');
+  var limitedPriceEl = document.getElementById('calc-limited-price');
+  var limitedQty = limitedQtyEl ? (Number(limitedQtyEl.value) || 0) : 0;
+  var limitedPlatePrice = limitedPriceEl ? (Number(limitedPriceEl.value) || 0) : 0;
+  if (limitedQty > 0 && limitedPlatePrice > 0) extraBits.push('מנות מצומצם: ' + limitedQty + ' מנות × ₪' + fmtMoney(limitedPlatePrice));
+  document.querySelectorAll('#calc-extras .calc-extra:checked').forEach(function(cb) {
+    var x = cfg.extras[Number(cb.value)];
+    if (x && x.price) extraBits.push(x.name + ' ₪' + fmtMoney(x.price));
+  });
+  var extraHtml = extraBits.length ? '<div style="margin-top:6pt;font-size:10.5pt;color:#444">הסה״כ כולל גם: ' + extraBits.join(' · ') + '</div>' : '';
+
+  var css = '@page{size:A4;margin:25.4mm 31.75mm}' +
+    'body{font-family:Calibri,Arial,sans-serif;font-size:12pt;direction:rtl;color:#000}' +
+    '.q-logo{text-align:center;margin-bottom:18pt}.q-logo img{width:170px}' +
+    '.q-title{text-align:center;font-weight:bold;font-size:14pt;margin:0 0 2pt}' +
+    '.q-sub{text-align:center;font-size:14pt;margin:0 0 10pt}' +
+    '.q-couple{text-align:center;margin:0 0 14pt}' +
+    'table{width:100%;border-collapse:collapse;table-layout:fixed}' +
+    'th,td{border:1px solid #000;padding:4pt 2pt;text-align:center;font-size:11pt;font-weight:normal}' +
+    '.q-includes{margin:16pt 0 0;line-height:1.45}' +
+    '.q-notes{margin:14pt 0 0;font-weight:bold}';
+
+  var html = '<!doctype html><html lang="he" dir="rtl"><head><meta charset="UTF-8"><title>הצעת מחיר - ' + escapeHtml(lead.name) + '</title><style>' + css + '</style></head><body>' +
+    '<div class="q-logo"><img src="/artista-logo.png" alt="ARTISTA"></div>' +
+    '<p class="q-title">מזל טוב!</p>' +
+    '<p class="q-sub">החוויה היא בתהליך ואנחנו כאן כדי להגשים.</p>' +
+    '<p class="q-couple">שם הזוג: ' + escapeHtml(lead.name) + '&nbsp;&nbsp;&nbsp;&nbsp;כמות אורחים מינימלית להתחייבות: ' + guests + '</p>' +
+    '<table><tr><th>תאריך</th><th>יום</th><th>מחיר מנה</th><th>תאורה ומסכים</th><th>שירותי מזיגה</th><th>בר תוצרת חוץ/ בר פרימיום</th><th>סה״כ</th></tr>' +
+    '<tr><td>' + formatDate(dateVal) + '</td><td>' + dayName + '</td><td>' + fmtMoney(platePrice) + '</td><td>' + fmtMoney(cfg.av.price || 0) + '</td><td>' + fmtMoney(cfg.bar.pouring_fee || 0) + '</td><td>' + (barSum ? fmtMoney(barSum) : '') + '</td><td>' + fmtMoney(total) + '</td></tr></table>' +
+    extraHtml +
+    '<p class="q-includes"><b>המחיר כולל:</b> רשיון עסק + ביטוחים, תעודת כשרות. גנרטור חרום, מאבטח חמוש. גישה מלאה לנכים, חניון פרטי תת קרקעי, וחניון צמוד חיצוני. סוויטה מפנקת לחתן כלה, מנקה צמודה לחדרי הנוחיות. מנהלי אירוע שילוו אתכם לפני ובמהלך האירוע. חופה עם בדים לבנים, תאורת גב חופה, פינות ישיבה, מארחת, ועמדות ממוחשבות לסידוריי הושבה. <b>בקבוקיי זכוכית אישיים מבית קוקה קולה.</b> <b>2 מזנוני קינוחים מבית ביסקוטי + פירות העונה + עמדת אפטר פארטי.</b></p>' +
+    '<p class="q-notes">הערות והבטחות: אל תהססו לשאול, להתייעץ בשביל זה אנחנו כאן.&nbsp;&nbsp;052-6098609&nbsp;&nbsp;052-3221274&nbsp;&nbsp;050-5490390</p>' +
+    '</body></html>';
+
+  var frame = document.createElement('iframe');
+  frame.setAttribute('title', 'artista-quote-print-frame');
+  frame.style.position = 'fixed';
+  frame.style.left = '0';
+  frame.style.bottom = '0';
+  frame.style.width = '0';
+  frame.style.height = '0';
+  frame.style.border = '0';
+  frame.style.opacity = '0';
+  document.body.appendChild(frame);
+  var printWindow = frame.contentWindow;
+  var printDocument = frame.contentDocument || (printWindow && printWindow.document);
+  if (!printWindow || !printDocument) { frame.remove(); toast('לא ניתן לפתוח חלון הדפסה', 'error'); return; }
+  printDocument.open();
+  printDocument.write(html);
+  printDocument.close();
+  var cleanup = function() { setTimeout(function() { if (frame && frame.parentNode) frame.parentNode.removeChild(frame); }, 500); };
+  var printNow = function() {
+    try { printWindow.focus(); printWindow.print(); } catch (e) {}
+    if (printWindow && printWindow.addEventListener) { printWindow.addEventListener('afterprint', cleanup); } else { cleanup(); }
+    setTimeout(cleanup, 1500);
+  };
+  var logoImg = printDocument.querySelector('.q-logo img');
+  if (logoImg && !logoImg.complete) { logoImg.onload = printNow; logoImg.onerror = printNow; setTimeout(printNow, 1500); } else { setTimeout(printNow, 100); }
+}
+
 function calculatorApply() {
   var sel = document.getElementById('calc-couple');
   var leadId = sel ? sel.value : '';
