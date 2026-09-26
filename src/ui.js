@@ -3408,6 +3408,19 @@ function submitForcedPasswordChange() {
   });
 }
 
+function refreshCurrentUser() {
+  apiCall('GET', '/api/auth/me').then(function(res) {
+    if (res && res.user && res.user.name && currentUser && (res.user.name !== currentUser.name || res.user.role !== currentUser.role)) {
+      currentUser.name = res.user.name;
+      currentUser.role = res.user.role;
+      localStorage.setItem('crm_user', JSON.stringify(currentUser));
+      document.getElementById('user-name').textContent = currentUser.name;
+      document.getElementById('user-avatar').textContent = currentUser.name[0];
+      applySuperAdminVisibility();
+    }
+  }).catch(function() {});
+}
+
 function showApp() {
   if (isForcePasswordChangeRequired()) {
     showForcePasswordChange();
@@ -3419,6 +3432,7 @@ function showApp() {
   document.getElementById('app').style.display = 'flex';
   document.getElementById('user-name').textContent = currentUser ? currentUser.name : '';
   document.getElementById('user-avatar').textContent = currentUser ? currentUser.name[0] : 'מ';
+  refreshCurrentUser();
 
   var shellMode = getShellMode();
   if (shellMode === 'default') {

@@ -445,6 +445,12 @@ export async function handleAuth(request, env, path) {
     };
   }
 
+  if (path === '/api/auth/me' && method === 'GET') {
+    const user = await requireAuthUser(request, env);
+    if (user instanceof Response) return user;
+    return { user: mapAuthUser(user) };
+  }
+
   if (path === '/api/auth/verify' && method === 'POST') {
     const { token } = await request.json();
     const payload = await verifyToken(token, env.JWT_SECRET);
