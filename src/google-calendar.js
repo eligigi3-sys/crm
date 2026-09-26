@@ -473,8 +473,17 @@ export async function handleGoogleCallback(request, env) {
 
   // שמור tokens במסד הנתונים
   const existing = await env.DB.prepare(
-    "SELECT key FROM app_settings WHERE key = 'google_tokens'"
+    "SELECT value FROM app_settings WHERE key = 'google_tokens'"
   ).first();
+
+  // גוגל מחזירה refresh_token רק כש-prompt=consent. אם בחיבור עתידי היא לא תחזיר,
+  // שומרים את ה-refresh_token הקיים כדי לא לאבד את החיבור הקבוע.
+  if (!tokens.refresh_token && existing) {
+    try {
+      const prev = JSON.parse(existing.value);
+      if (prev.refresh_token) tokens.refresh_token = prev.refresh_token;
+    } catch (e) { /* ignore */ }
+  }
   
   if (existing) {
     await env.DB.prepare(
