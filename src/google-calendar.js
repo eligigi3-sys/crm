@@ -3,12 +3,18 @@
 // ============================================================
 
 import { requireAuthUser, requireTenantContext, assertTenantModuleEnabled, assertTenantRole } from './auth.js';
+import { isValidAppHost } from './host.js';
 
+// ה-OAuth תמיד עובר דרך הדומיין הראשי - Google לא מאפשר redirect_uri עם wildcard,
+// ולכן רק crm.comics-events.co.il רשום ב-Google Cloud Console.
 const REDIRECT_URI = 'https://crm.comics-events.co.il/auth/google/callback';
+const APEX_HOST = 'crm.comics-events.co.il';
 const SCOPES = 'https://www.googleapis.com/auth/calendar.events';
 
 // שלב 1: הפניה ל-Google לאישור
-export function getAuthUrl(env) {
+// returnHost - ה-host שהמשתמש הגיע ממנו (למשל artista.comics-events.co.il);
+// נשמר ב-state כדי להחזיר אותו לשם בסוף התהליך.
+export function getAuthUrl(env, returnHost) {
   const params = new URLSearchParams({
     client_id: env.GOOGLE_CLIENT_ID,
     redirect_uri: REDIRECT_URI,
@@ -17,6 +23,10 @@ export function getAuthUrl(env) {
     access_type: 'offline',
     prompt: 'consent',
   });
+  const normalizedHost = String(returnHost || '').toLowerCase().split(':')[0].trim();
+  if (normalizedHost && isValidAppHost(normalizedHost)) {
+    params.set('state', normalizedHost);
+  }
   return `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
 }
 
@@ -256,7 +266,7 @@ export async function handleGoogle(request, env, path) {
   if (path === '/api/google/auth-url') {
     const roleState = await assertTenantRole(tenantCtx, ['owner', 'admin', 'manager']);
     if (roleState instanceof Response) return roleState;
-    const url = getAuthUrl(env);
+    const url = getAuthUrl(env, new URL(request.url).hostname);
     return { url };
   }
 
@@ -409,6 +419,11 @@ export async function handleGoogleCallback(request, env) {
     );
   }
 
+  // state נושא את ה-host שהמשתמש התחיל ממנו (subdomain של עסק) - מאומת מול הדומיין שלנו בלבד
+  const stateHost = url.searchParams.get('state') || '';
+  const returnHost = isValidAppHost(stateHost) ? stateHost.toLowerCase() : APEX_HOST;
+  const returnUrl = 'https://' + returnHost + '/';
+
   const tokens = await exchangeCode(code, env);
   tokens.expires_at = Date.now() + (tokens.expires_in || 3500) * 1000;
 
@@ -432,7 +447,7 @@ export async function handleGoogleCallback(request, env) {
       <div style="font-size:60px">✅</div>
       <h2 style="color:#16a34a">חובר בהצלחה ל-Google Calendar!</h2>
       <p>המערכת מוכנה לסנכרן אירועים ליומן שלך.</p>
-      <a href="/" style="background:#7c3aed;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">חזור למערכת</a>
+      <a href="${returnUrl}" style="background:#7c3aed;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">חזור למערכת</a>
     </body></html>`,
     { headers: { 'Content-Type': 'text/html;charset=UTF-8' } }
   );
