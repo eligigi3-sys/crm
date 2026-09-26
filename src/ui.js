@@ -2480,6 +2480,10 @@ var CRM_MOBILE_NAV_ITEMS = [
   { navId: 'nav-business-settings', page: 'business-settings', label: 'הגדרות', icon: '⚙️' }
 ];
 var DEFAULT_MOBILE_BOTTOM_NAV = ['nav-calendar', 'nav-leads', 'nav-shopping', 'nav-sales-documents', 'nav-business-settings'];
+var ARTISTA_MOBILE_BOTTOM_NAV = ['nav-pipeline', 'nav-calculator', 'nav-calendar', 'nav-leads', 'nav-business-settings'];
+function getDefaultMobileBottomNav() {
+  return (typeof isArtistaMode === 'function' && isArtistaMode()) ? ARTISTA_MOBILE_BOTTOM_NAV.slice() : DEFAULT_MOBILE_BOTTOM_NAV.slice();
+}
 var currentTeamMembers = [];
 var currentSuperAdminTenantDetail = null;
 var tenantOwnerSetupStep = 0;
@@ -2651,16 +2655,16 @@ function getMobileBottomNavSelection() {
   } catch (e) {
     selected = null;
   }
-  if (!Array.isArray(selected) || !selected.length) selected = DEFAULT_MOBILE_BOTTOM_NAV.slice();
+  if (!Array.isArray(selected) || !selected.length) selected = getDefaultMobileBottomNav();
   selected = selected.filter(function(id, idx) { return validIds.indexOf(id) !== -1 && selected.indexOf(id) === idx; }).slice(0, 5);
-  if (!selected.length) selected = DEFAULT_MOBILE_BOTTOM_NAV.filter(function(id) { return validIds.indexOf(id) !== -1; }).slice(0, 5);
+  if (!selected.length) selected = getDefaultMobileBottomNav().filter(function(id) { return validIds.indexOf(id) !== -1; }).slice(0, 5);
   return selected.length ? selected : validIds.slice(0, 5);
 }
 
 function saveMobileBottomNavSelection(selected) {
   var validIds = getAvailableCrmMobileNavItems().map(function(item) { return item.navId; });
   selected = (selected || []).filter(function(id, idx) { return validIds.indexOf(id) !== -1 && selected.indexOf(id) === idx; }).slice(0, 5);
-  if (!selected.length) selected = DEFAULT_MOBILE_BOTTOM_NAV.filter(function(id) { return validIds.indexOf(id) !== -1; }).slice(0, 5);
+  if (!selected.length) selected = getDefaultMobileBottomNav().filter(function(id) { return validIds.indexOf(id) !== -1; }).slice(0, 5);
   localStorage.setItem(getMobileBottomNavStorageKey(), JSON.stringify(selected));
   applyMobileNavigationPreferences();
 }
