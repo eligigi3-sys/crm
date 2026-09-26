@@ -690,7 +690,6 @@ tr:hover td{background:#fafbfc;cursor:pointer}
   .sidebar-logo,
   .nav-section,
   .sidebar-bottom,
-  #gcal-status,
   #sidebar-user-row {
     display: none !important;
   }
@@ -931,7 +930,6 @@ tr:hover td{background:#fafbfc;cursor:pointer}
   .sidebar-logo,
   .nav-section,
   .sidebar-bottom,
-  #gcal-status,
   #sidebar-user-row {
     display: none !important;
   }
@@ -1811,7 +1809,6 @@ tbody tr:hover td{background:#f6f4fc}
         <button class="btn btn-secondary" id="btn-enter-crm" style="display:none;width:100%;justify-content:center">Enter CRM</button>
         <button class="btn btn-secondary" id="btn-back-platform" style="display:none;width:100%;justify-content:center">Back to Platform Admin</button>
       </div>
-      <div id="gcal-status" style="margin:12px 8px 0 8px;padding:10px 12px;border-radius:8px;font-size:12px;display:none"></div>
     </div>
   </div>
   <div id="main">
@@ -2024,6 +2021,17 @@ id="customers-search">
         <button class="btn btn-secondary" id="btn-refresh-business-settings">רענן</button>
       </div>
       <div class="business-settings-layout">
+        <div class="business-settings-card">
+          <div class="business-settings-head">
+            <div>
+              <div class="business-settings-title">חיבור Google Calendar</div>
+              <div class="business-settings-sub">סנכרון אירועים מהמערכת ליומן גוגל שלך.</div>
+            </div>
+          </div>
+          <div class="business-settings-body" style="padding-top:14px">
+            <div id="gcal-status" style="padding:10px 12px;border-radius:8px;font-size:12px;display:none"></div>
+          </div>
+        </div>
         <div class="business-settings-card">
           <div class="business-settings-head">
             <div>
