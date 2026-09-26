@@ -1650,7 +1650,8 @@ tr:hover td{background:#f7f8fd}
 /* Mobile top bar matches sidebar */
 body.crm-shell .mobile-crm-topbar{background:linear-gradient(135deg,#221a4d,#3b1178);border-bottom:none}
 body.crm-shell .mobile-crm-topbar .mobile-crm-title{color:#fff}
-body.crm-shell .mobile-crm-topbar .mobile-menu-btn{color:#fff}
+body.crm-shell .mobile-crm-topbar .mobile-menu-btn{color:#fff;background:rgba(255,255,255,.14);border:none}
+body.crm-shell .mobile-crm-topbar .mobile-menu-btn:hover{background:rgba(255,255,255,.22)}
 </style>
 </head>
 <body>
