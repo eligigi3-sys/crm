@@ -7653,7 +7653,7 @@ function generateArtistaQuote() {
   });
   var extraHtml = extraBits.length ? '<div style="margin-top:6pt;font-size:10.5pt;color:#444">הסה״כ כולל גם: ' + extraBits.join(' · ') + '</div>' : '';
 
-  var css = '@page{size:A4;margin:25.4mm 31.75mm}' +
+  var css = '@page{size:A4 portrait;margin:25.4mm 31.75mm}' +
     'body{font-family:Calibri,Arial,sans-serif;font-size:12pt;direction:rtl;color:#000;background:#fff}' +
     '.q-logo{text-align:center;margin-bottom:18pt}.q-logo img{width:170px}' +
     '.q-title{text-align:center;font-weight:bold;font-size:14pt;margin:0 0 2pt}' +
