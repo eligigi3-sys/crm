@@ -4417,6 +4417,7 @@ function preloadLeads() {
 }
 
 var dupTimer;
+var dupTimer2;
 function checkDup(field, value) {
   clearTimeout(dupTimer);
   document.getElementById('dup-' + field).style.display = 'none';
@@ -13571,4 +13572,5 @@ function selectCustomer(c) {
   document.getElementById('ac-phone').style.display = 'none';
   document.getElementById('ac-email').style.display = 'none';
 }
+
 

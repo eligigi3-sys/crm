@@ -1379,6 +1379,9 @@ export async function handleLeads(request, env, path) {
 
     await env.DB.prepare(`
       UPDATE leads SET
+        name = ?,
+        phone = ?,
+        email = ?,
         event_type = ?,
         event_date = ?,
         event_time = ?,
@@ -1395,6 +1398,9 @@ export async function handleLeads(request, env, path) {
       WHERE id = ?
         AND tenant_id = ?
     `).bind(
+      (b.name === undefined || b.name === '') ? existingLead.name : b.name,
+      (b.phone === undefined) ? existingLead.phone : (b.phone || null),
+      (b.email === undefined) ? existingLead.email : (b.email || null),
       b.event_type || null,
       b.event_date || null,
       b.event_time || null,
@@ -1752,3 +1758,4 @@ export async function autoSyncToCalendar(leadId, newStatus, env) {
 
   await syncEventToCalendar(lead, env);
 }
+
