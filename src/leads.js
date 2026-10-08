@@ -1317,9 +1317,10 @@ export async function handleLeads(request, env, path) {
         notes,
         meeting_date,
         close_probability,
-        tenant_id
+        tenant_id,
+        google_event_id
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       leadNum,
       contact.id,
@@ -1338,7 +1339,9 @@ export async function handleLeads(request, env, path) {
       b.notes || null,
       b.meeting_date || null,
       (b.close_probability === null || b.close_probability === undefined || b.close_probability === '') ? null : Number(b.close_probability),
-      tenantId
+      tenantId,
+      // קישור לאירוע קיים ביומן Google (מונע כפילות) - הסנכרון יעדכן אותו במקום ליצור חדש
+      (typeof b.google_event_id === 'string' && /^[A-Za-z0-9_-]{5,1024}$/.test(b.google_event_id.trim())) ? b.google_event_id.trim() : null
     ).run();
 
     try {
