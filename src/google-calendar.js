@@ -152,12 +152,28 @@ export async function syncEventToCalendar(lead, env) {
   ].filter(Boolean).join('\n\n');
 
   // בנה זמן האירוע
-  const startTime = lead.event_time || '10:00';
-  const [startH, startM] = startTime.split(':');
-  const endH = String(parseInt(startH) + 4).padStart(2, '0');
-  
-  const startDateTime = `${lead.event_date}T${startTime}:00`;
-  const endDateTime = `${lead.event_date}T${endH}:${startM}:00`;
+  // event_time יכול להיות שעת התחלה בלבד ("20:30") או טווח ("20:00-24:00").
+  // בלי שעת סיום מפורשת - ברירת מחדל 4 שעות, עם גלישה נכונה אחרי חצות (היום הבא).
+  const timeMatch = String(lead.event_time || '').match(/(\d{1,2}):(\d{2})(?:\s*[-–]\s*(\d{1,2}):(\d{2}))?/);
+  const startH = timeMatch ? parseInt(timeMatch[1], 10) : 10;
+  const startM = timeMatch ? parseInt(timeMatch[2], 10) : 0;
+  const hasEnd = !!(timeMatch && timeMatch[3] !== undefined);
+  let endTotal = hasEnd
+    ? parseInt(timeMatch[3], 10) * 60 + parseInt(timeMatch[4], 10)
+    : startH * 60 + startM + 240;
+  const startTotal = startH * 60 + startM;
+  if (hasEnd && endTotal <= startTotal) endTotal += 24 * 60; // טווח שחוצה חצות (למשל 22:00-02:00)
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const addDays = (dateStr, days) => {
+    const d = new Date(`${dateStr}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+  };
+  const endDate = addDays(lead.event_date, Math.floor(endTotal / 1440));
+  const endMinutes = endTotal % 1440;
+
+  const startDateTime = `${lead.event_date}T${pad2(startH)}:${pad2(startM)}:00`;
+  const endDateTime = `${endDate}T${pad2(Math.floor(endMinutes / 60))}:${pad2(endMinutes % 60)}:00`;
 
   const eventBody = {
     summary: `🎈 ${lead.name} - ${lead.event_type || 'אירוע'}`,
